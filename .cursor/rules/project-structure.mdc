@@ -8,7 +8,6 @@ alwaysApply: true
 This project is a react app. The main source code is located in the [`src/`](mdc:src) directory, which contains the following key subdirectories:
 
 - [`components/`](mdc:src/components): Reusable UI components and subcomponents.
-- [`pages/`](mdc:src/pages): Main application pages, organized by feature.
 - [`api/`](mdc:src/api): API logic and backend communication.
 - [`store/`](mdc:src/store): State management modules.
 - [`hooks/`](mdc:src/hooks): Custom React hooks for reusable logic.
@@ -17,6 +16,7 @@ This project is a react app. The main source code is located in the [`src/`](mdc
 - [`constants/`](mdc:src/constants): Application-wide constants and configuration values.
 - [`lib/`](mdc:src/lib): Shared libraries or helper code.
 - [`assets/`](mdc:src/assets): Static assets such as images, icons, and animations.
+- @`routes/`: Main application pages,Using File-Based Route Generation.
 
 
 The project uses [Vite](mdc:vite.config.ts) for development and build tooling, [Tailwind CSS](mdc:tailwind.config.ts) for styling, and [Yarn](mdc:package.json) as the package manager. Entry point is [`main.tsx`](mdc:src/main.tsx).
