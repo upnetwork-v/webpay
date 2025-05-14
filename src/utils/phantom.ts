@@ -2,7 +2,7 @@
 import { Transaction } from "@solana/web3.js";
 import bs58 from "bs58";
 import nacl from "tweetnacl";
-import naclUtil from "tweetnacl-util";
+import { decode as decodeUTF8 } from "@stablelib/utf8";
 
 export const DAPP_URL = window.location.origin;
 export const SOLANA_NETWORK = "devnet";
@@ -72,6 +72,6 @@ export function decryptPhantomPayload(
     sharedSecret
   );
   if (!decrypted) throw new Error("Failed to decrypt Phantom payload");
-  const payload = JSON.parse(naclUtil.encodeUTF8(decrypted));
+  const payload = JSON.parse(decodeUTF8(decrypted));
   return payload.public_key;
 }
