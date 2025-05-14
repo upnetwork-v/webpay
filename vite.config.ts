@@ -6,6 +6,7 @@ import inject from "@rollup/plugin-inject";
 
 // https://vite.dev/config/
 export default defineConfig({
+  base: "/MerchantConnectFrontend/",
   resolve: {
     alias: {
       "@": "/src",
