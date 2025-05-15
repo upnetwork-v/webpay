@@ -43,7 +43,22 @@ function PaymentPage() {
       setComplete(true);
     }
     if (urlParams.get("errorCode")) {
-      setError(urlParams.get("errorMessage") || "Payment failed");
+      const errorCode = urlParams.get("errorCode");
+      const errorMessage = urlParams.get("errorMessage");
+      
+      console.log("Phantom returned error:", { errorCode, errorMessage });
+      
+      // More specific error handling based on error code
+      if (errorCode === "-32603") {
+        setError(`Phantom 钱包处理错误 (${errorCode}): 请确认您的钱包已连接到 Solana Devnet 网络，并且有足够的 SOL 余额支付交易和手续费。
+
+原始错误: ${errorMessage}`);
+      } else {
+        setError(errorMessage || "支付失败");
+      }
+      
+      // Clean URL after getting the error parameters
+      window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, []);
 

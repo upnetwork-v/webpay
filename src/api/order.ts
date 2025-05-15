@@ -19,7 +19,7 @@ export async function getOrderById(orderId: string): Promise<Order> {
     // Return SOL payment order
     return {
       orderId,
-      amount: 0.1, // SOL amount
+      amount: 0.01, // SOL amount
       recipient: "9iusfh8hawwYU3iMW8UqNSR1wjbWTy6UkJKMZ8D65Fx3",
       description: "Test order for SOL payment",
       paymentType: "SOL",
