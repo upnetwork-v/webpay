@@ -2,15 +2,15 @@
 <html>
 
 <head>
-    <meta http-equiv="refresh" content="0; url=/MerchantConnectFrontend/" />
+    <meta charset="utf-8" />
     <script>
-        // 支持带 hash 的 SPA 路由
-        var l = window.location;
+        // 只要不是以 base path 开头，补上 base path
         var base = "/MerchantConnectFrontend";
-        var path = l.pathname.replace(base, "");
-        var search = l.search || "";
-        var hash = l.hash || "";
-        window.location.replace(base + "/index.html?redirect=" + encodeURIComponent(path + search + hash));
+        var l = window.location;
+        if (!l.pathname.startsWith(base)) {
+            window.location.replace(base + l.pathname + l.search + l.hash);
+        }
+        // 否则什么都不做，SPA 会自动处理
     </script>
 </head>
 
