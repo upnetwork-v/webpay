@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import bs58 from "bs58";
 import { createFileRoute } from "@tanstack/react-router";
 import nacl from "tweetnacl";
@@ -16,7 +16,7 @@ import { createUsdcTransferTransaction } from "@/utils/transaction";
 import { createSolTransferTransaction } from "@/utils/transaction";
 
 // --- Main Page Component ---
-const PaymentPage: React.FC = () => {
+function PaymentPage() {
   const { orderId } = Route.useParams();
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
@@ -178,8 +178,8 @@ const PaymentPage: React.FC = () => {
   if (!order) return null;
 
   return (
-    <div className="max-w-md mx-auto p-4 bg-white rounded shadow mt-8">
-      <h2 className="text-xl font-bold mb-2">Order Payment</h2>
+    <div className="bg-white rounded mx-auto max-w-md shadow mt-8 p-4">
+      <h2 className="font-bold text-xl mb-2">Order Payment</h2>
       <div className="mb-4">
         <div>
           <b>Order ID:</b> {order.orderId}
@@ -202,7 +202,7 @@ const PaymentPage: React.FC = () => {
       </div>
       {!phantomConnected ? (
         <button
-          className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 mb-4"
+          className="rounded bg-green-600 text-white mb-4 py-2 px-4 hover:bg-green-700"
           onClick={handleConnectPhantom}
         >
           Connect Phantom Wallet
@@ -211,12 +211,12 @@ const PaymentPage: React.FC = () => {
         <div className="mb-2 text-green-700">Phantom Wallet Connected</div>
       )}
       <button
-        className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700"
+        className="rounded bg-purple-600 text-white py-2 px-4 hover:bg-purple-700"
         onClick={handlePay}
       >
         Pay with Phantom
       </button>
-      <div className="text-xs text-gray-500 mt-2">
+      <div className="mt-2 text-xs text-gray-500">
         You will be redirected to Phantom App to complete the payment.
       </div>
       {showPhantomDownloadPrompt && (
@@ -226,7 +226,7 @@ const PaymentPage: React.FC = () => {
       )}
     </div>
   );
-};
+}
 
 export const Route = createFileRoute("/payment/$orderId")({
   component: PaymentPage,
