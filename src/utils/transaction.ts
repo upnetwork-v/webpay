@@ -151,44 +151,88 @@ export async function createSolTransferTransaction({
   try {
     // Convert SOL to lamports
     const lamports = Math.round(amount * LAMPORTS_PER_SOL);
+    
+    // Validate inputs
+    if (!from || !to || !amount) {
+      throw new Error("Missing required transaction parameters");
+    }
 
+    const fromPubkey = new PublicKey(from);
+    const toPubkey = new PublicKey(to);
+    
     console.log("Creating SOL transaction with params:", {
-      from: from.toString(),
-      to: to.toString(),
+      from: fromPubkey.toBase58(),
+      to: toPubkey.toBase58(),
       lamports,
       orderId,
+      network: SOLANA_NETWORK
     });
+    
+    // Get the current status of the cluster to ensure connection is working
+    console.log("Checking connection to", SOLANA_NETWORK);
+    const clusterStatus = await connection.getVersion();
+    console.log("Solana cluster status:", clusterStatus);
 
-    // Check sender's SOL balance
-    const fromBalance = await connection.getBalance(new PublicKey(from));
-    if (fromBalance < lamports) {
+    // Check sender's SOL balance with explicit confirmation
+    const fromBalance = await connection.getBalance(fromPubkey, "confirmed");
+    console.log("Sender balance:", fromBalance / LAMPORTS_PER_SOL, "SOL");
+    
+    // Ensure there's enough balance for the transaction plus fees
+    // Estimate fees conservatively at 0.000005 SOL (5000 lamports)
+    const estimatedFee = 5000;
+    const totalNeeded = lamports + estimatedFee;
+    
+    if (fromBalance < totalNeeded) {
       throw new Error(
-        `付款人 SOL 余额不足，当前余额：${fromBalance / LAMPORTS_PER_SOL}，需要：${amount}`
+        `付款人 SOL 余额不足，当前余额：${fromBalance / LAMPORTS_PER_SOL}，需要：${amount} + 手续费`
       );
     }
 
     // Check if recipient account exists
-    const toAccountInfo = await connection.getAccountInfo(new PublicKey(to));
+    const toAccountInfo = await connection.getAccountInfo(toPubkey);
     if (!toAccountInfo) {
       throw new Error("收款人账户不存在");
     }
 
+    // Create a new transaction
+    const tx = new Transaction();
+    
     // Transfer instruction
     const transferIx = SystemProgram.transfer({
-      fromPubkey: new PublicKey(from),
-      toPubkey: new PublicKey(to),
+      fromPubkey,
+      toPubkey,
       lamports,
     });
-
-    // const memoIx = createMemoInstruction(orderId, new PublicKey(from));
-
-    const tx = new Transaction().add(transferIx);
+    
+    // Add the transfer instruction
+    tx.add(transferIx);
+    
+    // Uncomment to add memo instruction if needed
+    // const memoIx = createMemoInstruction(orderId, fromPubkey);
     // tx.add(memoIx);
-    tx.feePayer = new PublicKey(from);
-    const { blockhash } = await connection.getLatestBlockhash();
+    
+    // Set fee payer
+    tx.feePayer = fromPubkey;
+    
+    // Get a fresh blockhash with confirmed commitment
+    const { blockhash, lastValidBlockHeight } = 
+      await connection.getLatestBlockhash("confirmed");
+    
     tx.recentBlockhash = blockhash;
+    console.log("Using blockhash:", blockhash, "valid until height:", lastValidBlockHeight);
+    
+    // Log detailed transaction information
+    console.log("SOL Transaction created with instructions:", 
+      tx.instructions.map(ins => ({
+        programId: ins.programId.toBase58(),
+        keys: ins.keys.map(k => ({ 
+          pubkey: k.pubkey.toBase58(),
+          isSigner: k.isSigner,
+          isWritable: k.isWritable
+        }))
+      }))
+    );
 
-    console.log("SOL Transaction created successfully");
     return tx;
   } catch (error) {
     console.error("Error creating SOL transaction:", error);

@@ -16,6 +16,25 @@ export function openPhantomSignAndSendTransactionDeeplink(
   redirectLink: string
 ) {
   try {
+    // Log transaction details before serialization
+    console.log("Transaction details before serialization:", {
+      feePayer: transaction.feePayer?.toBase58(),
+      recentBlockhash: transaction.recentBlockhash,
+      instructions: transaction.instructions.map(ins => ({
+        programId: ins.programId.toBase58(),
+        keys: ins.keys.length
+      }))
+    });
+    
+    // Ensure the transaction is fully valid before serialization
+    if (!transaction.recentBlockhash) {
+      throw new Error("Transaction is missing recentBlockhash");
+    }
+    
+    if (!transaction.feePayer) {
+      throw new Error("Transaction is missing feePayer");
+    }
+    
     const serialized = bs58.encode(
       transaction.serialize({
         requireAllSignatures: false,
@@ -23,13 +42,20 @@ export function openPhantomSignAndSendTransactionDeeplink(
       })
     );
     console.log("Transaction serialized successfully");
-
+    
     const params = new URLSearchParams({
       transaction: serialized,
       redirect_link: redirectLink,
     });
+    
+    // Add additional Phantom parameters for better error handling
+    params.append("app_url", window.location.origin);
+    params.append("cluster", SOLANA_NETWORK);
+    
     const deeplinkUrl = buildUrl("signAndSendTransaction", params);
     console.log("Opening Phantom deeplink", deeplinkUrl);
+    console.log("Redirect link set to:", redirectLink);
+    
     window.location.href = deeplinkUrl;
   } catch (error) {
     console.error("Error creating deeplink:", error);
