@@ -192,7 +192,7 @@ function PaymentPage() {
           {order.paymentType === "SOL" ? "SOL" : "USDC"}
         </div>
         {order.paymentType === "SPL" && (
-          <div>
+          <div className="break-all">
             <b>USDC Mint:</b> {order.usdcMint}
           </div>
         )}
