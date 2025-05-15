@@ -46,7 +46,7 @@ export function openPhantomConnectDeeplink(dappPublicKey: string) {
   const deeplinkUrl = buildUrl(
     "connect",
     new URLSearchParams({
-      app_url: encodeURIComponent(window.location.origin),
+      app_url: encodeURIComponent(redirectUrl),
       redirect_link: encodeURIComponent(redirectUrl),
       dapp_encryption_public_key: dappPublicKey,
       cluster: SOLANA_NETWORK,
