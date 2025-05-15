@@ -8,12 +8,12 @@ export const DAPP_URL = window.location.origin;
 export const SOLANA_NETWORK = "devnet";
 
 export function getRedirectAfterTransactionUrl(orderId: string): string {
-  return `${DAPP_URL}/payment/${orderId}?deeplink=1`;
+  return `${DAPP_URL}/#/payment/${orderId}?deeplink=1`;
 }
 
 const useUniversalLinks = false;
 
-const buildUrl = (path: string, params: URLSearchParams) =>
+export const buildUrl = (path: string, params: URLSearchParams) =>
   `${useUniversalLinks ? "https://phantom.app/ul/" : "phantom://"}v1/${path}?${params.toString()}`;
 
 export function openPhantomSignAndSendTransactionDeeplink(
@@ -49,8 +49,8 @@ export function openPhantomConnectDeeplink(dappPublicKey: string) {
     new URLSearchParams({
       dapp_encryption_public_key: dappPublicKey,
       cluster: SOLANA_NETWORK,
-      app_url: encodeURIComponent(redirectUrl),
-      redirect_link: encodeURIComponent(redirectUrl),
+      app_url: redirectUrl,
+      redirect_link: redirectUrl,
     })
   );
   console.log(deeplinkUrl);
