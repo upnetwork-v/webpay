@@ -11,9 +11,10 @@ export function getRedirectAfterTransactionUrl(orderId: string): string {
   return `${DAPP_URL}/payment/${orderId}?deeplink=1`;
 }
 
-const useUniversalLinks = true;
+const useUniversalLinks = false;
+
 const buildUrl = (path: string, params: URLSearchParams) =>
-  `${useUniversalLinks ? "https://phantom.app/ul/" : "phantom://ul/"}v1/${path}?${params.toString()}`;
+  `${useUniversalLinks ? "https://phantom.app/ul/" : "phantom://"}v1/${path}?${params.toString()}`;
 
 export function openPhantomSignAndSendTransactionDeeplink(
   transaction: Transaction,
@@ -33,7 +34,7 @@ export function openPhantomSignAndSendTransactionDeeplink(
       redirect_link: redirectLink,
     });
     const deeplinkUrl = buildUrl("signAndSendTransaction", params);
-    console.log("Opening Phantom deeplink");
+    console.log("Opening Phantom deeplink", deeplinkUrl);
     window.location.href = deeplinkUrl;
   } catch (error) {
     console.error("Error creating deeplink:", error);
@@ -46,13 +47,14 @@ export function openPhantomConnectDeeplink(dappPublicKey: string) {
   const deeplinkUrl = buildUrl(
     "connect",
     new URLSearchParams({
-      app_url: encodeURIComponent(redirectUrl),
-      redirect_link: encodeURIComponent(redirectUrl),
       dapp_encryption_public_key: dappPublicKey,
       cluster: SOLANA_NETWORK,
+      app_url: encodeURIComponent(redirectUrl),
+      redirect_link: encodeURIComponent(redirectUrl),
     })
   );
-  console.log("Opening Phantom deeplink", deeplinkUrl);
+  console.log(deeplinkUrl);
+
   window.location.href = deeplinkUrl;
 }
 
