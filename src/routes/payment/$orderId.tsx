@@ -101,7 +101,14 @@ function PaymentPage() {
 
   const handleConnectPhantom = () => {
     if (!dappKeyPair) return;
-    openPhantomConnectDeeplink(bs58.encode(dappKeyPair.publicKey));
+    const dappPublicKey = bs58.encode(dappKeyPair.publicKey);
+    console.log(
+      "dappPublicKey (base58):",
+      dappPublicKey,
+      "length:",
+      dappKeyPair.publicKey.length
+    );
+    openPhantomConnectDeeplink(dappPublicKey);
   };
 
   const handlePay = async () => {
