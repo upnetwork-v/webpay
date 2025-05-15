@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta http-equiv="refresh" content="0; url=/MerchantConnectFrontend/" />
+    <script>
+        // 支持带 hash 的 SPA 路由
+        var l = window.location;
+        var base = "/MerchantConnectFrontend";
+        var path = l.pathname.replace(base, "");
+        var search = l.search || "";
+        var hash = l.hash || "";
+        window.location.replace(base + "/index.html?redirect=" + encodeURIComponent(path + search + hash));
+    </script>
+</head>
+
+<body></body>
+
+</html>
