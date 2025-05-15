@@ -1,19 +1,16 @@
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<html lang="en">
 
 <head>
-    <meta charset="utf-8" />
-    <script>
-        // 只要不是以 base path 开头，补上 base path
-        var base = "/MerchantConnectFrontend";
-        var l = window.location;
-        if (!l.pathname.startsWith(base)) {
-            window.location.replace(base + l.pathname + l.search + l.hash);
-        }
-        // 否则什么都不做，SPA 会自动处理
-    </script>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vite + React + TS</title>
 </head>
 
-<body></body>
+<body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+</body>
 
 </html>
