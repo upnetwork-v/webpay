@@ -5,7 +5,6 @@ import nacl from "tweetnacl";
 
 import { getOrderById } from "@/api/order";
 import type { Order } from "@/types/payment";
-import { PhantomDownloadPrompt } from "@/components/PhantomDownloadPrompt";
 import {
   openPhantomConnectDeeplink,
   openPhantomSignAndSendTransactionDeeplink,
@@ -21,11 +20,12 @@ function PaymentPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [complete, setComplete] = useState(false);
-  const [showPhantomDownloadPrompt, setShowPhantomDownloadPrompt] =
-    useState(false);
+  useState(false);
   const deeplinkTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [phantomConnected, setPhantomConnected] = useState(false);
   const [phantomPublicKey, setPhantomPublicKey] = useState<string | null>(null);
+  const [phantomSession, setPhantomSession] = useState<string | null>(null);
+  const [phantomEncryptionPublicKey, setPhantomEncryptionPublicKey] = useState<string | null>(null);
   const [dappKeyPair, setDappKeyPair] = useState<nacl.BoxKeyPair | null>(null);
 
   useEffect(() => {
@@ -45,9 +45,9 @@ function PaymentPage() {
     if (urlParams.get("errorCode")) {
       const errorCode = urlParams.get("errorCode");
       const errorMessage = urlParams.get("errorMessage");
-      
+
       console.log("Phantom returned error:", { errorCode, errorMessage });
-      
+
       // More specific error handling based on error code
       if (errorCode === "-32603") {
         setError(`Phantom 钱包处理错误 (${errorCode}): 请确认您的钱包已连接到 Solana Devnet 网络，并且有足够的 SOL 余额支付交易和手续费。
@@ -56,7 +56,7 @@ function PaymentPage() {
       } else {
         setError(errorMessage || "支付失败");
       }
-      
+
       // Clean URL after getting the error parameters
       window.history.replaceState({}, document.title, window.location.pathname);
     }
@@ -87,16 +87,26 @@ function PaymentPage() {
     const nonce = urlParams.get("nonce");
     const data = urlParams.get("data");
     if (phantom_pk && nonce && data && dappKeyPair) {
-      setPhantomConnected(true);
       try {
-        const publicKey = decryptPhantomPayload(
+        // 解密 Phantom 回调数据，获取钱包公钥和会话令牌
+        const decryptedData = decryptPhantomPayload(
           phantom_pk,
           nonce,
           data,
           dappKeyPair
         );
-        setPhantomPublicKey(publicKey);
-      } catch {
+        
+        setPhantomPublicKey(decryptedData.public_key);
+        setPhantomSession(decryptedData.session);
+        setPhantomEncryptionPublicKey(phantom_pk);
+        setPhantomConnected(true);
+        
+        console.log("Phantom 钱包连接成功", {
+          publicKey: decryptedData.public_key,
+          sessionAvailable: !!decryptedData.session
+        });
+      } catch (err) {
+        console.error("Phantom 钱包连接解密失败", err);
         setError("Phantom 钱包连接信息解密失败");
       }
       // 清理URL
@@ -135,7 +145,6 @@ function PaymentPage() {
       return;
     }
     setError(null);
-    setShowPhantomDownloadPrompt(false);
     if (!order) return;
     try {
       console.log("Starting payment process");
@@ -165,17 +174,11 @@ function PaymentPage() {
         });
       }
 
-      // 跳转 deeplink前打印base64
-      const serializedBase64 = tx
-        .serialize({ requireAllSignatures: false, verifySignatures: false })
-        .toString("base64");
-      console.log("Serialized transaction (base64):", serializedBase64);
-
       // 记录当前页面路径
       const before = window.location.href;
       console.log("Current URL before deeplink:", before);
 
-      // 跳转 deeplink
+      // 跳转 deeplink，使用完整的参数集
       const redirectUrl = `${window.location.origin}${window.location.pathname}`;
       console.log("Complete transaction object:", {
         feePayer: tx.feePayer?.toBase58(),
@@ -183,14 +186,18 @@ function PaymentPage() {
         instructions: tx.instructions.length,
         signers: tx.signatures.length,
       });
-      openPhantomSignAndSendTransactionDeeplink(tx, redirectUrl);
-
-      // 1.5秒后检查页面是否还在原页面，如果是则弹窗提示
-      deeplinkTimeoutRef.current = setTimeout(() => {
-        if (window.location.href === before) {
-          setShowPhantomDownloadPrompt(true);
-        }
-      }, 1500);
+      
+      // 使用官方文档要求的所有参数调用 deeplink 方法
+      // 在前面的验证确保了这些值不为null，但TypeScript需要类型断言
+      openPhantomSignAndSendTransactionDeeplink(
+        tx,
+        redirectUrl,
+        phantomEncryptionPublicKey as string,
+        dappKeyPair as nacl.BoxKeyPair,
+        phantomSession as string
+      );
+      
+      console.log("Phantom deeplink opened with session");
     } catch (e) {
       console.error("Payment error:", e);
       setError(e instanceof Error ? e.message : String(e));
@@ -244,11 +251,6 @@ function PaymentPage() {
       <div className="mt-2 text-xs text-gray-500">
         You will be redirected to Phantom App to complete the payment.
       </div>
-      {showPhantomDownloadPrompt && (
-        <PhantomDownloadPrompt
-          onClose={() => setShowPhantomDownloadPrompt(false)}
-        />
-      )}
     </div>
   );
 }

@@ -11,9 +11,20 @@ const useUniversalLinks = false;
 export const buildUrl = (path: string, params: URLSearchParams) =>
   `${useUniversalLinks ? "https://phantom.app/ul/" : "phantom://"}v1/${path}?${params.toString()}`;
 
+/**
+ * Opens a Phantom deeplink to sign and send a transaction according to the official Phantom documentation
+ * @param transaction - The transaction to be signed and sent
+ * @param redirectLink - Where to redirect after completion
+ * @param phantomEncryptionPublicKey - The phantom encryption public key received during connection
+ * @param dappKeyPair - The dapp key pair used for encryption
+ * @param session - Session token received from connect method
+ */
 export function openPhantomSignAndSendTransactionDeeplink(
   transaction: Transaction,
-  redirectLink: string
+  redirectLink: string,
+  phantomEncryptionPublicKey: string,
+  dappKeyPair: nacl.BoxKeyPair,
+  session: string
 ) {
   try {
     // Log transaction details before serialization
@@ -35,6 +46,20 @@ export function openPhantomSignAndSendTransactionDeeplink(
       throw new Error("Transaction is missing feePayer");
     }
     
+    // Validate required parameters
+    if (!phantomEncryptionPublicKey) {
+      throw new Error("Missing required parameter: phantomEncryptionPublicKey");
+    }
+    
+    if (!dappKeyPair) {
+      throw new Error("Missing required parameter: dappKeyPair");
+    }
+    
+    if (!session) {
+      throw new Error("Missing required parameter: session. Must connect wallet first.");
+    }
+    
+    // Serialize the transaction
     const serialized = bs58.encode(
       transaction.serialize({
         requireAllSignatures: false,
@@ -43,14 +68,46 @@ export function openPhantomSignAndSendTransactionDeeplink(
     );
     console.log("Transaction serialized successfully");
     
-    const params = new URLSearchParams({
-      transaction: serialized,
-      redirect_link: redirectLink,
-    });
+    // Generate a random nonce
+    const nonce = nacl.randomBytes(24);
+    const nonceBase58 = bs58.encode(nonce);
     
-    // Add additional Phantom parameters for better error handling
-    params.append("app_url", window.location.origin);
-    params.append("cluster", SOLANA_NETWORK);
+    // Create payload object according to Phantom docs
+    const payloadObj = {
+      transaction: serialized,
+      // Optional send options can be added here if needed
+      // sendOptions: {
+      //   skipPreflight: false,
+      //   preflightCommitment: "confirmed"
+      // },
+      session: session
+    };
+    
+    // Convert payload to string
+    const payloadString = JSON.stringify(payloadObj);
+    
+    // Encrypt the payload
+    const phantomPubKeyBytes = bs58.decode(phantomEncryptionPublicKey);
+    const sharedSecret = nacl.box.before(phantomPubKeyBytes, dappKeyPair.secretKey);
+    const messageNonce = nacl.randomBytes(24);
+    
+    // Convert string to Uint8Array for encryption
+    const encoder = new TextEncoder();
+    const payloadBytes = encoder.encode(payloadString);
+    
+    const encryptedPayload = nacl.box.after(
+      payloadBytes,
+      messageNonce,
+      sharedSecret
+    );
+    
+    // Create params according to Phantom docs
+    const params = new URLSearchParams({
+      dapp_encryption_public_key: bs58.encode(dappKeyPair.publicKey),
+      nonce: nonceBase58,
+      redirect_link: redirectLink,
+      payload: bs58.encode(encryptedPayload)
+    });
     
     const deeplinkUrl = buildUrl("signAndSendTransaction", params);
     console.log("Opening Phantom deeplink", deeplinkUrl);
@@ -79,12 +136,20 @@ export function openPhantomConnectDeeplink(dappPublicKey: string) {
   window.location.href = deeplinkUrl;
 }
 
+/**
+ * Decrypts payload received from Phantom wallet
+ * @param phantomPublicKey - Phantom encryption public key
+ * @param nonce - Nonce used for encryption
+ * @param data - Encrypted data
+ * @param dappKeyPair - Dapp key pair used for decryption
+ * @returns Object containing public_key and session from Phantom
+ */
 export function decryptPhantomPayload(
   phantomPublicKey: string,
   nonce: string,
   data: string,
   dappKeyPair: nacl.BoxKeyPair
-): string {
+): { public_key: string; session: string } {
   const phantomPublicKeyBytes = bs58.decode(phantomPublicKey);
   const sharedSecret = nacl.box.before(
     phantomPublicKeyBytes,
@@ -97,5 +162,13 @@ export function decryptPhantomPayload(
   );
   if (!decrypted) throw new Error("Failed to decrypt Phantom payload");
   const payload = JSON.parse(decodeUTF8(decrypted));
-  return payload.public_key;
+  // 确保payload包含必要的字段
+  if (!payload.public_key || !payload.session) {
+    console.error("Invalid Phantom payload:", payload);
+    throw new Error("Phantom payload missing required fields");
+  }
+  return {
+    public_key: payload.public_key,
+    session: payload.session
+  };
 }
