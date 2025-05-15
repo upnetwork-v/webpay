@@ -12,6 +12,30 @@ export const buildUrl = (path: string, params: URLSearchParams) =>
   `${useUniversalLinks ? "https://phantom.app/ul/" : "phantom://"}v1/${path}?${params.toString()}`;
 
 /**
+ * Encrypts a payload using the shared secret between the dapp and Phantom
+ * @param payload - The payload to encrypt
+ * @param sharedSecret - The shared secret between the dapp and Phantom
+ * @returns [nonce, encryptedPayload] - The nonce and encrypted payload
+ */
+export function encryptPayload(payload: any, sharedSecret: Uint8Array): [Uint8Array, Uint8Array] {
+  // Generate a random nonce
+  const nonce = nacl.randomBytes(24);
+  
+  // Convert payload to Uint8Array for encryption
+  const encoder = new TextEncoder();
+  const payloadBytes = encoder.encode(JSON.stringify(payload));
+  
+  // Encrypt the payload using the shared secret
+  const encryptedPayload = nacl.box.after(
+    payloadBytes,
+    nonce,
+    sharedSecret
+  );
+  
+  return [nonce, encryptedPayload];
+}
+
+/**
  * Opens a Phantom deeplink to sign and send a transaction according to the official Phantom documentation
  * @param transaction - The transaction to be signed and sent
  * @param redirectLink - Where to redirect after completion
@@ -60,51 +84,28 @@ export function openPhantomSignAndSendTransactionDeeplink(
     }
     
     // Serialize the transaction
-    const serialized = bs58.encode(
-      transaction.serialize({
-        requireAllSignatures: false,
-        verifySignatures: false,
-      })
-    );
-    console.log("Transaction serialized successfully");
+    const serializedTransaction = transaction.serialize({
+      requireAllSignatures: false,
+      verifySignatures: false,
+    });
     
-    // Generate a random nonce
-    const nonce = nacl.randomBytes(24);
-    const nonceBase58 = bs58.encode(nonce);
-    
-    // Create payload object according to Phantom docs
-    const payloadObj = {
-      transaction: serialized,
-      // Optional send options can be added here if needed
-      // sendOptions: {
-      //   skipPreflight: false,
-      //   preflightCommitment: "confirmed"
-      // },
-      session: session
+    // Create the payload object according to Phantom's official demo
+    const payload = {
+      session,
+      transaction: bs58.encode(serializedTransaction)
     };
     
-    // Convert payload to string
-    const payloadString = JSON.stringify(payloadObj);
-    
-    // Encrypt the payload
+    // Calculate shared secret from phantom public key and dapp secret key
     const phantomPubKeyBytes = bs58.decode(phantomEncryptionPublicKey);
     const sharedSecret = nacl.box.before(phantomPubKeyBytes, dappKeyPair.secretKey);
-    const messageNonce = nacl.randomBytes(24);
     
-    // Convert string to Uint8Array for encryption
-    const encoder = new TextEncoder();
-    const payloadBytes = encoder.encode(payloadString);
-    
-    const encryptedPayload = nacl.box.after(
-      payloadBytes,
-      messageNonce,
-      sharedSecret
-    );
+    // Encrypt the payload using the shared secret
+    const [nonce, encryptedPayload] = encryptPayload(payload, sharedSecret);
     
     // Create params according to Phantom docs
     const params = new URLSearchParams({
       dapp_encryption_public_key: bs58.encode(dappKeyPair.publicKey),
-      nonce: nonceBase58,
+      nonce: bs58.encode(nonce),
       redirect_link: redirectLink,
       payload: bs58.encode(encryptedPayload)
     });
