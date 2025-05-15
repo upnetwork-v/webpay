@@ -9,7 +9,6 @@ import { PhantomDownloadPrompt } from "@/components/PhantomDownloadPrompt";
 import {
   openPhantomConnectDeeplink,
   openPhantomSignAndSendTransactionDeeplink,
-  getRedirectAfterTransactionUrl,
   decryptPhantomPayload,
 } from "@/utils/phantom";
 import { createUsdcTransferTransaction } from "@/utils/transaction";
@@ -162,10 +161,8 @@ function PaymentPage() {
       console.log("Current URL before deeplink:", before);
 
       // 跳转 deeplink
-      openPhantomSignAndSendTransactionDeeplink(
-        tx,
-        getRedirectAfterTransactionUrl(orderId)
-      );
+      const redirectUrl = `${window.location.origin}${window.location.pathname}`;
+      openPhantomSignAndSendTransactionDeeplink(tx, redirectUrl);
 
       // 1.5秒后检查页面是否还在原页面，如果是则弹窗提示
       deeplinkTimeoutRef.current = setTimeout(() => {

@@ -4,12 +4,7 @@ import bs58 from "bs58";
 import nacl from "tweetnacl";
 import { decode as decodeUTF8 } from "@stablelib/utf8";
 
-export const DAPP_URL = window.location.origin;
 export const SOLANA_NETWORK = "devnet";
-
-export function getRedirectAfterTransactionUrl(orderId: string): string {
-  return `${DAPP_URL}/#/payment/${orderId}?deeplink=1`;
-}
 
 const useUniversalLinks = false;
 
