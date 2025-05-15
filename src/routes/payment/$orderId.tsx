@@ -162,6 +162,12 @@ function PaymentPage() {
 
       // 跳转 deeplink
       const redirectUrl = `${window.location.origin}${window.location.pathname}`;
+      console.log("Complete transaction object:", {
+        feePayer: tx.feePayer?.toBase58(),
+        recentBlockhash: tx.recentBlockhash,
+        instructions: tx.instructions.length,
+        signers: tx.signatures.length,
+      });
       openPhantomSignAndSendTransactionDeeplink(tx, redirectUrl);
 
       // 1.5秒后检查页面是否还在原页面，如果是则弹窗提示
