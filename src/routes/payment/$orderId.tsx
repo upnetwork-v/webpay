@@ -11,7 +11,6 @@ import {
   decryptPhantomPayload,
   decryptTransactionResponse,
   getSolanaExplorerUrl,
-  SOLANA_NETWORK,
 } from "@/utils/phantom";
 import { createUsdcTransferTransaction } from "@/utils/transaction";
 import { createSolTransferTransaction } from "@/utils/transaction";
