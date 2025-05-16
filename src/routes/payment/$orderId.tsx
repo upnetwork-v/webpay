@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import bs58 from "bs58";
 import { createFileRoute } from "@tanstack/react-router";
 import nacl from "tweetnacl";
+import { decode as decodeUTF8 } from "@stablelib/utf8";
 
 import { getOrderById } from "@/api/order";
 import type { Order } from "@/types/payment";
@@ -44,6 +45,8 @@ function PaymentPage() {
   useEffect(() => {
     // Handle Phantom deeplink redirect
     const urlParams = new URLSearchParams(window.location.search);
+
+    // 直接从URL中获取signature（旧方法）
     if (urlParams.get("signature")) {
       const signature = urlParams.get("signature");
       setTransactionSignature(signature);
@@ -51,6 +54,53 @@ function PaymentPage() {
       // 清理URL
       window.history.replaceState({}, document.title, window.location.pathname);
     }
+    // 从加密的data参数中提取signature（新方法 - 根据Phantom文档）
+    else if (
+      urlParams.get("data") &&
+      urlParams.get("nonce") &&
+      dappKeyPair &&
+      phantomEncryptionPublicKey
+    ) {
+      try {
+        const data = urlParams.get("data")!;
+        const nonce = urlParams.get("nonce")!;
+
+        // 解密Phantom返回的数据
+        const phantomPublicKeyBytes = bs58.decode(phantomEncryptionPublicKey);
+        const sharedSecret = nacl.box.before(
+          phantomPublicKeyBytes,
+          dappKeyPair.secretKey
+        );
+
+        const decryptedData = nacl.box.open.after(
+          bs58.decode(data),
+          bs58.decode(nonce),
+          sharedSecret
+        );
+
+        if (!decryptedData) {
+          throw new Error("Failed to decrypt transaction response");
+        }
+
+        const payload = JSON.parse(decodeUTF8(decryptedData));
+        console.log("Decrypted transaction response:", payload);
+
+        if (payload.signature) {
+          setTransactionSignature(payload.signature);
+          setComplete(true);
+          // 清理URL
+          window.history.replaceState(
+            {},
+            document.title,
+            window.location.pathname
+          );
+        }
+      } catch (err) {
+        console.error("Error decrypting transaction response:", err);
+        setError("Failed to process transaction response");
+      }
+    }
+
     if (urlParams.get("errorCode")) {
       const errorCode = urlParams.get("errorCode");
       const errorMessage = urlParams.get("errorMessage");
@@ -69,7 +119,7 @@ function PaymentPage() {
       // Clean URL after getting the error parameters
       window.history.replaceState({}, document.title, window.location.pathname);
     }
-  }, []);
+  }, [dappKeyPair, phantomEncryptionPublicKey]);
 
   // 生成/恢复 dapp keypair
   useEffect(() => {
