@@ -9,6 +9,7 @@ import {
   openPhantomConnectDeeplink,
   openPhantomSignAndSendTransactionDeeplink,
   decryptPhantomPayload,
+  SOLANA_NETWORK,
 } from "@/utils/phantom";
 import { createUsdcTransferTransaction } from "@/utils/transaction";
 import { createSolTransferTransaction } from "@/utils/transaction";
@@ -20,7 +21,9 @@ function PaymentPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [complete, setComplete] = useState(false);
-  useState(false);
+  const [transactionSignature, setTransactionSignature] = useState<
+    string | null
+  >(null);
   const deeplinkTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [phantomConnected, setPhantomConnected] = useState(false);
   const [phantomPublicKey, setPhantomPublicKey] = useState<string | null>(null);
@@ -42,7 +45,11 @@ function PaymentPage() {
     // Handle Phantom deeplink redirect
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get("signature")) {
+      const signature = urlParams.get("signature");
+      setTransactionSignature(signature);
       setComplete(true);
+      // 清理URL
+      window.history.replaceState({}, document.title, window.location.pathname);
     }
     if (urlParams.get("errorCode")) {
       const errorCode = urlParams.get("errorCode");
@@ -206,9 +213,37 @@ function PaymentPage() {
     }
   };
 
+  // 获取 Solana Explorer 链接
+  const getSolanaExplorerUrl = (signature: string) => {
+    const networkParam =
+      SOLANA_NETWORK === ("mainnet-beta" as string)
+        ? ""
+        : `?cluster=${SOLANA_NETWORK}`;
+    return `https://explorer.solana.com/tx/${signature}${networkParam}`;
+  };
+
   if (loading) return <div>Loading order...</div>;
   if (error) return <div style={{ color: "red" }}>Error: {error}</div>;
-  if (complete) return <div>Payment complete! Thank you.</div>;
+  if (complete)
+    return (
+      <div className="bg-white rounded mx-auto max-w-md shadow mt-8 p-4">
+        <div className="text-center mb-4 text-green-600">
+          Payment completed! Thank you for your order.
+        </div>
+        {transactionSignature && (
+          <div className="text-center">
+            <a
+              href={getSolanaExplorerUrl(transactionSignature)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 hover:underline"
+            >
+              View transaction in Solana Explorer
+            </a>
+          </div>
+        )}
+      </div>
+    );
   if (!order) return null;
 
   return (

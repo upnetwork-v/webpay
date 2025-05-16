@@ -21,10 +21,13 @@ function createMemoInstruction(
   memo: string,
   signer: PublicKey
 ): TransactionInstruction {
+  console.log("原始 memo 数据:", memo);
+  const encodedData = new TextEncoder().encode(memo);
+  console.log("编码后的 memo 数据:", encodedData);
   return new TransactionInstruction({
     keys: [{ pubkey: signer, isSigner: true, isWritable: false }],
     programId: new PublicKey("MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr"),
-    data: new TextEncoder().encode(memo) as Buffer,
+    data: encodedData as Buffer,
   });
 }
 
