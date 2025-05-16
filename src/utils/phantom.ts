@@ -106,19 +106,36 @@ export function openPhantomSignAndSendTransactionDeeplink(
     // Encrypt the payload using the shared secret
     const [nonce, encryptedPayload] = encryptPayload(payload, sharedSecret);
 
+    // 使用当前URL的基本部分作为重定向URL，避免查询参数
+    const baseUrl = redirectLink.split("?")[0];
+    console.log("Base URL for transaction redirect:", baseUrl);
+
     // Create params according to Phantom docs
     const params = new URLSearchParams({
       dapp_encryption_public_key: bs58.encode(dappKeyPair.publicKey),
       nonce: bs58.encode(nonce),
-      redirect_link: redirectLink,
+      redirect_link: baseUrl, // 使用没有查询参数的URL
       payload: bs58.encode(encryptedPayload),
     });
 
     const deeplinkUrl = buildUrl("signAndSendTransaction", params);
     console.log("Opening Phantom deeplink", deeplinkUrl);
-    console.log("Redirect link set to:", redirectLink);
+    console.log("Redirect link set to:", baseUrl);
 
-    window.location.href = deeplinkUrl;
+    // 使用替代方法打开deeplink
+    if (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+      // 在移动设备上，使用window.location.href
+      window.location.href = deeplinkUrl;
+    } else {
+      // 在桌面上，创建隐藏的a标签并模拟点击
+      const link = document.createElement("a");
+      link.href = deeplinkUrl;
+      link.target = "_self"; // 确保在同一个标签页中打开
+      link.rel = "noopener noreferrer";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
   } catch (error) {
     console.error("Error creating deeplink:", error);
     throw error;
@@ -126,19 +143,39 @@ export function openPhantomSignAndSendTransactionDeeplink(
 }
 
 export function openPhantomConnectDeeplink(dappPublicKey: string) {
-  const redirectUrl = `${window.location.origin}${window.location.pathname}`;
+  // 使用当前URL作为重定向URL，而不是通用路径
+  const currentUrl = window.location.href;
+  // 去除URL中的查询参数，保留路径
+  const baseUrl = currentUrl.split("?")[0];
+
+  console.log("Current URL:", currentUrl);
+  console.log("Base URL for redirect:", baseUrl);
+
   const deeplinkUrl = buildUrl(
     "connect",
     new URLSearchParams({
       dapp_encryption_public_key: dappPublicKey,
       cluster: SOLANA_NETWORK,
-      app_url: redirectUrl,
-      redirect_link: redirectUrl,
+      app_url: baseUrl,
+      redirect_link: baseUrl, // 使用精确的当前URL作为重定向目标
     })
   );
-  console.log(deeplinkUrl);
+  console.log("Opening connect deeplink:", deeplinkUrl);
 
-  window.location.href = deeplinkUrl;
+  // 使用替代方法打开deeplink
+  if (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+    // 在移动设备上，使用window.location.href
+    window.location.href = deeplinkUrl;
+  } else {
+    // 在桌面上，创建隐藏的a标签并模拟点击
+    const link = document.createElement("a");
+    link.href = deeplinkUrl;
+    link.target = "_self"; // 确保在同一个标签页中打开
+    link.rel = "noopener noreferrer";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
 }
 
 /**

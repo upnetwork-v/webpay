@@ -33,6 +33,24 @@ function PaymentPage() {
     string | null
   >(null);
   const [dappKeyPair, setDappKeyPair] = useState<nacl.BoxKeyPair | null>(null);
+  const [isWalletConnectFlow, setIsWalletConnectFlow] = useState(false);
+
+  // 初始化时从localStorage加载钱包连接信息
+  useEffect(() => {
+    const savedPhantomPk = localStorage.getItem(
+      "phantom_encryption_public_key"
+    );
+    const savedPhantomPublicKey = localStorage.getItem("phantom_public_key");
+    const savedPhantomSession = localStorage.getItem("phantom_session");
+
+    if (savedPhantomPk && savedPhantomPublicKey && savedPhantomSession) {
+      console.log("Loading saved wallet connection info");
+      setPhantomEncryptionPublicKey(savedPhantomPk);
+      setPhantomPublicKey(savedPhantomPublicKey);
+      setPhantomSession(savedPhantomSession);
+      setPhantomConnected(true);
+    }
+  }, []);
 
   // 获取订单信息
   useEffect(() => {
@@ -52,6 +70,19 @@ function PaymentPage() {
     console.log("dappKeyPair available:", !!dappKeyPair);
     console.log("phantomEncryptionPublicKey:", phantomEncryptionPublicKey);
 
+    // 检查是否有钱包连接相关参数，如果有则标记为钱包连接流程
+    if (
+      urlParams.get("phantom_encryption_public_key") &&
+      urlParams.get("nonce") &&
+      urlParams.get("data")
+    ) {
+      setIsWalletConnectFlow(true);
+      // 清除可能存在的旧交易数据
+      sessionStorage.removeItem("pendingTxData");
+      sessionStorage.removeItem("pendingTxNonce");
+      return; // 不继续处理交易参数，因为这是钱包连接流程
+    }
+
     // 直接从URL中获取signature（旧方法）
     if (urlParams.get("signature")) {
       const signature = urlParams.get("signature");
@@ -61,15 +92,30 @@ function PaymentPage() {
       window.history.replaceState({}, document.title, window.location.pathname);
     }
     // 从加密的data参数中提取signature（新方法 - 根据Phantom文档）
-    else if (urlParams.get("data") && urlParams.get("nonce")) {
+    else if (
+      urlParams.get("data") &&
+      urlParams.get("nonce") &&
+      !isWalletConnectFlow
+    ) {
       try {
         const data = urlParams.get("data")!;
         const nonce = urlParams.get("nonce")!;
 
         console.log("Found data and nonce in URL");
 
+        // 从localStorage获取可能存在的phantomEncryptionPublicKey
+        const savedPhantomPk = localStorage.getItem(
+          "phantom_encryption_public_key"
+        );
+        if (savedPhantomPk && !phantomEncryptionPublicKey) {
+          console.log(
+            "Using saved phantomEncryptionPublicKey from localStorage"
+          );
+          setPhantomEncryptionPublicKey(savedPhantomPk);
+        }
+
         // 如果尚未准备好解密所需的数据，先设置一个标记，稍后再处理
-        if (!dappKeyPair || !phantomEncryptionPublicKey) {
+        if (!dappKeyPair || (!phantomEncryptionPublicKey && !savedPhantomPk)) {
           console.log("Saving transaction data for later processing");
           // 将数据保存在sessionStorage中，以便钱包连接后处理
           sessionStorage.setItem("pendingTxData", data);
@@ -80,8 +126,11 @@ function PaymentPage() {
         // 使用封装方法解密交易响应
         try {
           console.log("Attempting to decrypt transaction response");
+          const pkToUse = phantomEncryptionPublicKey || savedPhantomPk;
+          console.log("Using public key for decryption:", pkToUse);
+
           const response = decryptTransactionResponse(
-            phantomEncryptionPublicKey,
+            pkToUse!,
             nonce,
             data,
             dappKeyPair
@@ -129,10 +178,15 @@ function PaymentPage() {
       // Clean URL after getting the error parameters
       window.history.replaceState({}, document.title, window.location.pathname);
     }
-  }, [dappKeyPair, phantomEncryptionPublicKey]);
+  }, [dappKeyPair, phantomEncryptionPublicKey, isWalletConnectFlow]);
 
   // 检查是否有待处理的交易数据
   useEffect(() => {
+    // 如果是钱包连接流程，不处理待处理的交易数据
+    if (isWalletConnectFlow) {
+      return;
+    }
+
     const pendingData = sessionStorage.getItem("pendingTxData");
     const pendingNonce = sessionStorage.getItem("pendingTxNonce");
 
@@ -143,9 +197,22 @@ function PaymentPage() {
       phantomEncryptionPublicKey
     ) {
       console.log("Processing pending transaction data");
+
+      // 尝试使用已保存的phantomEncryptionPublicKey
+      const pkToUse =
+        phantomEncryptionPublicKey ||
+        localStorage.getItem("phantom_encryption_public_key");
+
+      if (!pkToUse) {
+        console.log(
+          "No encryption public key available, cannot process transaction yet"
+        );
+        return;
+      }
+
       try {
         const response = decryptTransactionResponse(
-          phantomEncryptionPublicKey,
+          pkToUse,
           pendingNonce,
           pendingData,
           dappKeyPair
@@ -163,7 +230,7 @@ function PaymentPage() {
       sessionStorage.removeItem("pendingTxData");
       sessionStorage.removeItem("pendingTxNonce");
     }
-  }, [dappKeyPair, phantomEncryptionPublicKey]);
+  }, [dappKeyPair, phantomEncryptionPublicKey, isWalletConnectFlow]);
 
   // 生成/恢复 dapp keypair
   useEffect(() => {
@@ -199,6 +266,11 @@ function PaymentPage() {
           dappKeyPair
         );
 
+        // 保存钱包连接信息到localStorage，以便在页面刷新后恢复
+        localStorage.setItem("phantom_encryption_public_key", phantom_pk);
+        localStorage.setItem("phantom_public_key", decryptedData.public_key);
+        localStorage.setItem("phantom_session", decryptedData.session);
+
         setPhantomPublicKey(decryptedData.public_key);
         setPhantomSession(decryptedData.session);
         setPhantomEncryptionPublicKey(phantom_pk);
@@ -207,10 +279,46 @@ function PaymentPage() {
         console.log("Phantom 钱包连接成功", {
           publicKey: decryptedData.public_key,
           sessionAvailable: !!decryptedData.session,
+          encryptionPublicKey: phantom_pk,
         });
+
+        // 钱包连接成功后，重置钱包连接流程标记
+        setIsWalletConnectFlow(false);
+
+        // 检查是否有待处理的交易数据
+        const pendingData = sessionStorage.getItem("pendingTxData");
+        const pendingNonce = sessionStorage.getItem("pendingTxNonce");
+
+        if (pendingData && pendingNonce) {
+          console.log("Found pending transaction data after wallet connection");
+          try {
+            const response = decryptTransactionResponse(
+              phantom_pk,
+              pendingNonce,
+              pendingData,
+              dappKeyPair
+            );
+
+            setTransactionSignature(response.signature);
+            setComplete(true);
+
+            // 清理sessionStorage
+            sessionStorage.removeItem("pendingTxData");
+            sessionStorage.removeItem("pendingTxNonce");
+          } catch (err) {
+            console.error(
+              "Error processing pending transaction after connect:",
+              err
+            );
+            // 解密失败也当作交易完成
+            setComplete(true);
+          }
+        }
       } catch (err) {
         console.error("Phantom 钱包连接解密失败", err);
         setError("Phantom 钱包连接信息解密失败");
+        // 解密失败时也重置钱包连接流程标记
+        setIsWalletConnectFlow(false);
       }
       // 清理URL
       window.history.replaceState({}, document.title, window.location.pathname);
@@ -229,6 +337,8 @@ function PaymentPage() {
   // 连接 Phantom 钱包
   const handleConnectPhantom = () => {
     if (!dappKeyPair) return;
+    // 设置钱包连接流程标记
+    setIsWalletConnectFlow(true);
     const dappPublicKey = bs58.encode(dappKeyPair.publicKey);
     console.log(
       "dappPublicKey (base58):",
@@ -292,14 +402,21 @@ function PaymentPage() {
         signers: tx.signatures.length,
       });
 
+      if (!phantomEncryptionPublicKey) {
+        throw new Error("Missing Phantom encryption public key");
+      }
+
+      if (!phantomSession) {
+        throw new Error("Missing Phantom session token");
+      }
+
       // 使用官方文档要求的所有参数调用 deeplink 方法
-      // 在前面的验证确保了这些值不为null，但TypeScript需要类型断言
       openPhantomSignAndSendTransactionDeeplink(
         tx,
         redirectUrl,
-        phantomEncryptionPublicKey as string,
+        phantomEncryptionPublicKey,
         dappKeyPair as nacl.BoxKeyPair,
-        phantomSession as string
+        phantomSession
       );
 
       console.log("Phantom deeplink opened with session");
