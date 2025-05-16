@@ -151,7 +151,7 @@ export async function createSolTransferTransaction({
   try {
     // Convert SOL to lamports
     const lamports = Math.round(amount * LAMPORTS_PER_SOL);
-    
+
     // Validate inputs
     if (!from || !to || !amount) {
       throw new Error("Missing required transaction parameters");
@@ -159,15 +159,15 @@ export async function createSolTransferTransaction({
 
     const fromPubkey = new PublicKey(from);
     const toPubkey = new PublicKey(to);
-    
+
     console.log("Creating SOL transaction with params:", {
       from: fromPubkey.toBase58(),
       to: toPubkey.toBase58(),
       lamports,
       orderId,
-      network: SOLANA_NETWORK
+      network: SOLANA_NETWORK,
     });
-    
+
     // Get the current status of the cluster to ensure connection is working
     console.log("Checking connection to", SOLANA_NETWORK);
     const clusterStatus = await connection.getVersion();
@@ -176,12 +176,12 @@ export async function createSolTransferTransaction({
     // Check sender's SOL balance with explicit confirmation
     const fromBalance = await connection.getBalance(fromPubkey, "confirmed");
     console.log("Sender balance:", fromBalance / LAMPORTS_PER_SOL, "SOL");
-    
+
     // Ensure there's enough balance for the transaction plus fees
     // Estimate fees conservatively at 0.000005 SOL (5000 lamports)
     const estimatedFee = 5000;
     const totalNeeded = lamports + estimatedFee;
-    
+
     if (fromBalance < totalNeeded) {
       throw new Error(
         `付款人 SOL 余额不足，当前余额：${fromBalance / LAMPORTS_PER_SOL}，需要：${amount} + 手续费`
@@ -196,40 +196,46 @@ export async function createSolTransferTransaction({
 
     // Create a new transaction
     const tx = new Transaction();
-    
+
     // Transfer instruction
     const transferIx = SystemProgram.transfer({
       fromPubkey,
       toPubkey,
       lamports,
     });
-    
+
     // Add the transfer instruction
     tx.add(transferIx);
-    
-    // Uncomment to add memo instruction if needed
-    // const memoIx = createMemoInstruction(orderId, fromPubkey);
-    // tx.add(memoIx);
-    
+
+    // Add memo instruction with orderId
+    const memoIx = createMemoInstruction(orderId, fromPubkey);
+    tx.add(memoIx);
+
     // Set fee payer
     tx.feePayer = fromPubkey;
-    
+
     // Get a fresh blockhash with confirmed commitment
-    const { blockhash, lastValidBlockHeight } = 
+    const { blockhash, lastValidBlockHeight } =
       await connection.getLatestBlockhash("confirmed");
-    
+
     tx.recentBlockhash = blockhash;
-    console.log("Using blockhash:", blockhash, "valid until height:", lastValidBlockHeight);
-    
+    console.log(
+      "Using blockhash:",
+      blockhash,
+      "valid until height:",
+      lastValidBlockHeight
+    );
+
     // Log detailed transaction information
-    console.log("SOL Transaction created with instructions:", 
-      tx.instructions.map(ins => ({
+    console.log(
+      "SOL Transaction created with instructions:",
+      tx.instructions.map((ins) => ({
         programId: ins.programId.toBase58(),
-        keys: ins.keys.map(k => ({ 
+        keys: ins.keys.map((k) => ({
           pubkey: k.pubkey.toBase58(),
           isSigner: k.isSigner,
-          isWritable: k.isWritable
-        }))
+          isWritable: k.isWritable,
+        })),
       }))
     );
 

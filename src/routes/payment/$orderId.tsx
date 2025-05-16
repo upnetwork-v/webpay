@@ -25,7 +25,9 @@ function PaymentPage() {
   const [phantomConnected, setPhantomConnected] = useState(false);
   const [phantomPublicKey, setPhantomPublicKey] = useState<string | null>(null);
   const [phantomSession, setPhantomSession] = useState<string | null>(null);
-  const [phantomEncryptionPublicKey, setPhantomEncryptionPublicKey] = useState<string | null>(null);
+  const [phantomEncryptionPublicKey, setPhantomEncryptionPublicKey] = useState<
+    string | null
+  >(null);
   const [dappKeyPair, setDappKeyPair] = useState<nacl.BoxKeyPair | null>(null);
 
   useEffect(() => {
@@ -95,15 +97,15 @@ function PaymentPage() {
           data,
           dappKeyPair
         );
-        
+
         setPhantomPublicKey(decryptedData.public_key);
         setPhantomSession(decryptedData.session);
         setPhantomEncryptionPublicKey(phantom_pk);
         setPhantomConnected(true);
-        
+
         console.log("Phantom 钱包连接成功", {
           publicKey: decryptedData.public_key,
-          sessionAvailable: !!decryptedData.session
+          sessionAvailable: !!decryptedData.session,
         });
       } catch (err) {
         console.error("Phantom 钱包连接解密失败", err);
@@ -186,7 +188,7 @@ function PaymentPage() {
         instructions: tx.instructions.length,
         signers: tx.signatures.length,
       });
-      
+
       // 使用官方文档要求的所有参数调用 deeplink 方法
       // 在前面的验证确保了这些值不为null，但TypeScript需要类型断言
       openPhantomSignAndSendTransactionDeeplink(
@@ -196,7 +198,7 @@ function PaymentPage() {
         dappKeyPair as nacl.BoxKeyPair,
         phantomSession as string
       );
-      
+
       console.log("Phantom deeplink opened with session");
     } catch (e) {
       console.error("Payment error:", e);
