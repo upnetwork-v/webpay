@@ -34,7 +34,7 @@ function createMemoInstruction(
 export async function createSPLTransferTransaction({
   from,
   to,
-  amount,
+  tokenAmount,
   tokenAddress,
   orderId,
 }: TransactionParams): Promise<Transaction> {
@@ -47,7 +47,7 @@ export async function createSPLTransferTransaction({
       from: from.toString(),
       to: to.toString(),
       tokenAddress: tokenAddress.toString(),
-      amount,
+      tokenAmount,
       orderId,
     });
 
@@ -94,9 +94,12 @@ export async function createSPLTransferTransaction({
         fromTokenAccountParsed.value.data.parsed.info.tokenAmount.uiAmount;
     }
     console.log("付款人 Token 余额:", fromBalance);
-    if (fromBalance === undefined || BigInt(fromBalance) < BigInt(amount)) {
+    if (
+      fromBalance === undefined ||
+      BigInt(fromBalance) < BigInt(tokenAmount)
+    ) {
       throw new Error(
-        `付款人 Token 余额不足，当前余额：${fromBalance ?? 0}，需要：${amount}`
+        `付款人 Token 余额不足，当前余额：${fromBalance ?? 0}，需要：${tokenAmount}`
       );
     }
 
@@ -122,7 +125,7 @@ export async function createSPLTransferTransaction({
       fromTokenAccount,
       toTokenAccount,
       new PublicKey(from),
-      BigInt(amount)
+      BigInt(tokenAmount)
     );
 
     // Memo instruction
@@ -144,15 +147,15 @@ export async function createSPLTransferTransaction({
 export async function createSolTransferTransaction({
   from,
   to,
-  amount,
+  tokenAmount,
   orderId,
 }: TransactionParams): Promise<Transaction> {
   try {
     // Convert SOL to lamports
-    const lamports = BigInt(amount);
+    const lamports = BigInt(tokenAmount);
 
     // Validate inputs
-    if (!from || !to || !amount) {
+    if (!from || !to || !tokenAmount) {
       throw new Error("Missing required transaction parameters");
     }
 
@@ -183,7 +186,7 @@ export async function createSolTransferTransaction({
 
     if (fromBalance < totalNeeded) {
       throw new Error(
-        `付款人 SOL 余额不足，当前余额：${fromBalance / LAMPORTS_PER_SOL}，需要：${amount} + 手续费`
+        `付款人 SOL 余额不足，当前余额：${fromBalance / LAMPORTS_PER_SOL}，需要：${tokenAmount} + 手续费`
       );
     }
 
