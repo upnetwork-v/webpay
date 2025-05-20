@@ -2,7 +2,7 @@ import { useEffect, useState, useRef, useMemo } from "react";
 import bs58 from "bs58";
 import { createFileRoute } from "@tanstack/react-router";
 import nacl from "tweetnacl";
-
+// TODO: update route name to webpay
 import { getOrderById, coinCalculatorQuery } from "@/api/order";
 import type { Order, CoinCalculator } from "@/types/payment";
 import {
@@ -484,15 +484,15 @@ function PaymentPage() {
   // 渲染订单支付界面
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md mx-auto bg-white rounded-xl shadow-md overflow-hidden">
+      <div className="bg-white rounded-xl mx-auto max-w-md shadow-md overflow-hidden">
         {/* 商家信息 */}
-        <div className="p-6 border-b border-gray-200">
+        <div className="border-b border-gray-200 p-6">
           <div className="flex items-center">
-            <div className="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-xl font-bold">
+            <div className="rounded-full flex font-bold bg-blue-100 h-12 text-xl text-blue-600 w-12 items-center justify-center">
               {order.merchantName.charAt(0).toUpperCase()}
             </div>
             <div className="ml-4">
-              <h2 className="text-lg font-semibold text-gray-900">
+              <h2 className="font-semibold text-lg text-gray-900">
                 {order.merchantName}
               </h2>
               <p className="text-sm text-gray-500">正在等待支付</p>
@@ -501,33 +501,33 @@ function PaymentPage() {
         </div>
 
         {/* 订单金额 */}
-        <div className="p-6 border-b border-gray-200">
+        <div className="border-b border-gray-200 p-6">
           <div className="text-center">
-            <p className="text-sm text-gray-500 mb-1">支付金额</p>
-            <p className="text-3xl font-bold text-gray-900">
+            <p className="text-sm mb-1 text-gray-500">支付金额</p>
+            <p className="font-bold text-3xl text-gray-900">
               {order.orderValue} {order.currency}
             </p>
-            <p className="text-sm text-gray-500 mt-2">
+            <p className="mt-2 text-sm text-gray-500">
               ≈ {coinCalculator?.tokenAmount} {order.defaultPaymentToken}
             </p>
           </div>
         </div>
 
         {/* 订单详情 */}
-        <div className="p-6 border-b border-gray-200">
-          <h3 className="text-sm font-medium text-gray-500 mb-3">订单详情</h3>
+        <div className="border-b border-gray-200 p-6">
+          <h3 className="font-medium text-sm mb-3 text-gray-500">订单详情</h3>
           <div className="space-y-2">
-            <div className="flex justify-between text-sm">
+            <div className="flex text-sm justify-between">
               <span className="text-gray-500">订单号</span>
               <span className="text-gray-900">{order.orderId}</span>
             </div>
-            <div className="flex justify-between text-sm">
+            <div className="flex text-sm justify-between">
               <span className="text-gray-500">商品描述</span>
-              <span className="text-gray-900 text-right">test description</span>
+              <span className="text-right text-gray-900">test description</span>
             </div>
-            <div className="flex justify-between text-sm">
+            <div className="flex text-sm justify-between">
               <span className="text-gray-500">收款地址</span>
-              <span className="text-gray-900 font-mono text-xs break-all ml-2">
+              <span className="font-mono text-xs ml-2 text-gray-900 break-all">
                 {order.merchantSolanaAddress}
               </span>
             </div>
@@ -536,7 +536,7 @@ function PaymentPage() {
 
         {/* 支付方式 */}
         <div className="p-6">
-          <h3 className="text-sm font-medium text-gray-500 mb-3">支付方式</h3>
+          <h3 className="font-medium text-sm mb-3 text-gray-500">支付方式</h3>
           <div className="space-y-4">
             {order.supportTokenList.map((token) => (
               <div
@@ -552,7 +552,7 @@ function PaymentPage() {
                   setOrder({ ...order });
                 }}
               >
-                <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center mr-3">
+                <div className="rounded-full flex bg-gray-200 h-8 mr-3 w-8 items-center justify-center">
                   {token.symbol.charAt(0).toUpperCase()}
                 </div>
                 <div className="flex-1">
@@ -586,10 +586,10 @@ function PaymentPage() {
         <div className="p-6 pt-0">
           {!phantomConnected ? (
             <button
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg flex items-center justify-center space-x-2"
+              className="rounded-lg flex font-medium space-x-2 bg-blue-600 text-white w-full py-3 px-4 items-center justify-center hover:bg-blue-700"
               onClick={handleConnectPhantom}
             >
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+              <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M12 0C5.383 0 0 5.383 0 12s5.383 12 12 12 12-5.383 12-12S18.617 0 12 0zm0 22c-5.514 0-10-4.486-10-10S6.486 2 12 2s10 4.486 10 10-4.486 10-10 10z" />
                 <path d="M16.5 7.5h-9a1 1 0 00-1 1v6a1 1 0 001 1h9a1 1 0 001-1v-6a1 1 0 00-1-1zm-1 6h-7v-4h7v4z" />
               </svg>
@@ -597,7 +597,7 @@ function PaymentPage() {
             </button>
           ) : (
             <button
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg flex items-center justify-center space-x-2"
+              className="rounded-lg flex font-medium space-x-2 bg-blue-600 text-white w-full py-3 px-4 items-center justify-center hover:bg-blue-700"
               onClick={handlePay}
             >
               <span>
@@ -618,7 +618,7 @@ function PaymentPage() {
               </svg>
             </button>
           )}
-          <p className="text-xs text-gray-500 mt-3 text-center">
+          <p className="mt-3 text-xs text-center text-gray-500">
             点击确认后，将在 Phantom 钱包中完成支付
           </p>
         </div>
