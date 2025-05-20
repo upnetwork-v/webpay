@@ -31,37 +31,33 @@ function createMemoInstruction(
   });
 }
 
-export async function createUsdcTransferTransaction({
+export async function createSPLTransferTransaction({
   from,
   to,
   amount,
-  usdcMint,
+  tokenAddress,
   orderId,
 }: TransactionParams): Promise<Transaction> {
   try {
-    if (!usdcMint) {
-      throw new Error("USDC mint address is required for SPL token payment");
+    if (!tokenAddress) {
+      throw new Error("Token address is required for SPL token payment");
     }
-
-    // USDC has 6 decimals
-    const usdcDecimals = 6;
-    const usdcAmount = Math.round(amount * 10 ** usdcDecimals);
 
     console.log("Creating transaction with params:", {
       from: from.toString(),
       to: to.toString(),
-      usdcMint: usdcMint.toString(),
-      usdcAmount,
+      tokenAddress: tokenAddress.toString(),
+      amount,
       orderId,
     });
 
     // Get associated token accounts
     const fromTokenAccount = await getAssociatedTokenAddress(
-      new PublicKey(usdcMint),
+      new PublicKey(tokenAddress),
       new PublicKey(from)
     );
     const toTokenAccount = await getAssociatedTokenAddress(
-      new PublicKey(usdcMint),
+      new PublicKey(tokenAddress),
       new PublicKey(to)
     );
 
@@ -76,12 +72,12 @@ export async function createUsdcTransferTransaction({
 
     if (!fromAccountInfo) {
       throw new Error(
-        "付款人 USDC Token Account 不存在，请先在 Phantom 钱包内添加 USDC 资产并获取 USDC。"
+        "付款人 Token Account 不存在，请先在 Phantom 钱包内添加 Token 资产并获取 Token。"
       );
     }
     if (!toAccountInfo) {
       throw new Error(
-        "收款人 USDC Token Account 不存在，请联系收款人先添加 USDC 资产。"
+        "收款人 Token Account 不存在，请联系收款人先添加 Token 资产。"
       );
     }
 
@@ -97,10 +93,10 @@ export async function createUsdcTransferTransaction({
       fromBalance =
         fromTokenAccountParsed.value.data.parsed.info.tokenAmount.uiAmount;
     }
-    console.log("付款人 USDC 余额:", fromBalance);
-    if (fromBalance === undefined || fromBalance < amount) {
+    console.log("付款人 Token 余额:", fromBalance);
+    if (fromBalance === undefined || BigInt(fromBalance) < BigInt(amount)) {
       throw new Error(
-        `付款人 USDC 余额不足，当前余额：${fromBalance ?? 0}，需要：${amount}`
+        `付款人 Token 余额不足，当前余额：${fromBalance ?? 0}，需要：${amount}`
       );
     }
 
@@ -126,7 +122,7 @@ export async function createUsdcTransferTransaction({
       fromTokenAccount,
       toTokenAccount,
       new PublicKey(from),
-      usdcAmount
+      BigInt(amount)
     );
 
     // Memo instruction
@@ -153,7 +149,7 @@ export async function createSolTransferTransaction({
 }: TransactionParams): Promise<Transaction> {
   try {
     // Convert SOL to lamports
-    const lamports = Math.round(amount * LAMPORTS_PER_SOL);
+    const lamports = BigInt(amount);
 
     // Validate inputs
     if (!from || !to || !amount) {
@@ -183,7 +179,7 @@ export async function createSolTransferTransaction({
     // Ensure there's enough balance for the transaction plus fees
     // Estimate fees conservatively at 0.000005 SOL (5000 lamports)
     const estimatedFee = 5000;
-    const totalNeeded = lamports + estimatedFee;
+    const totalNeeded = lamports + BigInt(estimatedFee);
 
     if (fromBalance < totalNeeded) {
       throw new Error(

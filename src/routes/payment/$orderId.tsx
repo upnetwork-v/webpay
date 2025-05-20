@@ -1,10 +1,10 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import bs58 from "bs58";
 import { createFileRoute } from "@tanstack/react-router";
 import nacl from "tweetnacl";
 
-import { getOrderById } from "@/api/order";
-import type { Order } from "@/types/payment";
+import { getOrderById, coinCalculatorQuery } from "@/api/order";
+import type { Order, CoinCalculator } from "@/types/payment";
 import {
   openPhantomConnectDeeplink,
   openPhantomSignAndSendTransactionDeeplink,
@@ -12,13 +12,18 @@ import {
   decryptTransactionResponse,
   getSolanaExplorerUrl,
 } from "@/utils/phantom";
-import { createUsdcTransferTransaction } from "@/utils/transaction";
-import { createSolTransferTransaction } from "@/utils/transaction";
+import {
+  createSolTransferTransaction,
+  createSPLTransferTransaction,
+} from "@/utils/transaction";
 
 // --- Main Page Component ---
 function PaymentPage() {
   const { orderId } = Route.useParams();
   const [order, setOrder] = useState<Order | null>(null);
+  const [coinCalculator, setCoinCalculator] = useState<CoinCalculator | null>(
+    null
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [complete, setComplete] = useState(false);
@@ -60,6 +65,23 @@ function PaymentPage() {
       .catch(() => setError("Order not found"))
       .finally(() => setLoading(false));
   }, [orderId]);
+
+  const paymentToken = useMemo(() => {
+    if (!order) return null;
+    return order.supportTokenList.find(
+      (token) => token.symbol === order.defaultPaymentToken
+    );
+  }, [order]);
+
+  // 获取币种计算器信息
+  useEffect(() => {
+    if (!paymentToken || !order) return;
+
+    coinCalculatorQuery({
+      orderValue: order.orderValue,
+      tokenAddress: paymentToken.address,
+    }).then(setCoinCalculator);
+  }, [paymentToken, order]);
 
   // 处理交易结果回调
   useEffect(() => {
@@ -365,27 +387,29 @@ function PaymentPage() {
       console.log("Starting payment process");
 
       let tx;
-      if (order.paymentType === "SPL") {
-        if (!order.usdcMint) {
-          throw new Error(
-            "USDC mint address is required for SPL token payment"
-          );
+      const paymentToken = order.supportTokenList.find(
+        (token) => token.symbol === order.defaultPaymentToken
+      );
+      if (!paymentToken) {
+        throw new Error("Payment token not found");
+      }
+      if (!paymentToken.isNative) {
+        if (!paymentToken.address) {
+          throw new Error("Token address is required for SPL token payment");
         }
-        tx = await createUsdcTransferTransaction({
+        tx = await createSPLTransferTransaction({
           from: phantomPublicKey,
-          to: order.recipient,
-          amount: order.amount,
-          usdcMint: order.usdcMint,
+          to: order.merchantSolanaAddress,
+          tokenAmount: coinCalculator?.tokenAmount ?? "0",
+          tokenAddress: paymentToken.address,
           orderId: order.orderId,
-          paymentType: "SPL",
         });
       } else {
         tx = await createSolTransferTransaction({
           from: phantomPublicKey,
-          to: order.recipient,
-          amount: order.amount,
+          to: order.merchantSolanaAddress,
+          tokenAmount: coinCalculator?.tokenAmount ?? "0",
           orderId: order.orderId,
-          paymentType: "SOL",
         });
       }
 
