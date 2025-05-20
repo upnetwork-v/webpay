@@ -483,46 +483,145 @@ function PaymentPage() {
 
   // 渲染订单支付界面
   return (
-    <div className="bg-white rounded mx-auto max-w-md shadow mt-8 p-4">
-      <h2 className="font-bold text-xl mb-2">Order Payment</h2>
-      <div className="mb-4">
-        <div>
-          <b>Order ID:</b> {order.orderId}
-        </div>
-        <div>
-          <b>Description:</b> {order.description}
-        </div>
-        <div>
-          <b>Amount:</b> {order.amount}{" "}
-          {order.paymentType === "SOL" ? "SOL" : "USDC"}
-        </div>
-        {order.paymentType === "SPL" && (
-          <div className="break-all">
-            <b>USDC Mint:</b> {order.usdcMint}
+    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md mx-auto bg-white rounded-xl shadow-md overflow-hidden">
+        {/* 商家信息 */}
+        <div className="p-6 border-b border-gray-200">
+          <div className="flex items-center">
+            <div className="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-xl font-bold">
+              {order.merchantName.charAt(0).toUpperCase()}
+            </div>
+            <div className="ml-4">
+              <h2 className="text-lg font-semibold text-gray-900">
+                {order.merchantName}
+              </h2>
+              <p className="text-sm text-gray-500">正在等待支付</p>
+            </div>
           </div>
-        )}
-        <div className="break-all">
-          <b>Recipient:</b> {order.recipient}
         </div>
-      </div>
-      {!phantomConnected ? (
-        <button
-          className="rounded bg-green-600 text-white mb-4 py-2 px-4 hover:bg-green-700"
-          onClick={handleConnectPhantom}
-        >
-          Connect Phantom Wallet
-        </button>
-      ) : (
-        <div className="mb-2 text-green-700">Phantom Wallet Connected</div>
-      )}
-      <button
-        className="rounded bg-purple-600 text-white py-2 px-4 hover:bg-purple-700"
-        onClick={handlePay}
-      >
-        Pay with Phantom
-      </button>
-      <div className="mt-2 text-xs text-gray-500">
-        You will be redirected to Phantom App to complete the payment.
+
+        {/* 订单金额 */}
+        <div className="p-6 border-b border-gray-200">
+          <div className="text-center">
+            <p className="text-sm text-gray-500 mb-1">支付金额</p>
+            <p className="text-3xl font-bold text-gray-900">
+              {order.orderValue} {order.currency}
+            </p>
+            <p className="text-sm text-gray-500 mt-2">
+              ≈ {coinCalculator?.tokenAmount} {order.defaultPaymentToken}
+            </p>
+          </div>
+        </div>
+
+        {/* 订单详情 */}
+        <div className="p-6 border-b border-gray-200">
+          <h3 className="text-sm font-medium text-gray-500 mb-3">订单详情</h3>
+          <div className="space-y-2">
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-500">订单号</span>
+              <span className="text-gray-900">{order.orderId}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-500">商品描述</span>
+              <span className="text-gray-900 text-right">test description</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-500">收款地址</span>
+              <span className="text-gray-900 font-mono text-xs break-all ml-2">
+                {order.merchantSolanaAddress}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* 支付方式 */}
+        <div className="p-6">
+          <h3 className="text-sm font-medium text-gray-500 mb-3">支付方式</h3>
+          <div className="space-y-4">
+            {order.supportTokenList.map((token) => (
+              <div
+                key={token.symbol}
+                className={`flex items-center p-3 border rounded-lg cursor-pointer ${
+                  order.defaultPaymentToken === token.symbol
+                    ? "border-blue-500 bg-blue-50"
+                    : "border-gray-200 hover:border-gray-300"
+                }`}
+                onClick={() => {
+                  // 切换支付代币逻辑
+                  order.defaultPaymentToken = token.symbol;
+                  setOrder({ ...order });
+                }}
+              >
+                <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center mr-3">
+                  {token.symbol.charAt(0).toUpperCase()}
+                </div>
+                <div className="flex-1">
+                  <div className="font-medium">{token.symbol}</div>
+                  <div className="text-xs text-gray-500">
+                    {token.isNative ? "Native token" : "SPL Token"}
+                  </div>
+                </div>
+                {order.defaultPaymentToken === token.symbol && (
+                  <div className="text-blue-600">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-5 w-5"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* 支付按钮 */}
+        <div className="p-6 pt-0">
+          {!phantomConnected ? (
+            <button
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg flex items-center justify-center space-x-2"
+              onClick={handleConnectPhantom}
+            >
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 0C5.383 0 0 5.383 0 12s5.383 12 12 12 12-5.383 12-12S18.617 0 12 0zm0 22c-5.514 0-10-4.486-10-10S6.486 2 12 2s10 4.486 10 10-4.486 10-10 10z" />
+                <path d="M16.5 7.5h-9a1 1 0 00-1 1v6a1 1 0 001 1h9a1 1 0 001-1v-6a1 1 0 00-1-1zm-1 6h-7v-4h7v4z" />
+              </svg>
+              <span>连接 Phantom 钱包</span>
+            </button>
+          ) : (
+            <button
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg flex items-center justify-center space-x-2"
+              onClick={handlePay}
+            >
+              <span>
+                确认支付 {coinCalculator?.tokenAmount}{" "}
+                {order.defaultPaymentToken}
+              </span>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-5 w-5"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M10.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L12.586 11H5a1 1 0 110-2h7.586l-2.293-2.293a1 1 0 010-1.414z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            </button>
+          )}
+          <p className="text-xs text-gray-500 mt-3 text-center">
+            点击确认后，将在 Phantom 钱包中完成支付
+          </p>
+        </div>
       </div>
     </div>
   );
