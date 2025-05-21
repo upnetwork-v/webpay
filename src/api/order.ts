@@ -14,7 +14,7 @@ export async function getOrderById(orderId: string): Promise<Order> {
       merchantSolanaAddress: "9iusfh8hawwYU3iMW8UqNSR1wjbWTy6UkJKMZ8D65Fx3",
       orderId,
       orderValue: "0.01",
-      paymentStatus: "new",
+      paymentStatus: 0,
       secondVerification: true,
       supportTokenList: [
         {
@@ -35,7 +35,7 @@ export async function getOrderById(orderId: string): Promise<Order> {
       merchantSolanaAddress: "9iusfh8hawwYU3iMW8UqNSR1wjbWTy6UkJKMZ8D65Fx3",
       orderId,
       orderValue: "0.01",
-      paymentStatus: "new",
+      paymentStatus: 0,
       secondVerification: true,
       supportTokenList: [
         {

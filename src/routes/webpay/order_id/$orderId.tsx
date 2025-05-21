@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { getOrderById, coinCalculatorQuery } from "@/api/order";
 import type { Order, CoinCalculator } from "@/types/payment";
@@ -60,15 +60,24 @@ export default function PaymentPage() {
   const [tx, setTx] = useState<Transaction | null>(null);
 
   useEffect(() => {
-    if (
-      createPaymentTransaction &&
-      phantomEncryptionPublicKey &&
-      phantomPublicKey &&
-      !tx
-    ) {
-      createPaymentTransaction().then((tx) => {
-        setTx(tx);
-      });
+    if (!tx) {
+      if (
+        createPaymentTransaction &&
+        phantomEncryptionPublicKey &&
+        phantomPublicKey
+      ) {
+        createPaymentTransaction().then((tx) => {
+          console.log("create payment transaction", tx);
+          setTx(tx);
+        });
+      } else {
+        console.log(
+          "missing init params",
+          createPaymentTransaction,
+          phantomEncryptionPublicKey,
+          phantomPublicKey
+        );
+      }
     }
   }, [
     tx,
@@ -283,6 +292,45 @@ export default function PaymentPage() {
     setError,
   ]);
 
+  // confirm order
+  const orderConfirmed = useMemo(() => {
+    if (!order) return false;
+    return order.paymentStatus === 2;
+  }, [order]);
+
+  const requestTimeout = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    // Clear any existing timeout when dependencies change
+    if (requestTimeout.current) {
+      clearTimeout(requestTimeout.current);
+    }
+
+    // Only start polling if we have all required conditions
+    if (orderId && isComplete && transactionSignature && !orderConfirmed) {
+      const pollOrder = () => {
+        getOrderById(orderId).then((res) => {
+          console.log("polling order", res);
+          setOrder(res);
+        });
+      };
+
+      // Initial request
+      pollOrder();
+
+      // Set up polling interval
+      requestTimeout.current = setInterval(pollOrder, 3000);
+    }
+
+    // Cleanup function
+    return () => {
+      if (requestTimeout.current) {
+        clearInterval(requestTimeout.current);
+        requestTimeout.current = null;
+      }
+    };
+  }, [isComplete, transactionSignature, orderConfirmed, orderId]);
+
   // Render error state
   if (error) {
     return (
@@ -298,27 +346,6 @@ export default function PaymentPage() {
               Try Again
             </button>
           </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Render payment complete state
-  if (isComplete && transactionSignature) {
-    return (
-      <div className="flex min-h-screen bg-gray-50 items-center justify-center">
-        <div className="bg-white rounded-lg max-w-md shadow-md text-center w-full p-8">
-          <h2 className="font-bold mb-4 text-2xl text-green-600">
-            Payment Complete!
-          </h2>
-          <a
-            href={getSolanaExplorerUrl(transactionSignature)}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-blue-500 hover:underline"
-          >
-            View on Solana Explorer
-          </a>
         </div>
       </div>
     );
@@ -431,16 +458,33 @@ export default function PaymentPage() {
               className="btn btn-primary btn-block btn-lg"
               onClick={handleConnectWallet}
             >
-              <span>Connect Phantom Wallet</span>
+              Connect Phantom Wallet
             </button>
+          ) : isComplete && transactionSignature ? (
+            <>
+              <div className="text-xs text-base-content text-center p-4">
+                Pay Success!{" "}
+                <a
+                  href={getSolanaExplorerUrl(transactionSignature)}
+                  target="_blank"
+                  className="text-success hover:underline"
+                >
+                  View on Solana Explorer
+                </a>
+                . Confirming transaction...
+              </div>
+              <button className="btn btn-primary btn-block btn-lg" disabled>
+                <span className="loading loading-spinner loading-xs"></span>
+                Pay {coinCalculator?.tokenAmount} {coinCalculator?.tokenSymbol}
+              </button>
+            </>
           ) : (
             <button
               className="btn btn-primary btn-block btn-lg"
               onClick={handlePay}
+              disabled={!tx}
             >
-              <span>
-                Pay {coinCalculator?.tokenAmount} {coinCalculator?.tokenSymbol}
-              </span>
+              Pay {coinCalculator?.tokenAmount} {coinCalculator?.tokenSymbol}
             </button>
           )}
         </div>
