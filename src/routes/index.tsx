@@ -7,7 +7,7 @@ export const Route = createFileRoute("/")({
 
 function Index() {
   function openPhantomConnectDeeplink(dappPublicKey: string) {
-    const redirectUrl = `${window.location.origin}${window.location.pathname}`;
+    const redirectUrl = `${window.location.href}`;
     const deeplinkUrl = buildUrl(
       "connect",
       new URLSearchParams({

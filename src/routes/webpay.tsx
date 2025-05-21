@@ -17,6 +17,17 @@ import {
 } from "@/utils/transaction";
 import upnetworkLogo from "@/assets/img/upnetwork-logo.png";
 
+declare global {
+  interface Window {
+    solana?: {
+      isPhantom?: boolean;
+      signAndSendTransaction: (
+        transaction: any
+      ) => Promise<{ signature: string }>;
+    };
+  }
+}
+
 // Define route types
 export type SearchParams = {
   order_id?: string; // Make order_id optional
@@ -459,7 +470,7 @@ function PaymentPage() {
       console.log("Current URL before deeplink:", before);
 
       // 跳转 deeplink，使用完整的参数集
-      const redirectUrl = `${window.location.origin}${window.location.pathname}`;
+      const redirectUrl = `${window.location.href.split("?")[0]}`;
       console.log("Complete transaction object:", {
         feePayer: tx.feePayer?.toBase58(),
         recentBlockhash: tx.recentBlockhash,
@@ -484,7 +495,10 @@ function PaymentPage() {
         phantomSession
       );
 
-      console.log("Phantom deeplink opened with session");
+      console.log(
+        "Phantom deeplink opened with session, redirectUrl:",
+        redirectUrl
+      );
     } catch (e) {
       console.error("Payment error:", e);
       setError(e instanceof Error ? e.message : String(e));
@@ -518,8 +532,8 @@ function PaymentPage() {
 
   // 渲染订单支付界面
   return (
-    <div className="flex min-h-screen bg-gray-50 w-full justify-center items-center">
-      <div className="min-h-screen max-w-md bg-base-100 shadow-md w-full p-4 pb-24 overflow-hidden relative md:rounded-xl md:min-h-auto">
+    <div className="flex h-full bg-gray-50 w-full justify-center items-center">
+      <div className="h-full max-w-md bg-base-100 shadow-md w-full p-4 pb-24 overflow-hidden relative md:rounded-xl md:h-auto">
         <div className="font-semibold my-6 text-center">Merchant Connect</div>
         {order ? (
           <>

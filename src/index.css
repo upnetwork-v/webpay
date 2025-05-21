@@ -6,3 +6,9 @@
   default: true;
   --color-primary: #9886e5;
 }
+
+body,
+html,
+#root {
+  height: 100%;
+}

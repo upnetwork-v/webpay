@@ -106,21 +106,16 @@ export function openPhantomSignAndSendTransactionDeeplink(
     // Encrypt the payload using the shared secret
     const [nonce, encryptedPayload] = encryptPayload(payload, sharedSecret);
 
-    // 使用当前URL的基本部分作为重定向URL，避免查询参数
-    const baseUrl = redirectLink.split("?")[0];
-    console.log("Base URL for transaction redirect:", baseUrl);
-
     // Create params according to Phantom docs
     const params = new URLSearchParams({
       dapp_encryption_public_key: bs58.encode(dappKeyPair.publicKey),
       nonce: bs58.encode(nonce),
-      redirect_link: baseUrl, // 使用没有查询参数的URL
+      redirect_link: redirectLink, // 使用没有查询参数的URL
       payload: bs58.encode(encryptedPayload),
     });
 
     const deeplinkUrl = buildUrl("signAndSendTransaction", params);
     console.log("Opening Phantom deeplink", deeplinkUrl);
-    console.log("Redirect link set to:", baseUrl);
 
     // 使用替代方法打开deeplink
     if (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
@@ -157,7 +152,7 @@ export function openPhantomConnectDeeplink(dappPublicKey: string) {
       dapp_encryption_public_key: dappPublicKey,
       cluster: SOLANA_NETWORK,
       app_url: baseUrl,
-      redirect_link: baseUrl, // 使用精确的当前URL作为重定向目标
+      redirect_link: currentUrl, // 使用精确的当前URL作为重定向目标
     })
   );
   console.log("Opening connect deeplink:", deeplinkUrl);

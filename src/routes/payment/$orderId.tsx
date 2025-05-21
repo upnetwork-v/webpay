@@ -2,7 +2,6 @@ import { useEffect, useState, useRef, useMemo } from "react";
 import bs58 from "bs58";
 import { createFileRoute } from "@tanstack/react-router";
 import nacl from "tweetnacl";
-// TODO: update route name to webpay
 import { getOrderById, coinCalculatorQuery } from "@/api/order";
 import type { Order, CoinCalculator } from "@/types/payment";
 import {
@@ -60,11 +59,25 @@ function PaymentPage() {
 
   // 获取订单信息
   useEffect(() => {
-    if (!orderId) return;
+    if (!orderId) {
+      setError(
+        "Please provide an order_id in the URL (e.g., /webpay?order_id=123)"
+      );
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
     getOrderById(orderId)
-      .then(setOrder)
-      .catch(() => setError("Order not found"))
-      .finally(() => setLoading(false));
+      .then((orderData) => {
+        setOrder(orderData);
+        setLoading(false);
+      })
+      .catch((err) => {
+        setError("Failed to load order details");
+        console.error("Error fetching order:", err);
+        setLoading(false);
+      });
   }, [orderId]);
 
   const paymentToken = useMemo(() => {
@@ -76,13 +89,24 @@ function PaymentPage() {
 
   // 获取币种计算器信息
   useEffect(() => {
-    if (!paymentToken || !order) return;
-
-    coinCalculatorQuery({
-      orderValue: order.orderValue,
-      tokenAddress: paymentToken.address,
-    }).then(setCoinCalculator);
-  }, [paymentToken, order]);
+    if (order) {
+      try {
+        if (order) {
+          if (paymentToken) {
+            coinCalculatorQuery({
+              orderValue: order.orderValue,
+              tokenAddress: paymentToken.address,
+            }).then((calculatorData) => {
+              setCoinCalculator(calculatorData);
+            });
+          }
+        }
+      } catch (err) {
+        setError("Failed to load order details");
+        console.error("Error fetching order:", err);
+      }
+    }
+  }, [order]);
 
   // 处理交易结果回调
   useEffect(() => {
@@ -388,9 +412,7 @@ function PaymentPage() {
       console.log("Starting payment process");
 
       let tx;
-      const paymentToken = order.supportTokenList.find(
-        (token) => token.symbol === order.defaultPaymentToken
-      );
+
       if (!paymentToken) {
         throw new Error("Payment token not found");
       }
@@ -419,7 +441,7 @@ function PaymentPage() {
       console.log("Current URL before deeplink:", before);
 
       // 跳转 deeplink，使用完整的参数集
-      const redirectUrl = `${window.location.origin}${window.location.pathname}`;
+      const redirectUrl = `${window.location.href.split("?")[0]}`;
       console.log("Complete transaction object:", {
         feePayer: tx.feePayer?.toBase58(),
         recentBlockhash: tx.recentBlockhash,
@@ -444,15 +466,15 @@ function PaymentPage() {
         phantomSession
       );
 
-      console.log("Phantom deeplink opened with session");
+      console.log(
+        "Phantom deeplink opened with session, redirectUrl:",
+        redirectUrl
+      );
     } catch (e) {
       console.error("Payment error:", e);
       setError(e instanceof Error ? e.message : String(e));
     }
   };
-
-  // 渲染加载中状态
-  if (loading) return <div>Loading order...</div>;
 
   // 渲染错误状态
   if (error) return <div style={{ color: "red" }}>Error: {error}</div>;
@@ -479,69 +501,91 @@ function PaymentPage() {
       </div>
     );
 
-  // 如果没有订单数据，不渲染任何内容
-  if (!order) return null;
-
   // 渲染订单支付界面
   return (
-    <div className="flex min-h-screen bg-gray-50 justify-center items-center">
-      <div className="min-h-screen max-w-md bg-base-100 shadow-md w-full p-4 pb-24 overflow-hidden relative md:rounded-xl md:min-h-auto">
+    <div className="flex h-full bg-gray-50 w-full justify-center items-center">
+      <div className="h-full max-w-md bg-base-100 shadow-md w-full p-4 pb-24 overflow-hidden relative md:rounded-xl md:h-auto">
         <div className="font-semibold my-6 text-center">Merchant Connect</div>
-        <div className="font-semibold my-2 leading-tight text-3xl">
-          {order.merchantName}
-        </div>
-        <div className="my-2 text-xs leading-tight">
-          Order ID: {order.orderId}
-        </div>
-
-        {/* 订单详情 */}
-        <div className=" rounded-lg bg-base-300 my-4 p-4">
-          <div className="font-semibold text-white mb-4">Payment Details</div>
-
-          <div className="space-y-2 text-sm">
-            <div className="flex items-center">
-              <span className="text-neutral-content">Order Value</span>
-              <span className="flex-1 text-base-content text-ellipsis text-right overflow-hidden">
-                {order.orderValue} {order.currency}
-              </span>
+        {order ? (
+          <>
+            <div className="font-semibold my-2 leading-tight text-3xl">
+              {order.merchantName}
             </div>
-            <div className="flex items-center">
-              <span className="text-neutral-content">Payment Token</span>
-              <span className="flex-1 text-base-content text-ellipsis text-right overflow-hidden">
-                {coinCalculator?.tokenSymbol}
-              </span>
+            <div className="my-2 text-xs leading-tight">
+              Order ID: {order.orderId}
             </div>
-            {/* <div className="flex items-center">
+
+            {/* 订单详情 */}
+            <div className=" rounded-lg bg-base-300 my-4 p-4">
+              <div className="font-semibold text-white mb-4">
+                Payment Details
+              </div>
+
+              <div className="space-y-2 text-sm">
+                <div className="flex items-center">
+                  <span className="text-neutral-content">Order Value</span>
+                  <span className="flex-1 text-base-content text-ellipsis text-right overflow-hidden">
+                    {order.orderValue} {order.currency}
+                  </span>
+                </div>
+                <div className="flex items-center">
+                  <span className="text-neutral-content">Payment Token</span>
+                  <span className="flex-1 text-base-content text-ellipsis text-right overflow-hidden">
+                    {paymentToken?.symbol}
+                  </span>
+                </div>
+                {/* <div className="flex items-center">
               <span className="text-neutral-content">Merchant Address</span>
               <span className="font-mono flex-1 text-xs text-base-content text-right ml-2 break-all overflow-hidden">
                 {order.merchantSolanaAddress}
               </span>
             </div> */}
-            <div className="flex items-center">
-              <span className="text-neutral-content">Amount</span>
-              <span className="flex-1 text-base-content text-ellipsis text-right overflow-hidden">
-                {coinCalculator?.tokenAmount} {coinCalculator?.tokenSymbol}
-              </span>
-            </div>
+                <div className="flex items-center">
+                  <span className="text-neutral-content">Amount</span>
+                  <span className="flex-1 text-base-content text-ellipsis text-right overflow-hidden">
+                    {!coinCalculator && (
+                      <div className="loading loading-spinner loading-xs"></div>
+                    )}
+                    {coinCalculator?.tokenAmount} {coinCalculator?.tokenSymbol}
+                  </span>
+                </div>
 
-            <div className="flex items-center">
-              <span className="text-neutral-content">Fees</span>
-              <span className="flex-1 text-base-content text-ellipsis text-right overflow-hidden">
-                TODO
-              </span>
-            </div>
+                <div className="flex items-center">
+                  <span className="text-neutral-content">Fees</span>
+                  <span className="flex-1 text-base-content text-ellipsis text-right overflow-hidden">
+                    {!coinCalculator && (
+                      <div className="loading loading-spinner loading-xs"></div>
+                    )}
+                    {/* 计算 fee */}
+                  </span>
+                </div>
 
-            <div className="flex items-center">
-              <span className="font-semibold text-white text-lg">
-                Sub Total
-              </span>
+                <div className="flex items-center">
+                  <span className="font-semibold text-white text-lg">
+                    Sub Total
+                  </span>
 
-              <p className="font-semibold flex-1 text-white text-right">
-                ≈ {coinCalculator?.tokenAmount} {coinCalculator?.tokenSymbol}
-              </p>
+                  <p className="font-semibold flex-1 text-white text-right">
+                    ≈{" "}
+                    {!coinCalculator && (
+                      <div className="loading loading-spinner loading-xs"></div>
+                    )}
+                    {coinCalculator?.tokenAmount} {coinCalculator?.tokenSymbol}
+                  </p>
+                </div>
+              </div>
             </div>
+          </>
+        ) : (
+          <div className="rounded-lg bg-base-300 my-4 p-4">
+            <div className="font-semibold text-white mb-4">Payment Details</div>
+            {loading && (
+              <div className="flex min-h-48 justify-center items-center">
+                <div className="loading loading-spinner loading-lg"></div>
+              </div>
+            )}
           </div>
-        </div>
+        )}
         <div className="flex flex-col text-center leading-none gap-2">
           <div className=" text-xs text-base-content">Powered by</div>
           <div className="flex justify-center">
@@ -576,4 +620,10 @@ function PaymentPage() {
 
 export const Route = createFileRoute("/payment/$orderId")({
   component: PaymentPage,
+  validateSearch: (search: Record<string, unknown>): { orderId: string } => {
+    // Make order_id optional in the URL
+    return {
+      orderId: search.orderId as string,
+    };
+  },
 });
