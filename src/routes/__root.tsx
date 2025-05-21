@@ -4,8 +4,8 @@ import VConsole from "vconsole";
 
 function NotFound() {
   return (
-    <div className="p-8 text-center text-red-600">
-      <h1 className="text-2xl font-bold mb-2">404 - Page Not Found</h1>
+    <div className="text-center p-8 text-red-600">
+      <h1 className="font-bold mb-2 text-2xl">404 - Page Not Found</h1>
       <p className="mb-4">
         Sorry, the page you are looking for does not exist.
       </p>
@@ -22,15 +22,6 @@ export const Route = createRootRoute({
 
     return (
       <>
-        <div className="p-2 flex gap-2">
-          <Link to="/" className="[&.active]:font-bold">
-            Home
-          </Link>{" "}
-          <Link to="/about" className="[&.active]:font-bold">
-            About
-          </Link>
-        </div>
-        <hr />
         <Outlet />
       </>
     );

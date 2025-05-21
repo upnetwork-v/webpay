@@ -483,144 +483,86 @@ function PaymentPage() {
 
   // 渲染订单支付界面
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="bg-white rounded-xl mx-auto max-w-md shadow-md overflow-hidden">
-        {/* 商家信息 */}
-        <div className="border-b border-gray-200 p-6">
-          <div className="flex items-center">
-            <div className="rounded-full flex font-bold bg-blue-100 h-12 text-xl text-blue-600 w-12 items-center justify-center">
-              {order.merchantName.charAt(0).toUpperCase()}
-            </div>
-            <div className="ml-4">
-              <h2 className="font-semibold text-lg text-gray-900">
-                {order.merchantName}
-              </h2>
-              <p className="text-sm text-gray-500">正在等待支付</p>
-            </div>
-          </div>
+    <div className="flex min-h-screen bg-gray-50 justify-center items-center">
+      <div className="mx-auto min-h-screen max-w-md bg-base-100 shadow-md p-4 pb-24 overflow-hidden relative md:rounded-xl md:min-h-auto">
+        <div className="font-semibold my-6 text-center">Merchant Connect</div>
+        <div className="font-semibold my-2 leading-tight text-3xl">
+          {order.merchantName}
         </div>
-
-        {/* 订单金额 */}
-        <div className="border-b border-gray-200 p-6">
-          <div className="text-center">
-            <p className="text-sm mb-1 text-gray-500">支付金额</p>
-            <p className="font-bold text-3xl text-gray-900">
-              {order.orderValue} {order.currency}
-            </p>
-            <p className="mt-2 text-sm text-gray-500">
-              ≈ {coinCalculator?.tokenAmount} {order.defaultPaymentToken}
-            </p>
-          </div>
+        <div className="my-2 text-sm leading-tight">
+          Order ID: {order.orderId}
         </div>
 
         {/* 订单详情 */}
-        <div className="border-b border-gray-200 p-6">
-          <h3 className="font-medium text-sm mb-3 text-gray-500">订单详情</h3>
-          <div className="space-y-2">
-            <div className="flex text-sm justify-between">
-              <span className="text-gray-500">订单号</span>
-              <span className="text-gray-900">{order.orderId}</span>
+        <div className=" rounded-lg bg-base-300 my-4 p-4">
+          <div className="font-semibold mb-4">Payment Details</div>
+
+          <div className="space-y-2 text-sm">
+            <div className="flex items-center">
+              <span className="text-neutral-content">Order Value</span>
+              <span className="flex-1 text-base-content text-ellipsis text-right overflow-hidden">
+                {order.orderValue} {order.currency}
+              </span>
             </div>
-            <div className="flex text-sm justify-between">
-              <span className="text-gray-500">商品描述</span>
-              <span className="text-right text-gray-900">test description</span>
+            <div className="flex items-center">
+              <span className="text-neutral-content">Payment Token</span>
+              <span className="flex-1 text-base-content text-ellipsis text-right overflow-hidden">
+                {coinCalculator?.tokenSymbol}
+              </span>
             </div>
-            <div className="flex text-sm justify-between">
-              <span className="text-gray-500">收款地址</span>
-              <span className="font-mono text-xs ml-2 text-gray-900 break-all">
+            <div className="flex items-center">
+              <span className="text-neutral-content">Merchant Address</span>
+              <span className="font-mono flex-1 text-xs text-base-content text-right ml-2 break-all overflow-hidden">
                 {order.merchantSolanaAddress}
               </span>
             </div>
+            <div className="flex items-center">
+              <span className="text-neutral-content">Amount</span>
+              <span className="flex-1 text-base-content text-ellipsis text-right overflow-hidden">
+                {coinCalculator?.tokenAmount} {coinCalculator?.tokenSymbol}
+              </span>
+            </div>
+
+            <div className="flex items-center">
+              <span className="text-neutral-content">Fees</span>
+              <span className="flex-1 text-base-content text-ellipsis text-right overflow-hidden">
+                TODO
+              </span>
+            </div>
+
+            <div className="flex items-center">
+              <span className="text-neutral-content">Sub Total</span>
+
+              <p className="flex-1 text-sm text-neutral-content text-right">
+                ≈ {coinCalculator?.tokenAmount} {order.defaultPaymentToken}
+              </p>
+            </div>
           </div>
         </div>
-
-        {/* 支付方式 */}
-        <div className="p-6">
-          <h3 className="font-medium text-sm mb-3 text-gray-500">支付方式</h3>
-          <div className="space-y-4">
-            {order.supportTokenList.map((token) => (
-              <div
-                key={token.symbol}
-                className={`flex items-center p-3 border rounded-lg cursor-pointer ${
-                  order.defaultPaymentToken === token.symbol
-                    ? "border-blue-500 bg-blue-50"
-                    : "border-gray-200 hover:border-gray-300"
-                }`}
-                onClick={() => {
-                  // 切换支付代币逻辑
-                  order.defaultPaymentToken = token.symbol;
-                  setOrder({ ...order });
-                }}
-              >
-                <div className="rounded-full flex bg-gray-200 h-8 mr-3 w-8 items-center justify-center">
-                  {token.symbol.charAt(0).toUpperCase()}
-                </div>
-                <div className="flex-1">
-                  <div className="font-medium">{token.symbol}</div>
-                  <div className="text-xs text-gray-500">
-                    {token.isNative ? "Native token" : "SPL Token"}
-                  </div>
-                </div>
-                {order.defaultPaymentToken === token.symbol && (
-                  <div className="text-blue-600">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-5 w-5"
-                      viewBox="0 0 20 20"
-                      fill="currentColor"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
+        <div className="flex flex-col text-center leading-none gap-2">
+          <div className=" text-xs text-base-content">Powered by</div>
+          <div className="font-semibold uppercase">Up Network</div>
         </div>
 
         {/* 支付按钮 */}
-        <div className="p-6 pt-0">
+        <div className="p-4 right-0 bottom-2 left-0 absolute">
           {!phantomConnected ? (
             <button
-              className="rounded-lg flex font-medium space-x-2 bg-blue-600 text-white w-full py-3 px-4 items-center justify-center hover:bg-blue-700"
+              className="btn btn-primary btn-block btn-lg"
               onClick={handleConnectPhantom}
             >
-              <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 0C5.383 0 0 5.383 0 12s5.383 12 12 12 12-5.383 12-12S18.617 0 12 0zm0 22c-5.514 0-10-4.486-10-10S6.486 2 12 2s10 4.486 10 10-4.486 10-10 10z" />
-                <path d="M16.5 7.5h-9a1 1 0 00-1 1v6a1 1 0 001 1h9a1 1 0 001-1v-6a1 1 0 00-1-1zm-1 6h-7v-4h7v4z" />
-              </svg>
-              <span>连接 Phantom 钱包</span>
+              <span>Connect Phantom Wallet</span>
             </button>
           ) : (
             <button
-              className="rounded-lg flex font-medium space-x-2 bg-blue-600 text-white w-full py-3 px-4 items-center justify-center hover:bg-blue-700"
+              className="btn btn-primary btn-block btn-lg"
               onClick={handlePay}
             >
               <span>
-                确认支付 {coinCalculator?.tokenAmount}{" "}
-                {order.defaultPaymentToken}
+                Pay {coinCalculator?.tokenAmount} {coinCalculator?.tokenSymbol}
               </span>
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M10.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L12.586 11H5a1 1 0 110-2h7.586l-2.293-2.293a1 1 0 010-1.414z"
-                  clipRule="evenodd"
-                />
-              </svg>
             </button>
           )}
-          <p className="mt-3 text-xs text-center text-gray-500">
-            点击确认后，将在 Phantom 钱包中完成支付
-          </p>
         </div>
       </div>
     </div>
