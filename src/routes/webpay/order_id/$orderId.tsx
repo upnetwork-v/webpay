@@ -4,14 +4,15 @@ import { getOrderById, coinCalculatorQuery } from "@/api/order";
 import type { Order, CoinCalculator } from "@/types/payment";
 import { usePhantomWallet } from "@/hooks/usePhantomWallet";
 import { usePayment } from "@/hooks/usePayment";
-import { 
-  getSolanaExplorerUrl, 
+import {
+  getSolanaExplorerUrl,
   openPhantomSignAndSendTransactionDeeplink,
-  decryptTransactionResponse
+  decryptTransactionResponse,
 } from "@/utils/phantom";
+import { estimateTransactionFee } from "@/utils/feeEstimator";
 import upnetworkLogo from "@/assets/img/upnetwork-logo.png";
-import * as nacl from 'tweetnacl';
-
+import * as nacl from "tweetnacl";
+import type { Transaction } from "@solana/web3.js";
 
 export default function PaymentPage() {
   const { orderId } = Route.useParams();
@@ -24,6 +25,8 @@ export default function PaymentPage() {
   const [transactionSignature, setTransactionSignature] = useState<
     string | null
   >(null);
+  const [estimatedFee, setEstimatedFee] = useState<string>("0");
+  const [isEstimatingFee, setIsEstimatingFee] = useState<boolean>(false);
 
   // Initialize Phantom wallet
   const {
@@ -54,6 +57,35 @@ export default function PaymentPage() {
     phantomPublicKey: phantomPublicKey,
   });
 
+  const [tx, setTx] = useState<Transaction | null>(null);
+
+  useEffect(() => {
+    if (
+      createPaymentTransaction &&
+      phantomEncryptionPublicKey &&
+      phantomPublicKey &&
+      !tx
+    ) {
+      createPaymentTransaction().then((tx) => {
+        setTx(tx);
+      });
+    }
+  }, [
+    tx,
+    createPaymentTransaction,
+    phantomEncryptionPublicKey,
+    phantomPublicKey,
+  ]);
+
+  useEffect(() => {
+    if (tx) {
+      setIsEstimatingFee(true);
+      estimateTransactionFee(tx).then((fee) => {
+        setIsEstimatingFee(false);
+        setEstimatedFee(fee.toFixed(6)); // Format to 6 decimal places
+      });
+    }
+  }, [tx, setIsEstimatingFee, setEstimatedFee]);
 
   // Check for Phantom connection callback or payment response when component mounts
   useEffect(() => {
@@ -71,7 +103,11 @@ export default function PaymentPage() {
 
         if (success) {
           // Clean up the URL
-          window.history.replaceState({}, document.title, window.location.pathname);
+          window.history.replaceState(
+            {},
+            document.title,
+            window.location.pathname
+          );
         }
       } catch (error) {
         console.error("Error processing Phantom connection:", error);
@@ -93,7 +129,7 @@ export default function PaymentPage() {
           console.log("Payment successful:", response);
           setTransactionSignature(response.signature);
           setIsComplete(true);
-          
+
           // Clean up the URL
           const cleanUrl = window.location.pathname;
           window.history.replaceState({}, document.title, cleanUrl);
@@ -107,15 +143,22 @@ export default function PaymentPage() {
     }
     // Handle payment errors
     else if (errorCode) {
-      const errorMessage = urlParams.get("errorMessage") || "Payment was cancelled or failed";
+      const errorMessage =
+        urlParams.get("errorMessage") || "Payment was cancelled or failed";
       console.error("Payment error:", { errorCode, errorMessage });
       setError(`Payment failed: ${errorMessage}`);
-      
+
       // Clean up the URL
       const cleanUrl = window.location.pathname;
       window.history.replaceState({}, document.title, cleanUrl);
     }
-  }, [orderId, processConnectCallback, dappKeyPair, phantomEncryptionPublicKey, setError]);
+  }, [
+    orderId,
+    processConnectCallback,
+    dappKeyPair,
+    phantomEncryptionPublicKey,
+    setError,
+  ]);
 
   // Connect to Phantom wallet
   const handleConnectWallet = useCallback(async () => {
@@ -142,31 +185,34 @@ export default function PaymentPage() {
 
   // Fetch order details
   useEffect(() => {
-    if(orderId){
+    if (orderId) {
       setIsLoading(true);
-      getOrderById(orderId).then(setOrder).catch(err => {
-        console.error("Error fetching order:", err);
-        setError("Failed to load order details");
-      }).finally(() => {
-        setIsLoading(false);
-      })
+      getOrderById(orderId)
+        .then(setOrder)
+        .catch((err) => {
+          console.error("Error fetching order:", err);
+          setError("Failed to load order details");
+        })
+        .finally(() => {
+          setIsLoading(false);
+        });
     }
+  }, [orderId, setError]);
 
-  }, [orderId,setError]);
-
-  // 
+  //
   useEffect(() => {
     if (order) {
       coinCalculatorQuery({
         orderValue: order.orderValue,
         tokenAddress: order.defaultPaymentToken,
-      }).then(setCoinCalculator).catch(err => {
-        console.error("Error fetching Calculator:", err);
-        setError("Failed to Calculator");
       })
-
+        .then(setCoinCalculator)
+        .catch((err) => {
+          console.error("Error fetching Calculator:", err);
+          setError("Failed to Calculator");
+        });
     }
-  }, [order,setError])
+  }, [order, setError]);
 
   // Handle payment
   const handlePay = useCallback(async () => {
@@ -183,7 +229,6 @@ export default function PaymentPage() {
     try {
       setIsLoading(true);
 
-      const tx = await createPaymentTransaction();
       if (!tx) {
         throw new Error("Failed to create transaction");
       }
@@ -230,12 +275,12 @@ export default function PaymentPage() {
     phantomConnected,
     phantomPublicKey,
     order,
-    createPaymentTransaction,
+    tx,
     handleConnectWallet,
     phantomEncryptionPublicKey,
     phantomSession,
     dappKeyPair,
-    setError
+    setError,
   ]);
 
   // Render error state
@@ -278,7 +323,6 @@ export default function PaymentPage() {
       </div>
     );
   }
-
 
   // Render payment form
   return (
@@ -330,12 +374,13 @@ export default function PaymentPage() {
                 </div>
 
                 <div className="flex items-center">
-                  <span className="text-neutral-content">Fees</span>
+                  <span className="text-neutral-content">Network Fee</span>
                   <span className="flex-1 text-base-content text-ellipsis text-right overflow-hidden">
-                    {!coinCalculator && (
+                    {isEstimatingFee ? (
                       <div className="loading loading-spinner loading-xs"></div>
+                    ) : (
+                      `${estimatedFee} SOL`
                     )}
-                    {/* 计算 fee */}
                   </span>
                 </div>
 
@@ -346,12 +391,19 @@ export default function PaymentPage() {
 
                   <div className="font-semibold flex-1 text-white text-right">
                     ≈{" "}
-                    {!coinCalculator && (
+                    {!coinCalculator ? (
                       <div className="loading loading-spinner loading-xs"></div>
+                    ) : (
+                      `${coinCalculator.tokenAmount} ${coinCalculator.tokenSymbol}`
                     )}
-                    {coinCalculator?.tokenAmount} {coinCalculator?.tokenSymbol}
                   </div>
                 </div>
+
+                {!paymentToken?.isNative && (
+                  <div className="text-xs text-gray-400 text-right">
+                    * Network fee will be paid in SOL
+                  </div>
+                )}
               </div>
             </div>
           </>
