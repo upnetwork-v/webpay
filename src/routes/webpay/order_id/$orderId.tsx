@@ -4,20 +4,14 @@ import { getOrderById, coinCalculatorQuery } from "@/api/order";
 import type { Order, CoinCalculator } from "@/types/payment";
 import { usePhantomWallet } from "@/hooks/usePhantomWallet";
 import { usePayment } from "@/hooks/usePayment";
-import { handleTransactionResponse } from "@/utils/transactionHandlers";
-import { getSolanaExplorerUrl } from "@/utils/phantom";
+import { 
+  getSolanaExplorerUrl, 
+  openPhantomSignAndSendTransactionDeeplink,
+  decryptTransactionResponse
+} from "@/utils/phantom";
 import upnetworkLogo from "@/assets/img/upnetwork-logo.png";
+import * as nacl from 'tweetnacl';
 
-declare global {
-  interface Window {
-    solana?: {
-      isPhantom?: boolean;
-      signAndSendTransaction: (
-        transaction: any
-      ) => Promise<{ signature: string }>;
-    };
-  }
-}
 
 export default function PaymentPage() {
   const { orderId } = Route.useParams();
@@ -37,34 +31,12 @@ export default function PaymentPage() {
     phantomPublicKey,
     connectPhantom,
     dappKeyPair,
+    phantomEncryptionPublicKey,
+    phantomSession,
     processConnectCallback,
   } = usePhantomWallet();
 
-  // Check for Phantom connection callback when component mounts
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const phantomPk = urlParams.get("phantom_encryption_public_key");
-    const nonce = urlParams.get("nonce");
-    const data = urlParams.get("data");
-
-    // If we have all required parameters, process the connection callback
-    if (phantomPk && nonce && data) {
-      try {
-        console.log("Processing Phantom connection callback");
-        const success = processConnectCallback(phantomPk, nonce, data);
-
-        if (success) {
-          // Clean up the URL
-          const cleanUrl = window.location.pathname + "?order_id=" + orderId;
-          window.history.replaceState({}, document.title, cleanUrl);
-        }
-      } catch (error) {
-        console.error("Error processing Phantom connection:", error);
-        setError("Failed to connect to Phantom wallet");
-      }
-    }
-  }, [orderId, processConnectCallback]);
-
+  // Get payment token
   const paymentToken = useMemo(() => {
     if (!order) return null;
     return (
@@ -82,12 +54,68 @@ export default function PaymentPage() {
     phantomPublicKey: phantomPublicKey,
   });
 
-  // Handle errors
+
+  // Check for Phantom connection callback or payment response when component mounts
   useEffect(() => {
-    if (error) {
-      console.error("Payment error:", error);
+    const urlParams = new URLSearchParams(window.location.search);
+    const phantomPk = urlParams.get("phantom_encryption_public_key");
+    const nonce = urlParams.get("nonce");
+    const data = urlParams.get("data");
+    const errorCode = urlParams.get("errorCode");
+
+    // Handle connection callback
+    if (phantomPk && nonce && data) {
+      try {
+        console.log("Processing Phantom connection callback");
+        const success = processConnectCallback(phantomPk, nonce, data);
+
+        if (success) {
+          // Clean up the URL
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
+      } catch (error) {
+        console.error("Error processing Phantom connection:", error);
+        setError("Failed to connect to Phantom wallet");
+      }
     }
-  }, [error]);
+    // Handle payment response
+    else if (nonce && data && dappKeyPair && phantomEncryptionPublicKey) {
+      const processPaymentResponse = async () => {
+        try {
+          console.log("Processing payment response from Phantom");
+          const response = decryptTransactionResponse(
+            phantomEncryptionPublicKey,
+            nonce,
+            data,
+            dappKeyPair as nacl.BoxKeyPair
+          );
+
+          console.log("Payment successful:", response);
+          setTransactionSignature(response.signature);
+          setIsComplete(true);
+          
+          // Clean up the URL
+          const cleanUrl = window.location.pathname;
+          window.history.replaceState({}, document.title, cleanUrl);
+        } catch (err) {
+          console.error("Error processing payment response:", err);
+          setError("Failed to process payment response");
+        }
+      };
+
+      processPaymentResponse();
+    }
+    // Handle payment errors
+    else if (errorCode) {
+      const errorMessage = urlParams.get("errorMessage") || "Payment was cancelled or failed";
+      console.error("Payment error:", { errorCode, errorMessage });
+      setError(`Payment failed: ${errorMessage}`);
+      
+      // Clean up the URL
+      const cleanUrl = window.location.pathname;
+      window.history.replaceState({}, document.title, cleanUrl);
+    }
+  }, [orderId, processConnectCallback, dappKeyPair, phantomEncryptionPublicKey, setError]);
 
   // Connect to Phantom wallet
   const handleConnectWallet = useCallback(async () => {
@@ -114,44 +142,33 @@ export default function PaymentPage() {
 
   // Fetch order details
   useEffect(() => {
-    if (!orderId) {
-      setError(
-        "Please provide an order_id in the URL (e.g., /webpay?order_id=123)"
-      );
-      setIsLoading(false);
-      return;
-    }
-
-    const fetchOrder = async () => {
-      try {
-        setIsLoading(true);
-        const orderData = await getOrderById(orderId);
-        setOrder(orderData);
-
-        // Fetch coin calculator data if order exists
-        if (orderData) {
-          const calculatorData = await coinCalculatorQuery({
-            orderValue: orderData.orderValue,
-            tokenAddress: orderData.defaultPaymentToken,
-          });
-
-          if (calculatorData) {
-            setCoinCalculator(calculatorData);
-          }
-        }
-      } catch (err) {
+    if(orderId){
+      setIsLoading(true);
+      getOrderById(orderId).then(setOrder).catch(err => {
         console.error("Error fetching order:", err);
         setError("Failed to load order details");
-      } finally {
+      }).finally(() => {
         setIsLoading(false);
-      }
-    };
+      })
+    }
 
-    fetchOrder();
-  }, [orderId]);
+  }, [orderId,setError]);
+
+  // 
+  useEffect(() => {
+    if (order) {
+      coinCalculatorQuery({
+        orderValue: order.orderValue,
+        tokenAddress: order.defaultPaymentToken,
+      }).then(setCoinCalculator).catch(err => {
+        console.error("Error fetching Calculator:", err);
+        setError("Failed to Calculator");
+      })
+
+    }
+  }, [order,setError])
 
   // Handle payment
-  // TODO :支付流程有问题，不需要签名
   const handlePay = useCallback(async () => {
     if (!phantomConnected || !phantomPublicKey) {
       await handleConnectWallet();
@@ -166,52 +183,47 @@ export default function PaymentPage() {
     try {
       setIsLoading(true);
 
-      // Create payment transaction
       const tx = await createPaymentTransaction();
       if (!tx) {
         throw new Error("Failed to create transaction");
       }
 
-      // Convert transaction to buffer for Phantom
-      const serializedTx = tx.serialize({ requireAllSignatures: false });
-      const transaction = {
-        message: serializedTx.toString("base64"),
-      };
-
-      // Sign and send the transaction using Phantom
-      if (!window.solana) {
-        throw new Error("Phantom wallet not found");
+      if (!phantomEncryptionPublicKey) {
+        throw new Error("Missing Phantom encryption public key");
       }
 
-      const { signature } =
-        await window.solana.signAndSendTransaction(transaction);
-
-      if (!signature) {
-        throw new Error("Transaction was not signed");
+      if (!phantomSession) {
+        throw new Error("Missing Phantom session token");
       }
 
-      // Handle the transaction response
-      await handleTransactionResponse(
-        new URLSearchParams(window.location.search),
-        async () => ({
-          signature,
-        }),
-        (sig: string) => {
-          setTransactionSignature(sig);
-          setIsComplete(true);
-        },
-        (err: string) => {
-          setError(err);
-        }
+      if (!dappKeyPair) {
+        throw new Error("DApp key pair not initialized");
+      }
+
+      // Get the current URL for redirect
+      const redirectUrl = `${window.location.origin}${window.location.pathname}`;
+
+      console.log("Opening Phantom deeplink with transaction:", {
+        feePayer: tx.feePayer?.toBase58(),
+        recentBlockhash: tx.recentBlockhash,
+        instructions: tx.instructions.length,
+        signers: tx.signatures.length,
+        redirectUrl,
+      });
+
+      // Open Phantom deeplink for signing
+      openPhantomSignAndSendTransactionDeeplink(
+        tx,
+        redirectUrl,
+        phantomEncryptionPublicKey,
+        dappKeyPair as nacl.BoxKeyPair,
+        phantomSession
       );
 
-      console.log("Payment successful:", signature);
+      console.log("Phantom deeplink opened with redirectUrl:", redirectUrl);
     } catch (err) {
       console.error("Payment error:", err);
-      setError(
-        err instanceof Error ? err.message : "An unknown error occurred"
-      );
-    } finally {
+      setError(err instanceof Error ? err.message : "Payment failed");
       setIsLoading(false);
     }
   }, [
@@ -220,7 +232,10 @@ export default function PaymentPage() {
     order,
     createPaymentTransaction,
     handleConnectWallet,
-    setError,
+    phantomEncryptionPublicKey,
+    phantomSession,
+    dappKeyPair,
+    setError
   ]);
 
   // Render error state
@@ -264,17 +279,6 @@ export default function PaymentPage() {
     );
   }
 
-  // Render loading state
-  if (isLoading) {
-    return (
-      <div className="flex min-h-screen bg-gray-50 items-center justify-center">
-        <div className="text-center">
-          <div className="rounded-full mx-auto border-b-2 border-blue-500 h-12 mb-4 animate-spin w-12"></div>
-          <p>Loading order details...</p>
-        </div>
-      </div>
-    );
-  }
 
   // Render payment form
   return (
@@ -340,13 +344,13 @@ export default function PaymentPage() {
                     Sub Total
                   </span>
 
-                  <p className="font-semibold flex-1 text-white text-right">
+                  <div className="font-semibold flex-1 text-white text-right">
                     ≈{" "}
                     {!coinCalculator && (
                       <div className="loading loading-spinner loading-xs"></div>
                     )}
                     {coinCalculator?.tokenAmount} {coinCalculator?.tokenSymbol}
-                  </p>
+                  </div>
                 </div>
               </div>
             </div>
