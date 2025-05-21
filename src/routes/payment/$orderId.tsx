@@ -16,6 +16,7 @@ import {
   createSolTransferTransaction,
   createSPLTransferTransaction,
 } from "@/utils/transaction";
+import upnetworkLogo from "@/assets/img/upnetwork-logo.png";
 
 // --- Main Page Component ---
 function PaymentPage() {
@@ -484,18 +485,18 @@ function PaymentPage() {
   // 渲染订单支付界面
   return (
     <div className="flex min-h-screen bg-gray-50 justify-center items-center">
-      <div className="mx-auto min-h-screen max-w-md bg-base-100 shadow-md p-4 pb-24 overflow-hidden relative md:rounded-xl md:min-h-auto">
+      <div className="min-h-screen max-w-md bg-base-100 shadow-md w-full p-4 pb-24 overflow-hidden relative md:rounded-xl md:min-h-auto">
         <div className="font-semibold my-6 text-center">Merchant Connect</div>
         <div className="font-semibold my-2 leading-tight text-3xl">
           {order.merchantName}
         </div>
-        <div className="my-2 text-sm leading-tight">
+        <div className="my-2 text-xs leading-tight">
           Order ID: {order.orderId}
         </div>
 
         {/* 订单详情 */}
         <div className=" rounded-lg bg-base-300 my-4 p-4">
-          <div className="font-semibold mb-4">Payment Details</div>
+          <div className="font-semibold text-white mb-4">Payment Details</div>
 
           <div className="space-y-2 text-sm">
             <div className="flex items-center">
@@ -510,12 +511,12 @@ function PaymentPage() {
                 {coinCalculator?.tokenSymbol}
               </span>
             </div>
-            <div className="flex items-center">
+            {/* <div className="flex items-center">
               <span className="text-neutral-content">Merchant Address</span>
               <span className="font-mono flex-1 text-xs text-base-content text-right ml-2 break-all overflow-hidden">
                 {order.merchantSolanaAddress}
               </span>
-            </div>
+            </div> */}
             <div className="flex items-center">
               <span className="text-neutral-content">Amount</span>
               <span className="flex-1 text-base-content text-ellipsis text-right overflow-hidden">
@@ -531,17 +532,21 @@ function PaymentPage() {
             </div>
 
             <div className="flex items-center">
-              <span className="text-neutral-content">Sub Total</span>
+              <span className="font-semibold text-white text-lg">
+                Sub Total
+              </span>
 
-              <p className="flex-1 text-sm text-neutral-content text-right">
-                ≈ {coinCalculator?.tokenAmount} {order.defaultPaymentToken}
+              <p className="font-semibold flex-1 text-white text-right">
+                ≈ {coinCalculator?.tokenAmount} {coinCalculator?.tokenSymbol}
               </p>
             </div>
           </div>
         </div>
         <div className="flex flex-col text-center leading-none gap-2">
           <div className=" text-xs text-base-content">Powered by</div>
-          <div className="font-semibold uppercase">Up Network</div>
+          <div className="flex justify-center">
+            <img src={upnetworkLogo} alt="Up Network" className="h-6" />
+          </div>
         </div>
 
         {/* 支付按钮 */}
