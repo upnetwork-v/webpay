@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useMemo } from "react";
 import bs58 from "bs58";
-import { createFileRoute, useSearch } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import nacl from "tweetnacl";
 import { getOrderById, coinCalculatorQuery } from "@/api/order";
 import type { Order, CoinCalculator } from "@/types/payment";
@@ -17,38 +17,9 @@ import {
 } from "@/utils/transaction";
 import upnetworkLogo from "@/assets/img/upnetwork-logo.png";
 
-declare global {
-  interface Window {
-    solana?: {
-      isPhantom?: boolean;
-      signAndSendTransaction: (
-        transaction: any
-      ) => Promise<{ signature: string }>;
-    };
-  }
-}
-
-// Define route types
-export type SearchParams = {
-  order_id?: string; // Make order_id optional
-};
-
-// Extend the route type to include search params
-declare module "@tanstack/react-router" {
-  interface Register {
-    router: {
-      routesByPath: {
-        "/webpay": {
-          search: SearchParams;
-        };
-      };
-    };
-  }
-}
-
 // --- Main Page Component ---
 function PaymentPage() {
-  const { order_id: orderId } = useSearch({ from: "/webpay" });
+  const { orderId } = Route.useParams();
   const [order, setOrder] = useState<Order | null>(null);
   const [coinCalculator, setCoinCalculator] = useState<CoinCalculator | null>(
     null
@@ -594,13 +565,13 @@ function PaymentPage() {
                     Sub Total
                   </span>
 
-                  <p className="font-semibold flex-1 text-white text-right">
+                  <div className="font-semibold flex-1 text-white text-right">
                     ≈{" "}
                     {!coinCalculator && (
                       <div className="loading loading-spinner loading-xs"></div>
                     )}
                     {coinCalculator?.tokenAmount} {coinCalculator?.tokenSymbol}
-                  </p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -647,12 +618,12 @@ function PaymentPage() {
   );
 }
 
-export const Route = createFileRoute("/webpay")({
+export const Route = createFileRoute("/webpay/order_id/$orderId")({
   component: PaymentPage,
-  validateSearch: (search: Record<string, unknown>): SearchParams => {
+  validateSearch: (search: Record<string, unknown>): { orderId: string } => {
     // Make order_id optional in the URL
     return {
-      order_id: search.order_id as string | undefined,
+      orderId: search.orderId as string,
     };
   },
 });
