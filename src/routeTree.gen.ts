@@ -11,11 +11,18 @@
 // Import Routes
 
 import { Route as rootRoute } from './routes/__root'
+import { Route as WebpayImport } from './routes/webpay'
 import { Route as AboutImport } from './routes/about'
 import { Route as IndexImport } from './routes/index'
 import { Route as PaymentOrderIdImport } from './routes/payment/$orderId'
 
 // Create/Update Routes
+
+const WebpayRoute = WebpayImport.update({
+  id: '/webpay',
+  path: '/webpay',
+  getParentRoute: () => rootRoute,
+} as any)
 
 const AboutRoute = AboutImport.update({
   id: '/about',
@@ -53,6 +60,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AboutImport
       parentRoute: typeof rootRoute
     }
+    '/webpay': {
+      id: '/webpay'
+      path: '/webpay'
+      fullPath: '/webpay'
+      preLoaderRoute: typeof WebpayImport
+      parentRoute: typeof rootRoute
+    }
     '/payment/$orderId': {
       id: '/payment/$orderId'
       path: '/payment/$orderId'
@@ -68,12 +82,14 @@ declare module '@tanstack/react-router' {
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/webpay': typeof WebpayRoute
   '/payment/$orderId': typeof PaymentOrderIdRoute
 }
 
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/webpay': typeof WebpayRoute
   '/payment/$orderId': typeof PaymentOrderIdRoute
 }
 
@@ -81,27 +97,30 @@ export interface FileRoutesById {
   __root__: typeof rootRoute
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/webpay': typeof WebpayRoute
   '/payment/$orderId': typeof PaymentOrderIdRoute
 }
 
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/about' | '/payment/$orderId'
+  fullPaths: '/' | '/about' | '/webpay' | '/payment/$orderId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/about' | '/payment/$orderId'
-  id: '__root__' | '/' | '/about' | '/payment/$orderId'
+  to: '/' | '/about' | '/webpay' | '/payment/$orderId'
+  id: '__root__' | '/' | '/about' | '/webpay' | '/payment/$orderId'
   fileRoutesById: FileRoutesById
 }
 
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AboutRoute: typeof AboutRoute
+  WebpayRoute: typeof WebpayRoute
   PaymentOrderIdRoute: typeof PaymentOrderIdRoute
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AboutRoute: AboutRoute,
+  WebpayRoute: WebpayRoute,
   PaymentOrderIdRoute: PaymentOrderIdRoute,
 }
 
@@ -117,6 +136,7 @@ export const routeTree = rootRoute
       "children": [
         "/",
         "/about",
+        "/webpay",
         "/payment/$orderId"
       ]
     },
@@ -125,6 +145,9 @@ export const routeTree = rootRoute
     },
     "/about": {
       "filePath": "about.tsx"
+    },
+    "/webpay": {
+      "filePath": "webpay.tsx"
     },
     "/payment/$orderId": {
       "filePath": "payment/$orderId.tsx"
