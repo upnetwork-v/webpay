@@ -3,7 +3,7 @@ import type { Order, CoinCalculator } from "@/types/payment";
 export async function getOrderById(orderId: string): Promise<Order> {
   // Mock order data
   // 延时1秒
-  await new Promise((resolve) => setTimeout(resolve, 100));
+  await new Promise((resolve) => setTimeout(resolve, 1000));
 
   if (orderId === "1") {
     // Return SPL token payment order
@@ -56,7 +56,7 @@ export async function coinCalculatorQuery(params: {
 }): Promise<CoinCalculator> {
   // Mock coin calculator data
   // 延时1秒
-  await new Promise((resolve) => setTimeout(resolve, 100));
+  await new Promise((resolve) => setTimeout(resolve, 1000));
 
   return {
     orderValue: params.orderValue,

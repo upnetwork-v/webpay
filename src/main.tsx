@@ -5,6 +5,8 @@ import { RouterProvider, createRouter } from "@tanstack/react-router";
 // Import the generated route tree
 import { routeTree } from "./routeTree.gen";
 
+import type { SearchParams } from "./routes/webpay";
+
 // Create a new router instance
 const router = createRouter({
   routeTree,
@@ -14,7 +16,13 @@ const router = createRouter({
 // Register the router instance for type safety
 declare module "@tanstack/react-router" {
   interface Register {
-    router: typeof router;
+    router: {
+      routesByPath: {
+        "/webpay": {
+          search: SearchParams;
+        };
+      };
+    };
   }
 }
 
