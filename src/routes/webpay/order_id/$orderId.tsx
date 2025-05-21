@@ -32,8 +32,38 @@ export default function PaymentPage() {
   >(null);
 
   // Initialize Phantom wallet
-  const { phantomConnected, phantomPublicKey, connectPhantom } =
-    usePhantomWallet();
+  const {
+    phantomConnected,
+    phantomPublicKey,
+    connectPhantom,
+    dappKeyPair,
+    processConnectCallback,
+  } = usePhantomWallet();
+
+  // Check for Phantom connection callback when component mounts
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const phantomPk = urlParams.get("phantom_encryption_public_key");
+    const nonce = urlParams.get("nonce");
+    const data = urlParams.get("data");
+
+    // If we have all required parameters, process the connection callback
+    if (phantomPk && nonce && data) {
+      try {
+        console.log("Processing Phantom connection callback");
+        const success = processConnectCallback(phantomPk, nonce, data);
+
+        if (success) {
+          // Clean up the URL
+          const cleanUrl = window.location.pathname + "?order_id=" + orderId;
+          window.history.replaceState({}, document.title, cleanUrl);
+        }
+      } catch (error) {
+        console.error("Error processing Phantom connection:", error);
+        setError("Failed to connect to Phantom wallet");
+      }
+    }
+  }, [orderId, processConnectCallback]);
 
   const paymentToken = useMemo(() => {
     if (!order) return null;
@@ -62,12 +92,25 @@ export default function PaymentPage() {
   // Connect to Phantom wallet
   const handleConnectWallet = useCallback(async () => {
     try {
+      if (!dappKeyPair) {
+        throw new Error("Wallet initialization in progress. Please try again.");
+      }
+
+      // Clear any existing connection state
+      localStorage.removeItem("phantom_encryption_public_key");
+      localStorage.removeItem("phantom_public_key");
+      localStorage.removeItem("phantom_session");
+
       await connectPhantom();
     } catch (err) {
       console.error("Wallet connection error:", err);
-      setError("Failed to connect wallet. Please try again.");
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to connect wallet. Please try again."
+      );
     }
-  }, [connectPhantom, setError]);
+  }, [connectPhantom, setError, dappKeyPair]);
 
   // Fetch order details
   useEffect(() => {
@@ -108,6 +151,7 @@ export default function PaymentPage() {
   }, [orderId]);
 
   // Handle payment
+  // TODO :支付流程有问题，不需要签名
   const handlePay = useCallback(async () => {
     if (!phantomConnected || !phantomPublicKey) {
       await handleConnectWallet();
@@ -182,16 +226,18 @@ export default function PaymentPage() {
   // Render error state
   if (error) {
     return (
-      <div className="flex min-h-screen bg-gray-50 items-center justify-center">
-        <div className="bg-white rounded-lg max-w-md shadow-md text-center w-full p-8">
-          <h2 className="font-bold mb-4 text-2xl text-red-600">Error</h2>
-          <p className="mb-6">{error}</p>
-          <button
-            onClick={() => window.location.reload()}
-            className="rounded bg-blue-600 text-white py-2 px-4 transition-colors hover:bg-blue-700"
-          >
-            Try Again
-          </button>
+      <div className="hero bg-base-200 min-h-screen">
+        <div className="hero-content text-center">
+          <div className="max-w-md">
+            <h1 className="text-5xl font-bold">Error</h1>
+            <p className="py-6">{error}</p>
+            <button
+              className="btn btn-primary"
+              onClick={() => window.location.reload()}
+            >
+              Try Again
+            </button>
+          </div>
         </div>
       </div>
     );

@@ -61,7 +61,7 @@ export async function coinCalculatorQuery(params: {
   return {
     orderValue: params.orderValue,
     tokenAddress: params.tokenAddress,
-    tokenAmount: "5",
+    tokenAmount: "0.5",
     tokenSymbol: "USDC",
     tokenDecimals: 6,
   };

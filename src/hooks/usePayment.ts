@@ -4,6 +4,7 @@ import {
   createSPLTransferTransaction,
 } from "@/utils/transaction";
 import type { Order, CoinCalculator } from "@/types/payment";
+import { parseUnits } from "viem";
 
 interface UsePaymentProps {
   order: Order | null;
@@ -30,21 +31,35 @@ export const usePayment = ({
       let tx;
 
       if (!paymentToken.isNative) {
+        // SPL token payment
         if (!paymentToken.address) {
           throw new Error("Token address is required for SPL token payment");
+        }
+        if (!coinCalculator) {
+          throw new Error("Coin calculator is required for SPL token payment");
         }
         tx = await createSPLTransferTransaction({
           from: phantomPublicKey,
           to: order.merchantSolanaAddress,
-          tokenAmount: coinCalculator?.tokenAmount ?? "0",
+          tokenAmount: parseUnits(
+            coinCalculator.tokenAmount,
+            paymentToken.decimals
+          ),
           tokenAddress: paymentToken.address,
           orderId: order.orderId,
         });
       } else {
+        // SOL payment
+        if (!coinCalculator) {
+          throw new Error("Coin calculator is required for SOL payment");
+        }
         tx = await createSolTransferTransaction({
           from: phantomPublicKey,
           to: order.merchantSolanaAddress,
-          tokenAmount: coinCalculator?.tokenAmount ?? "0",
+          tokenAmount: parseUnits(
+            coinCalculator.tokenAmount,
+            paymentToken.decimals
+          ),
           orderId: order.orderId,
         });
       }

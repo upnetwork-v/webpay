@@ -91,7 +91,7 @@ export async function createSPLTransferTransaction({
       fromTokenAccountParsed.value.data.program === "spl-token"
     ) {
       fromBalance =
-        fromTokenAccountParsed.value.data.parsed.info.tokenAmount.uiAmount;
+        fromTokenAccountParsed.value.data.parsed.info.tokenAmount.amount;
     }
     console.log("付款人 Token 余额:", fromBalance);
     if (

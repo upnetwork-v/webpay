@@ -26,13 +26,13 @@ export interface Token {
 export interface TransactionParams {
   from: string;
   to: string;
-  tokenAmount: string;
+  tokenAmount: string | bigint;
   tokenAddress?: string;
   orderId: string;
 }
 
 export interface CoinCalculator {
-  orderValue: string;
+  orderValue?: string;
   tokenAddress?: string;
   tokenAmount: string;
   tokenSymbol: string;
