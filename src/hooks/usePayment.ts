@@ -3,11 +3,12 @@ import {
   createSolTransferTransaction,
   createSPLTransferTransaction,
 } from "@/utils/transaction";
-import type { Order, CoinCalculator } from "@/types/payment";
+import type { Order, CoinCalculator, Token } from "@/types/payment";
+import { parseUnits } from "viem";
 
 interface UsePaymentProps {
   order: Order | null;
-  paymentToken: any;
+  paymentToken: Token | null;
   coinCalculator: CoinCalculator | null;
   phantomPublicKey: string | null;
 }
@@ -23,28 +24,45 @@ export const usePayment = ({
 
   const createPaymentTransaction = async () => {
     if (!order || !phantomPublicKey || !paymentToken) {
-      throw new Error("Missing required payment information");
+      console.warn("Missing required payment information");
+      return;
     }
 
     try {
       let tx;
 
       if (!paymentToken.isNative) {
-        if (!paymentToken.address) {
+        // SPL token payment
+        if (!paymentToken.tokenAddress) {
           throw new Error("Token address is required for SPL token payment");
+        }
+        if (!coinCalculator) {
+          console.warn("Coin calculator is required for SPL token payment");
+          return tx;
         }
         tx = await createSPLTransferTransaction({
           from: phantomPublicKey,
-          to: order.merchantSolanaAddress,
-          tokenAmount: coinCalculator?.tokenAmount ?? "0",
-          tokenAddress: paymentToken.address,
+          to: order.merchantSolanaAddress, //"9iusfh8hawwYU3iMW8UqNSR1wjbWTy6UkJKMZ8D65Fx3", //
+          tokenAmount: parseUnits(
+            coinCalculator.payTokenAmount,
+            paymentToken.decimal
+          ),
+          tokenAddress: paymentToken.tokenAddress,
           orderId: order.orderId,
         });
       } else {
+        // SOL payment
+        if (!coinCalculator) {
+          console.warn("Coin calculator is required for SOL payment");
+          return tx;
+        }
         tx = await createSolTransferTransaction({
           from: phantomPublicKey,
           to: order.merchantSolanaAddress,
-          tokenAmount: coinCalculator?.tokenAmount ?? "0",
+          tokenAmount: parseUnits(
+            coinCalculator.payTokenAmount,
+            paymentToken.decimal
+          ),
           orderId: order.orderId,
         });
       }

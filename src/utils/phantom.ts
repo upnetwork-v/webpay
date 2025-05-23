@@ -4,7 +4,7 @@ import bs58 from "bs58";
 import nacl from "tweetnacl";
 import { decode as decodeUTF8 } from "@stablelib/utf8";
 
-export const SOLANA_NETWORK = "devnet";
+export const SOLANA_NETWORK = "mainnet-beta"; //"devnet";
 
 const useUniversalLinks = false;
 

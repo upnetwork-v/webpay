@@ -5,26 +5,11 @@ import { RouterProvider, createRouter } from "@tanstack/react-router";
 // Import the generated route tree
 import { routeTree } from "./routeTree.gen";
 
-import type { SearchParams } from "./routes/webpay";
-
 // Create a new router instance
 const router = createRouter({
   routeTree,
   basepath: "/MerchantConnectFrontend",
 });
-
-// Register the router instance for type safety
-declare module "@tanstack/react-router" {
-  interface Register {
-    router: {
-      routesByPath: {
-        "/webpay": {
-          search: SearchParams;
-        };
-      };
-    };
-  }
-}
 
 // Render the app
 const rootElement = document.getElementById("root")!;

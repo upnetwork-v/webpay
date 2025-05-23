@@ -2,7 +2,6 @@ import {
   PublicKey,
   Connection,
   Transaction,
-  clusterApiUrl,
   TransactionInstruction,
   SystemProgram,
   LAMPORTS_PER_SOL,
@@ -12,9 +11,8 @@ import {
   getAssociatedTokenAddress,
 } from "@solana/spl-token";
 import type { TransactionParams } from "@/types/payment";
-import { SOLANA_NETWORK } from "./phantom";
 
-const connection = new Connection(clusterApiUrl(SOLANA_NETWORK));
+const connection = new Connection(import.meta.env.VITE_SOLANA_RPC);
 
 // Helper to create a Memo instruction
 function createMemoInstruction(
@@ -56,15 +54,13 @@ export async function createSPLTransferTransaction({
       new PublicKey(tokenAddress),
       new PublicKey(from)
     );
+    console.log("fromTokenAccount", fromTokenAccount.toString());
+
     const toTokenAccount = await getAssociatedTokenAddress(
       new PublicKey(tokenAddress),
       new PublicKey(to)
     );
-
-    console.log("Token accounts:", {
-      fromTokenAccount: fromTokenAccount.toString(),
-      toTokenAccount: toTokenAccount.toString(),
-    });
+    console.log("toTokenAccount", toTokenAccount.toString());
 
     // Check if token accounts exist
     const fromAccountInfo = await connection.getAccountInfo(fromTokenAccount);
@@ -91,7 +87,7 @@ export async function createSPLTransferTransaction({
       fromTokenAccountParsed.value.data.program === "spl-token"
     ) {
       fromBalance =
-        fromTokenAccountParsed.value.data.parsed.info.tokenAmount.uiAmount;
+        fromTokenAccountParsed.value.data.parsed.info.tokenAmount.amount;
     }
     console.log("付款人 Token 余额:", fromBalance);
     if (
@@ -129,7 +125,14 @@ export async function createSPLTransferTransaction({
     );
 
     // Memo instruction
-    const memoIx = createMemoInstruction(orderId, new PublicKey(from));
+    const memoIx = createMemoInstruction(
+      JSON.stringify({
+        webpay: {
+          orderId,
+        },
+      }),
+      new PublicKey(from)
+    );
 
     const tx = new Transaction().add(transferIx, memoIx);
     tx.feePayer = new PublicKey(from);
@@ -167,11 +170,10 @@ export async function createSolTransferTransaction({
       to: toPubkey.toBase58(),
       lamports,
       orderId,
-      network: SOLANA_NETWORK,
     });
 
     // Get the current status of the cluster to ensure connection is working
-    console.log("Checking connection to", SOLANA_NETWORK);
+    console.log("Checking connection to", import.meta.env.VITE_SOLANA_RPC);
     const clusterStatus = await connection.getVersion();
     console.log("Solana cluster status:", clusterStatus);
 
@@ -210,7 +212,14 @@ export async function createSolTransferTransaction({
     tx.add(transferIx);
 
     // Add memo instruction with orderId
-    const memoIx = createMemoInstruction(orderId, fromPubkey);
+    const memoIx = createMemoInstruction(
+      JSON.stringify({
+        webpay: {
+          orderId,
+        },
+      }),
+      fromPubkey
+    );
     tx.add(memoIx);
 
     // Set fee payer

@@ -10,7 +10,7 @@ export interface Order {
   merchantSolanaAddress: string;
   orderId: string;
   orderValue: string;
-  paymentStatus: string;
+  paymentStatus: 0 | 1 | 2;
   secondVerification: boolean;
   supportTokenList: Token[];
   transaction_limit?: number;
@@ -18,23 +18,23 @@ export interface Order {
 }
 
 export interface Token {
-  address?: string;
+  tokenAddress?: string;
   isNative: boolean;
   symbol: string;
+  decimal: number;
 }
 
 export interface TransactionParams {
   from: string;
   to: string;
-  tokenAmount: string;
+  tokenAmount: string | bigint;
   tokenAddress?: string;
   orderId: string;
 }
 
 export interface CoinCalculator {
-  orderValue: string;
-  tokenAddress?: string;
-  tokenAmount: string;
-  tokenSymbol: string;
-  tokenDecimals: number;
+  tokenPrice?: string;
+  payTokenAmount: string;
+  payTokenSymbol: string;
+  payTokenDecimal: number;
 }
