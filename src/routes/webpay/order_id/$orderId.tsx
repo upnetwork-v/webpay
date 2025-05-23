@@ -211,6 +211,11 @@ export default function PaymentPage() {
   //
   useEffect(() => {
     if (order) {
+      if (!order.merchantSolanaAddress) {
+        setError("Merchant Solana address not found");
+        return;
+      }
+
       coinCalculatorQuery({
         id: order.orderId,
         symbol: paymentToken?.symbol || "",
@@ -222,7 +227,7 @@ export default function PaymentPage() {
           setError("Failed to Calculator");
         });
     }
-  }, [order, setError]);
+  }, [order, setError, paymentToken]);
 
   // Handle payment
   const handlePay = useCallback(async () => {

@@ -129,7 +129,14 @@ export async function createSPLTransferTransaction({
     );
 
     // Memo instruction
-    const memoIx = createMemoInstruction(orderId, new PublicKey(from));
+    const memoIx = createMemoInstruction(
+      JSON.stringify({
+        webpay: {
+          orderId,
+        },
+      }),
+      new PublicKey(from)
+    );
 
     const tx = new Transaction().add(transferIx, memoIx);
     tx.feePayer = new PublicKey(from);
@@ -210,7 +217,14 @@ export async function createSolTransferTransaction({
     tx.add(transferIx);
 
     // Add memo instruction with orderId
-    const memoIx = createMemoInstruction(orderId, fromPubkey);
+    const memoIx = createMemoInstruction(
+      JSON.stringify({
+        webpay: {
+          orderId,
+        },
+      }),
+      fromPubkey
+    );
     tx.add(memoIx);
 
     // Set fee payer

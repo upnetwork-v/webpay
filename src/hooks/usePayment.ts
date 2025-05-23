@@ -3,12 +3,12 @@ import {
   createSolTransferTransaction,
   createSPLTransferTransaction,
 } from "@/utils/transaction";
-import type { Order, CoinCalculator } from "@/types/payment";
+import type { Order, CoinCalculator, Token } from "@/types/payment";
 import { parseUnits } from "viem";
 
 interface UsePaymentProps {
   order: Order | null;
-  paymentToken: any;
+  paymentToken: Token | null;
   coinCalculator: CoinCalculator | null;
   phantomPublicKey: string | null;
 }
@@ -32,7 +32,7 @@ export const usePayment = ({
 
       if (!paymentToken.isNative) {
         // SPL token payment
-        if (!paymentToken.address) {
+        if (!paymentToken.tokenAddress) {
           throw new Error("Token address is required for SPL token payment");
         }
         if (!coinCalculator) {
@@ -43,9 +43,9 @@ export const usePayment = ({
           to: order.merchantSolanaAddress,
           tokenAmount: parseUnits(
             coinCalculator.payTokenAmount,
-            paymentToken.decimals
+            paymentToken.decimal
           ),
-          tokenAddress: paymentToken.address,
+          tokenAddress: paymentToken.tokenAddress,
           orderId: order.orderId,
         });
       } else {
@@ -58,7 +58,7 @@ export const usePayment = ({
           to: order.merchantSolanaAddress,
           tokenAmount: parseUnits(
             coinCalculator.payTokenAmount,
-            paymentToken.decimals
+            paymentToken.decimal
           ),
           orderId: order.orderId,
         });
