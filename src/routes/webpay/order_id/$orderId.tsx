@@ -73,7 +73,7 @@ export default function PaymentPage() {
       } else {
         console.log(
           "missing init params",
-          createPaymentTransaction,
+          typeof createPaymentTransaction,
           phantomEncryptionPublicKey,
           phantomPublicKey
         );
@@ -212,8 +212,9 @@ export default function PaymentPage() {
   useEffect(() => {
     if (order) {
       coinCalculatorQuery({
-        orderValue: order.orderValue,
-        tokenAddress: order.defaultPaymentToken,
+        id: order.orderId,
+        symbol: paymentToken?.symbol || "",
+        tokenAddress: paymentToken?.tokenAddress,
       })
         .then(setCoinCalculator)
         .catch((err) => {
@@ -375,7 +376,8 @@ export default function PaymentPage() {
                 <div className="flex items-center">
                   <span className="text-neutral-content">Order Value</span>
                   <span className="flex-1 text-base-content text-ellipsis text-right overflow-hidden">
-                    {order.orderValue} {order.currency}
+                    {(Number(order.orderValue) / 100).toFixed(2)}{" "}
+                    {order.currency}
                   </span>
                 </div>
                 <div className="flex items-center">
@@ -396,7 +398,8 @@ export default function PaymentPage() {
                     {!coinCalculator && (
                       <div className="loading loading-spinner loading-xs"></div>
                     )}
-                    {coinCalculator?.tokenAmount} {coinCalculator?.tokenSymbol}
+                    {coinCalculator?.payTokenAmount}{" "}
+                    {coinCalculator?.payTokenSymbol}
                   </span>
                 </div>
 
@@ -421,7 +424,7 @@ export default function PaymentPage() {
                     {!coinCalculator ? (
                       <div className="loading loading-spinner loading-xs"></div>
                     ) : (
-                      `${coinCalculator.tokenAmount} ${coinCalculator.tokenSymbol}`
+                      `${coinCalculator.payTokenAmount} ${coinCalculator.payTokenSymbol}`
                     )}
                   </div>
                 </div>
@@ -475,7 +478,8 @@ export default function PaymentPage() {
               </div>
               <button className="btn btn-primary btn-block btn-lg" disabled>
                 <span className="loading loading-spinner loading-xs"></span>
-                Pay {coinCalculator?.tokenAmount} {coinCalculator?.tokenSymbol}
+                Pay {coinCalculator?.payTokenAmount}{" "}
+                {coinCalculator?.payTokenSymbol}
               </button>
             </>
           ) : (
@@ -484,7 +488,8 @@ export default function PaymentPage() {
               onClick={handlePay}
               disabled={!tx}
             >
-              Pay {coinCalculator?.tokenAmount} {coinCalculator?.tokenSymbol}
+              Pay {coinCalculator?.payTokenAmount}{" "}
+              {coinCalculator?.payTokenSymbol}
             </button>
           )}
         </div>

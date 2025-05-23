@@ -42,7 +42,7 @@ export const usePayment = ({
           from: phantomPublicKey,
           to: order.merchantSolanaAddress,
           tokenAmount: parseUnits(
-            coinCalculator.tokenAmount,
+            coinCalculator.payTokenAmount,
             paymentToken.decimals
           ),
           tokenAddress: paymentToken.address,
@@ -57,7 +57,7 @@ export const usePayment = ({
           from: phantomPublicKey,
           to: order.merchantSolanaAddress,
           tokenAmount: parseUnits(
-            coinCalculator.tokenAmount,
+            coinCalculator.payTokenAmount,
             paymentToken.decimals
           ),
           orderId: order.orderId,
