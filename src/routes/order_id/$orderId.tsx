@@ -461,7 +461,7 @@ export default function PaymentPage() {
             )}
           </div>
         )}
-        <div className="flex flex-col text-center leading-none gap-2">
+        <div className="flex flex-col text-center leading-none gap-2 py-6">
           <div className=" text-xs text-base-content">Powered by</div>
           <div className="flex justify-center">
             <img src={upnetworkLogo} alt="Up Network" className="h-6" />
