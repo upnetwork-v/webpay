@@ -8,19 +8,12 @@
 // You should NOT make any changes in this file as it will be overwritten.
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
-import { createFileRoute } from '@tanstack/react-router'
-
 // Import Routes
 
 import { Route as rootRoute } from './routes/__root'
 import { Route as AboutImport } from './routes/about'
 import { Route as IndexImport } from './routes/index'
-import { Route as WebpayOrderidorderIdcopyImport } from './routes/webpay/order_id/__orderId copy'
 import { Route as WebpayOrderidOrderIdImport } from './routes/webpay/order_id/$orderId'
-
-// Create Virtual Routes
-
-const WebpayOrderidImport = createFileRoute('/webpay/order_id')()
 
 // Create/Update Routes
 
@@ -34,17 +27,6 @@ const IndexRoute = IndexImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRoute,
-} as any)
-
-const WebpayOrderidRoute = WebpayOrderidImport.update({
-  id: '/webpay/order_id',
-  path: '/webpay/order_id',
-  getParentRoute: () => rootRoute,
-} as any)
-
-const WebpayOrderidorderIdcopyRoute = WebpayOrderidorderIdcopyImport.update({
-  id: '/__orderId copy',
-  getParentRoute: () => WebpayOrderidRoute,
 } as any)
 
 const WebpayOrderidOrderIdRoute = WebpayOrderidOrderIdImport.update({
@@ -78,49 +60,21 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WebpayOrderidOrderIdImport
       parentRoute: typeof rootRoute
     }
-    '/webpay/order_id': {
-      id: '/webpay/order_id'
-      path: '/webpay/order_id'
-      fullPath: '/webpay/order_id'
-      preLoaderRoute: typeof WebpayOrderidImport
-      parentRoute: typeof rootRoute
-    }
-    '/webpay/order_id/__orderId copy': {
-      id: '/webpay/order_id/__orderId copy'
-      path: '/webpay/order_id'
-      fullPath: '/webpay/order_id'
-      preLoaderRoute: typeof WebpayOrderidorderIdcopyImport
-      parentRoute: typeof WebpayOrderidRoute
-    }
   }
 }
 
 // Create and export the route tree
 
-interface WebpayOrderidRouteChildren {
-  WebpayOrderidorderIdcopyRoute: typeof WebpayOrderidorderIdcopyRoute
-}
-
-const WebpayOrderidRouteChildren: WebpayOrderidRouteChildren = {
-  WebpayOrderidorderIdcopyRoute: WebpayOrderidorderIdcopyRoute,
-}
-
-const WebpayOrderidRouteWithChildren = WebpayOrderidRoute._addFileChildren(
-  WebpayOrderidRouteChildren,
-)
-
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/webpay/order_id/$orderId': typeof WebpayOrderidOrderIdRoute
-  '/webpay/order_id': typeof WebpayOrderidorderIdcopyRoute
 }
 
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/webpay/order_id/$orderId': typeof WebpayOrderidOrderIdRoute
-  '/webpay/order_id': typeof WebpayOrderidorderIdcopyRoute
 }
 
 export interface FileRoutesById {
@@ -128,22 +82,14 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/webpay/order_id/$orderId': typeof WebpayOrderidOrderIdRoute
-  '/webpay/order_id': typeof WebpayOrderidRouteWithChildren
-  '/webpay/order_id/__orderId copy': typeof WebpayOrderidorderIdcopyRoute
 }
 
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/about' | '/webpay/order_id/$orderId' | '/webpay/order_id'
+  fullPaths: '/' | '/about' | '/webpay/order_id/$orderId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/about' | '/webpay/order_id/$orderId' | '/webpay/order_id'
-  id:
-    | '__root__'
-    | '/'
-    | '/about'
-    | '/webpay/order_id/$orderId'
-    | '/webpay/order_id'
-    | '/webpay/order_id/__orderId copy'
+  to: '/' | '/about' | '/webpay/order_id/$orderId'
+  id: '__root__' | '/' | '/about' | '/webpay/order_id/$orderId'
   fileRoutesById: FileRoutesById
 }
 
@@ -151,14 +97,12 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AboutRoute: typeof AboutRoute
   WebpayOrderidOrderIdRoute: typeof WebpayOrderidOrderIdRoute
-  WebpayOrderidRoute: typeof WebpayOrderidRouteWithChildren
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AboutRoute: AboutRoute,
   WebpayOrderidOrderIdRoute: WebpayOrderidOrderIdRoute,
-  WebpayOrderidRoute: WebpayOrderidRouteWithChildren,
 }
 
 export const routeTree = rootRoute
@@ -173,8 +117,7 @@ export const routeTree = rootRoute
       "children": [
         "/",
         "/about",
-        "/webpay/order_id/$orderId",
-        "/webpay/order_id"
+        "/webpay/order_id/$orderId"
       ]
     },
     "/": {
@@ -185,16 +128,6 @@ export const routeTree = rootRoute
     },
     "/webpay/order_id/$orderId": {
       "filePath": "webpay/order_id/$orderId.tsx"
-    },
-    "/webpay/order_id": {
-      "filePath": "webpay/order_id",
-      "children": [
-        "/webpay/order_id/__orderId copy"
-      ]
-    },
-    "/webpay/order_id/__orderId copy": {
-      "filePath": "webpay/order_id/__orderId copy.tsx",
-      "parent": "/webpay/order_id"
     }
   }
 }

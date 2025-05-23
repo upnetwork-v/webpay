@@ -56,15 +56,13 @@ export async function createSPLTransferTransaction({
       new PublicKey(tokenAddress),
       new PublicKey(from)
     );
+    console.log("fromTokenAccount", fromTokenAccount.toString());
+
     const toTokenAccount = await getAssociatedTokenAddress(
       new PublicKey(tokenAddress),
       new PublicKey(to)
     );
-
-    console.log("Token accounts:", {
-      fromTokenAccount: fromTokenAccount.toString(),
-      toTokenAccount: toTokenAccount.toString(),
-    });
+    console.log("toTokenAccount", toTokenAccount.toString());
 
     // Check if token accounts exist
     const fromAccountInfo = await connection.getAccountInfo(fromTokenAccount);

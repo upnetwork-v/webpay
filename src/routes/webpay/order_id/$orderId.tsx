@@ -66,10 +66,15 @@ export default function PaymentPage() {
         phantomEncryptionPublicKey &&
         phantomPublicKey
       ) {
-        createPaymentTransaction().then((tx) => {
-          console.log("create payment transaction", tx);
-          setTx(tx);
-        });
+        createPaymentTransaction()
+          .then((tx) => {
+            console.log("create payment transaction", tx);
+            setTx(tx);
+          })
+          .catch((err) => {
+            console.error("Error creating payment transaction:", err);
+            setError(`Failed to create payment transaction: ${err}`);
+          });
       } else {
         console.log(
           "missing init params",
@@ -120,7 +125,7 @@ export default function PaymentPage() {
         }
       } catch (error) {
         console.error("Error processing Phantom connection:", error);
-        setError("Failed to connect to Phantom wallet");
+        setError(`Failed to connect to Phantom wallet: ${error}`);
       }
     }
     // Handle payment response
@@ -144,7 +149,7 @@ export default function PaymentPage() {
           window.history.replaceState({}, document.title, cleanUrl);
         } catch (err) {
           console.error("Error processing payment response:", err);
-          setError("Failed to process payment response");
+          setError(`Failed to process payment response: ${err}`);
         }
       };
 
@@ -200,7 +205,7 @@ export default function PaymentPage() {
         .then(setOrder)
         .catch((err) => {
           console.error("Error fetching order:", err);
-          setError("Failed to load order details");
+          setError(`Failed to load order details: ${err}`);
         })
         .finally(() => {
           setIsLoading(false);
@@ -224,7 +229,7 @@ export default function PaymentPage() {
         .then(setCoinCalculator)
         .catch((err) => {
           console.error("Error fetching Calculator:", err);
-          setError("Failed to Calculator");
+          setError(`Failed to Calculator: ${err}`);
         });
     }
   }, [order, setError, paymentToken]);
@@ -237,7 +242,7 @@ export default function PaymentPage() {
     }
 
     if (!order) {
-      setError("Order not found");
+      setError(`Order not found`);
       return;
     }
 
@@ -283,7 +288,11 @@ export default function PaymentPage() {
       console.log("Phantom deeplink opened with redirectUrl:", redirectUrl);
     } catch (err) {
       console.error("Payment error:", err);
-      setError(err instanceof Error ? err.message : "Payment failed");
+      setError(
+        err instanceof Error
+          ? `Payment error: ${err.message}`
+          : "Payment failed"
+      );
       setIsLoading(false);
     }
   }, [

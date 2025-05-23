@@ -40,7 +40,7 @@ export const usePayment = ({
         }
         tx = await createSPLTransferTransaction({
           from: phantomPublicKey,
-          to: order.merchantSolanaAddress,
+          to: order.merchantSolanaAddress, //"9iusfh8hawwYU3iMW8UqNSR1wjbWTy6UkJKMZ8D65Fx3", //
           tokenAmount: parseUnits(
             coinCalculator.payTokenAmount,
             paymentToken.decimal
