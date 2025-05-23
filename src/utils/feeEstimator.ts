@@ -1,13 +1,11 @@
 import {
   Connection,
-  clusterApiUrl,
   Transaction,
   VersionedTransaction,
   LAMPORTS_PER_SOL,
 } from "@solana/web3.js";
-import { SOLANA_NETWORK } from "./phantom";
 
-const connection = new Connection(clusterApiUrl(SOLANA_NETWORK));
+const connection = new Connection(import.meta.env.VITE_SOLANA_RPC);
 
 // Default fee in SOL if estimation fails
 const DEFAULT_FEE = 0.000005; // 5000 lamports

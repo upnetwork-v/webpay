@@ -2,7 +2,6 @@ import {
   PublicKey,
   Connection,
   Transaction,
-  clusterApiUrl,
   TransactionInstruction,
   SystemProgram,
   LAMPORTS_PER_SOL,
@@ -12,9 +11,8 @@ import {
   getAssociatedTokenAddress,
 } from "@solana/spl-token";
 import type { TransactionParams } from "@/types/payment";
-import { SOLANA_NETWORK } from "./phantom";
 
-const connection = new Connection(clusterApiUrl(SOLANA_NETWORK));
+const connection = new Connection(import.meta.env.VITE_SOLANA_RPC);
 
 // Helper to create a Memo instruction
 function createMemoInstruction(
@@ -172,11 +170,10 @@ export async function createSolTransferTransaction({
       to: toPubkey.toBase58(),
       lamports,
       orderId,
-      network: SOLANA_NETWORK,
     });
 
     // Get the current status of the cluster to ensure connection is working
-    console.log("Checking connection to", SOLANA_NETWORK);
+    console.log("Checking connection to", import.meta.env.VITE_SOLANA_RPC);
     const clusterStatus = await connection.getVersion();
     console.log("Solana cluster status:", clusterStatus);
 

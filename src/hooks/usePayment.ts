@@ -24,7 +24,8 @@ export const usePayment = ({
 
   const createPaymentTransaction = async () => {
     if (!order || !phantomPublicKey || !paymentToken) {
-      throw new Error("Missing required payment information");
+      console.warn("Missing required payment information");
+      return;
     }
 
     try {
@@ -36,7 +37,8 @@ export const usePayment = ({
           throw new Error("Token address is required for SPL token payment");
         }
         if (!coinCalculator) {
-          throw new Error("Coin calculator is required for SPL token payment");
+          console.warn("Coin calculator is required for SPL token payment");
+          return tx;
         }
         tx = await createSPLTransferTransaction({
           from: phantomPublicKey,
@@ -51,7 +53,8 @@ export const usePayment = ({
       } else {
         // SOL payment
         if (!coinCalculator) {
-          throw new Error("Coin calculator is required for SOL payment");
+          console.warn("Coin calculator is required for SOL payment");
+          return tx;
         }
         tx = await createSolTransferTransaction({
           from: phantomPublicKey,

@@ -69,7 +69,7 @@ export default function PaymentPage() {
         createPaymentTransaction()
           .then((tx) => {
             console.log("create payment transaction", tx);
-            setTx(tx);
+            tx && setTx(tx);
           })
           .catch((err) => {
             console.error("Error creating payment transaction:", err);
@@ -512,7 +512,7 @@ export default function PaymentPage() {
   );
 }
 
-export const Route = createFileRoute("/webpay/order_id/$orderId")({
+export const Route = createFileRoute("/order_id/$orderId")({
   component: PaymentPage,
   validateSearch: (search: Record<string, unknown>): { orderId: string } => {
     return {
