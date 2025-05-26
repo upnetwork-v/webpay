@@ -221,6 +221,21 @@ export default function PaymentPage() {
         return;
       }
 
+      if (order.paymentStatus === "success") {
+        setError("Order already paid");
+        return;
+      }
+
+      if (order.paymentStatus === "faile") {
+        setError("Order payment failed");
+        return;
+      }
+
+      if (order.paymentStatus === "pending") {
+        setError("Order payment pending");
+        return;
+      }
+
       coinCalculatorQuery({
         id: order.orderId,
         symbol: paymentToken?.symbol || "",
@@ -310,7 +325,7 @@ export default function PaymentPage() {
   // confirm order
   const orderConfirmed = useMemo(() => {
     if (!order) return false;
-    return order.paymentStatus === 2;
+    return order.paymentStatus === "success";
   }, [order]);
 
   const requestTimeout = useRef<NodeJS.Timeout | null>(null);
@@ -334,7 +349,7 @@ export default function PaymentPage() {
       pollOrder();
 
       // Set up polling interval
-      requestTimeout.current = setInterval(pollOrder, 3000);
+      requestTimeout.current = setInterval(pollOrder, 6000);
     }
 
     // Cleanup function
@@ -488,13 +503,22 @@ export default function PaymentPage() {
                 >
                   View on Solana Explorer
                 </a>
-                . Confirming transaction...
+                .{" "}
+                {orderConfirmed
+                  ? "Order Confirmed!"
+                  : "Confirming transaction..."}
               </div>
-              <button className="btn btn-primary btn-block btn-lg" disabled>
-                <span className="loading loading-spinner loading-xs"></span>
-                Pay {coinCalculator?.payTokenAmount}{" "}
-                {coinCalculator?.payTokenSymbol}
-              </button>
+              {orderConfirmed ? (
+                <button className="btn btn-success btn-block btn-lg">
+                  Order Confirmed!
+                </button>
+              ) : (
+                <button className="btn btn-primary btn-block btn-lg" disabled>
+                  <span className="loading loading-spinner loading-xs"></span>
+                  Pay {coinCalculator?.payTokenAmount}{" "}
+                  {coinCalculator?.payTokenSymbol}
+                </button>
+              )}
             </>
           ) : (
             <button

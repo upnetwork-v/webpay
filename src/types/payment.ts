@@ -10,7 +10,7 @@ export interface Order {
   merchantSolanaAddress: string;
   orderId: string;
   orderValue: string;
-  paymentStatus: 0 | 1 | 2;
+  paymentStatus: "new" | "success" | "faile" | "pending";
   secondVerification: boolean;
   supportTokenList: Token[];
   transaction_limit?: number;
