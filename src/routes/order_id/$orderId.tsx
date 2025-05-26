@@ -367,14 +367,22 @@ export default function PaymentPage() {
       <div className="hero bg-base-200 min-h-screen">
         <div className="hero-content text-center">
           <div className="max-w-md">
-            <h1 className="text-5xl font-bold">Error</h1>
+            {order?.paymentStatus !== "success" ? (
+              <h1 className="text-5xl font-bold">Error</h1>
+            ) : (
+              <h1 className="text-5xl font-bold">Success</h1>
+            )}
+
             <p className="py-6">{error}</p>
-            <button
-              className="btn btn-primary"
-              onClick={() => window.location.reload()}
-            >
-              Try Again
-            </button>
+
+            {order?.paymentStatus !== "success" ? (
+              <button
+                className="btn btn-primary"
+                onClick={() => window.location.reload()}
+              >
+                Try Again
+              </button>
+            ) : null}
           </div>
         </div>
       </div>
