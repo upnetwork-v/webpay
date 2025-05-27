@@ -10,7 +10,7 @@ import {
   decryptTransactionResponse,
 } from "@/utils/phantom";
 import { estimateTransactionFee } from "@/utils/feeEstimator";
-import upnetworkLogo from "@/assets/img/upnetwork-logo.png";
+import Logo from "@/assets/logo.svg";
 import * as nacl from "tweetnacl";
 import type { Transaction } from "@solana/web3.js";
 
@@ -484,10 +484,10 @@ export default function PaymentPage() {
             )}
           </div>
         )}
-        <div className="flex flex-col text-center leading-none gap-2 py-6">
+        <div className="flex flex-col text-center leading-none gap-3 py-6">
           <div className=" text-xs text-base-content">Powered by</div>
           <div className="flex justify-center">
-            <img src={upnetworkLogo} alt="Up Network" className="h-6" />
+            <img src={Logo} alt="Up Network" className="h-6" />
           </div>
         </div>
 
