@@ -1,35 +1,43 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import {
   createSolTransferTransaction,
   createSPLTransferTransaction,
 } from "@/utils/transaction";
 import type { Order, CoinCalculator, Token } from "@/types/payment";
 import { parseUnits } from "viem";
+import { useWallet } from "./useWallet";
 
 interface UsePaymentProps {
   order: Order | null;
   paymentToken: Token | null;
   coinCalculator: CoinCalculator | null;
-  phantomPublicKey: string | null;
 }
 
 export const usePayment = ({
   order,
   paymentToken,
   coinCalculator,
-  phantomPublicKey,
 }: UsePaymentProps) => {
   const [error, setError] = useState<string | null>(null);
   const [isPaying, setIsPaying] = useState(false);
+  const { wallet, account } = useWallet();
 
-  const createPaymentTransaction = async () => {
-    if (!order || !phantomPublicKey || !paymentToken) {
+  const createPaymentTransaction = useCallback(async () => {
+    if (!order || !account || !paymentToken) {
       console.warn("Missing required payment information");
-      return;
+      throw new Error("Wallet not connected or missing payment information");
     }
 
     try {
+      setIsPaying(true);
+      setError(null);
+
+      if (!wallet) {
+        throw new Error("Wallet not connected");
+      }
+
       let tx;
+      const fromAddress = account.address;
 
       if (!paymentToken.isNative) {
         // SPL token payment
@@ -37,12 +45,12 @@ export const usePayment = ({
           throw new Error("Token address is required for SPL token payment");
         }
         if (!coinCalculator) {
-          console.warn("Coin calculator is required for SPL token payment");
-          return tx;
+          throw new Error("Coin calculator is required for SPL token payment");
         }
+        
         tx = await createSPLTransferTransaction({
-          from: phantomPublicKey,
-          to: order.merchantSolanaAddress, //"9iusfh8hawwYU3iMW8UqNSR1wjbWTy6UkJKMZ8D65Fx3", //
+          from: fromAddress,
+          to: order.merchantSolanaAddress,
           tokenAmount: parseUnits(
             coinCalculator.payTokenAmount,
             paymentToken.decimal
@@ -53,11 +61,11 @@ export const usePayment = ({
       } else {
         // SOL payment
         if (!coinCalculator) {
-          console.warn("Coin calculator is required for SOL payment");
-          return tx;
+          throw new Error("Coin calculator is required for SOL payment");
         }
+        
         tx = await createSolTransferTransaction({
-          from: phantomPublicKey,
+          from: fromAddress,
           to: order.merchantSolanaAddress,
           tokenAmount: parseUnits(
             coinCalculator.payTokenAmount,
@@ -67,12 +75,17 @@ export const usePayment = ({
         });
       }
 
-      return tx;
+      // Send the transaction using the wallet
+      const { signature } = await wallet.sendTransaction(tx);
+      return { signature };
     } catch (err) {
-      console.error("Error creating payment transaction:", err);
+      console.error("Error in payment process:", err);
+      setError(err instanceof Error ? err.message : "Payment failed");
       throw err;
+    } finally {
+      setIsPaying(false);
     }
-  };
+  }, [order, paymentToken, coinCalculator, wallet, account]);
 
   return {
     error,

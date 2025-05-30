@@ -10,6 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@headlessui/react": "^2.2.4",
     "@solana/spl-token": "^0.4.13",
     "@solana/web3.js": "^1.87.6",
     "@stablelib/base64": "^1.0.0",
