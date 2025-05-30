@@ -54,7 +54,6 @@ export default function PaymentPage() {
     order: order,
     paymentToken: paymentToken,
     coinCalculator: coinCalculator,
-    phantomPublicKey: phantomPublicKey,
   });
 
   const [tx, setTx] = useState<Transaction | null>(null);
