@@ -88,6 +88,7 @@ export default function PaymentPage() {
     createPaymentTransaction,
     phantomEncryptionPublicKey,
     phantomPublicKey,
+    setError,
   ]);
 
   useEffect(() => {
