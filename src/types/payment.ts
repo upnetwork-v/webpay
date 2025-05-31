@@ -29,7 +29,7 @@ export interface TransactionParams {
   to: string;
   tokenAmount: string | bigint;
   tokenAddress?: string;
-  orderId: string;
+  memo?: string;
 }
 
 export interface CoinCalculator {

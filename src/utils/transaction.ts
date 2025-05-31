@@ -34,7 +34,7 @@ export async function createSPLTransferTransaction({
   to,
   tokenAmount,
   tokenAddress,
-  orderId,
+  memo,
 }: TransactionParams): Promise<Transaction> {
   try {
     if (!tokenAddress) {
@@ -46,7 +46,7 @@ export async function createSPLTransferTransaction({
       to: to.toString(),
       tokenAddress: tokenAddress.toString(),
       tokenAmount,
-      orderId,
+      memo,
     });
 
     // Get associated token accounts
@@ -128,7 +128,7 @@ export async function createSPLTransferTransaction({
     const memoIx = createMemoInstruction(
       JSON.stringify({
         webpay: {
-          orderId,
+          orderId: memo,
         },
       }),
       new PublicKey(from)
@@ -151,7 +151,7 @@ export async function createSolTransferTransaction({
   from,
   to,
   tokenAmount,
-  orderId,
+  memo,
 }: TransactionParams): Promise<Transaction> {
   try {
     // Convert SOL to lamports
@@ -169,7 +169,7 @@ export async function createSolTransferTransaction({
       from: fromPubkey.toBase58(),
       to: toPubkey.toBase58(),
       lamports,
-      orderId,
+      memo,
     });
 
     // Get the current status of the cluster to ensure connection is working
@@ -215,7 +215,7 @@ export async function createSolTransferTransaction({
     const memoIx = createMemoInstruction(
       JSON.stringify({
         webpay: {
-          orderId,
+          orderId: memo,
         },
       }),
       fromPubkey
@@ -256,3 +256,5 @@ export async function createSolTransferTransaction({
     throw error;
   }
 }
+
+export { createMemoInstruction };

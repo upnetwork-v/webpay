@@ -2,17 +2,10 @@ import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { getOrderById, coinCalculatorQuery } from "@/api/order";
 import type { Order, CoinCalculator } from "@/types/payment";
-import { usePhantomWallet } from "@/hooks/usePhantomWallet";
-import { usePayment } from "@/hooks/usePayment";
-import {
-  getSolanaExplorerUrl,
-  openPhantomSignAndSendTransactionDeeplink,
-  decryptTransactionResponse,
-} from "@/utils/phantom";
-import { estimateTransactionFee } from "@/utils/feeEstimator";
-import Logo from "@/assets/logo.svg";
-import * as nacl from "tweetnacl";
-import type { Transaction } from "@solana/web3.js";
+import { WalletSelector, useWallet, usePayment } from "@/wallets";
+import Logo from "@/assets/img/upnetwork-logo.png";
+import { getSolanaExplorerUrl } from "@/utils/phantom";
+import { parseUnits } from "viem";
 
 export default function PaymentPage() {
   const { orderId } = Route.useParams();
@@ -27,17 +20,17 @@ export default function PaymentPage() {
   >(null);
   const [estimatedFee, setEstimatedFee] = useState<string>("0");
   const [isEstimatingFee, setIsEstimatingFee] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Initialize Phantom wallet
+  // 钱包 hook
+  const { connected, connecting, publicKey, connect } = useWallet();
+
+  // 支付 hook
   const {
-    phantomConnected,
-    phantomPublicKey,
-    connectPhantom,
-    dappKeyPair,
-    phantomEncryptionPublicKey,
-    phantomSession,
-    processConnectCallback,
-  } = usePhantomWallet();
+    processing: paymentProcessing,
+    error: paymentError,
+    sendPayment,
+  } = usePayment();
 
   // Get payment token
   const paymentToken = useMemo(() => {
@@ -49,154 +42,6 @@ export default function PaymentPage() {
     );
   }, [order]);
 
-  // Initialize payment logic
-  const { error, createPaymentTransaction, setError } = usePayment({
-    order: order,
-    paymentToken: paymentToken,
-    coinCalculator: coinCalculator,
-    phantomPublicKey: phantomPublicKey,
-  });
-
-  const [tx, setTx] = useState<Transaction | null>(null);
-
-  useEffect(() => {
-    if (!tx) {
-      if (
-        createPaymentTransaction &&
-        phantomEncryptionPublicKey &&
-        phantomPublicKey
-      ) {
-        createPaymentTransaction()
-          .then((tx) => {
-            console.log("create payment transaction", tx);
-            tx && setTx(tx);
-          })
-          .catch((err) => {
-            console.error("Error creating payment transaction:", err);
-            setError(`Failed to create payment transaction: ${err}`);
-          });
-      } else {
-        console.log(
-          "missing init params",
-          typeof createPaymentTransaction,
-          phantomEncryptionPublicKey,
-          phantomPublicKey
-        );
-      }
-    }
-  }, [
-    tx,
-    createPaymentTransaction,
-    phantomEncryptionPublicKey,
-    phantomPublicKey,
-  ]);
-
-  useEffect(() => {
-    if (tx) {
-      setIsEstimatingFee(true);
-      estimateTransactionFee(tx).then((fee) => {
-        setIsEstimatingFee(false);
-        setEstimatedFee(fee.toFixed(6)); // Format to 6 decimal places
-      });
-    }
-  }, [tx, setIsEstimatingFee, setEstimatedFee]);
-
-  // Check for Phantom connection callback or payment response when component mounts
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const phantomPk = urlParams.get("phantom_encryption_public_key");
-    const nonce = urlParams.get("nonce");
-    const data = urlParams.get("data");
-    const errorCode = urlParams.get("errorCode");
-
-    // Handle connection callback
-    if (phantomPk && nonce && data) {
-      try {
-        console.log("Processing Phantom connection callback");
-        const success = processConnectCallback(phantomPk, nonce, data);
-
-        if (success) {
-          // Clean up the URL
-          window.history.replaceState(
-            {},
-            document.title,
-            window.location.pathname
-          );
-        }
-      } catch (error) {
-        console.error("Error processing Phantom connection:", error);
-        setError(`Failed to connect to Phantom wallet: ${error}`);
-      }
-    }
-    // Handle payment response
-    else if (nonce && data && dappKeyPair && phantomEncryptionPublicKey) {
-      const processPaymentResponse = async () => {
-        try {
-          console.log("Processing payment response from Phantom");
-          const response = decryptTransactionResponse(
-            phantomEncryptionPublicKey,
-            nonce,
-            data,
-            dappKeyPair as nacl.BoxKeyPair
-          );
-
-          console.log("Payment successful:", response);
-          setTransactionSignature(response.signature);
-          setIsComplete(true);
-
-          // Clean up the URL
-          const cleanUrl = window.location.pathname;
-          window.history.replaceState({}, document.title, cleanUrl);
-        } catch (err) {
-          console.error("Error processing payment response:", err);
-          setError(`Failed to process payment response: ${err}`);
-        }
-      };
-
-      processPaymentResponse();
-    }
-    // Handle payment errors
-    else if (errorCode) {
-      const errorMessage =
-        urlParams.get("errorMessage") || "Payment was cancelled or failed";
-      console.error("Payment error:", { errorCode, errorMessage });
-      setError(`Payment failed: ${errorMessage}`);
-
-      // Clean up the URL
-      const cleanUrl = window.location.pathname;
-      window.history.replaceState({}, document.title, cleanUrl);
-    }
-  }, [
-    orderId,
-    processConnectCallback,
-    dappKeyPair,
-    phantomEncryptionPublicKey,
-    setError,
-  ]);
-
-  // Connect to Phantom wallet
-  const handleConnectWallet = useCallback(async () => {
-    try {
-      if (!dappKeyPair) {
-        throw new Error("Wallet initialization in progress. Please try again.");
-      }
-
-      // Clear any existing connection state
-      localStorage.removeItem("phantom_encryption_public_key");
-      localStorage.removeItem("phantom_public_key");
-      localStorage.removeItem("phantom_session");
-
-      await connectPhantom();
-    } catch (err) {
-      console.error("Wallet connection error:", err);
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Failed to connect wallet. Please try again."
-      );
-    }
-  }, [connectPhantom, setError, dappKeyPair]);
-
   // Fetch order details
   useEffect(() => {
     if (orderId) {
@@ -204,38 +49,33 @@ export default function PaymentPage() {
       getOrderById(orderId)
         .then(setOrder)
         .catch((err) => {
-          console.error("Error fetching order:", err);
           setError(`Failed to load order details: ${err}`);
         })
         .finally(() => {
           setIsLoading(false);
         });
     }
-  }, [orderId, setError]);
+  }, [orderId]);
 
-  //
+  // Get coin calculator
   useEffect(() => {
     if (order) {
       if (!order.merchantSolanaAddress) {
         setError("Merchant Solana address not found");
         return;
       }
-
       if (order.paymentStatus === "success") {
         setError("Order already paid");
         return;
       }
-
       if (order.paymentStatus === "faile") {
         setError("Order payment failed");
         return;
       }
-
       if (order.paymentStatus === "pending") {
         setError("Order payment pending");
         return;
       }
-
       coinCalculatorQuery({
         id: order.orderId,
         symbol: paymentToken?.symbol || "",
@@ -243,116 +83,83 @@ export default function PaymentPage() {
       })
         .then(setCoinCalculator)
         .catch((err) => {
-          console.error("Error fetching Calculator:", err);
           setError(`Failed to Calculator: ${err}`);
         });
     }
-  }, [order, setError, paymentToken]);
+  }, [order, paymentToken]);
+
+  // Estimate transaction fee
+  useEffect(() => {
+    // 目前无链上 Transaction 对象，暂不估算手续费
+    setEstimatedFee("0");
+    setIsEstimatingFee(false);
+  }, [coinCalculator]);
 
   // Handle payment
   const handlePay = useCallback(async () => {
-    if (!phantomConnected || !phantomPublicKey) {
-      await handleConnectWallet();
+    if (!connected || !publicKey) {
+      try {
+        await connect();
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : "Failed to connect wallet."
+        );
+      }
       return;
     }
-
-    if (!order) {
-      setError(`Order not found`);
+    if (!order || !coinCalculator) {
+      setError("Order or calculator not ready");
       return;
     }
-
     try {
       setIsLoading(true);
-
-      if (!tx) {
-        throw new Error("Failed to create transaction");
-      }
-
-      if (!phantomEncryptionPublicKey) {
-        throw new Error("Missing Phantom encryption public key");
-      }
-
-      if (!phantomSession) {
-        throw new Error("Missing Phantom session token");
-      }
-
-      if (!dappKeyPair) {
-        throw new Error("DApp key pair not initialized");
-      }
-
-      // Get the current URL for redirect
-      const redirectUrl = `${window.location.origin}${window.location.pathname}`;
-
-      console.log("Opening Phantom deeplink with transaction:", {
-        feePayer: tx.feePayer?.toBase58(),
-        recentBlockhash: tx.recentBlockhash,
-        instructions: tx.instructions.length,
-        signers: tx.signatures.length,
-        redirectUrl,
+      // 发起支付
+      const signature = await sendPayment({
+        recipient: order.merchantSolanaAddress,
+        amount: parseUnits(
+          coinCalculator.payTokenAmount,
+          coinCalculator.payTokenDecimal
+        ),
+        tokenAddress: paymentToken?.tokenAddress,
+        memo: order.orderId,
       });
-
-      // Open Phantom deeplink for signing
-      openPhantomSignAndSendTransactionDeeplink(
-        tx,
-        redirectUrl,
-        phantomEncryptionPublicKey,
-        dappKeyPair as nacl.BoxKeyPair,
-        phantomSession
-      );
-
-      console.log("Phantom deeplink opened with redirectUrl:", redirectUrl);
+      setTransactionSignature(signature);
+      setIsComplete(true);
     } catch (err) {
-      console.error("Payment error:", err);
-      setError(
-        err instanceof Error
-          ? `Payment error: ${err.message}`
-          : "Payment failed"
-      );
+      setError(err instanceof Error ? err.message : "Payment failed");
+    } finally {
       setIsLoading(false);
     }
   }, [
-    phantomConnected,
-    phantomPublicKey,
+    connected,
+    publicKey,
+    connect,
     order,
-    tx,
-    handleConnectWallet,
-    phantomEncryptionPublicKey,
-    phantomSession,
-    dappKeyPair,
-    setError,
+    coinCalculator,
+    sendPayment,
+    paymentToken,
   ]);
 
-  // confirm order
+  // Order confirmed
   const orderConfirmed = useMemo(() => {
     if (!order) return false;
     return order.paymentStatus === "success";
   }, [order]);
 
   const requestTimeout = useRef<NodeJS.Timeout | null>(null);
-
   useEffect(() => {
-    // Clear any existing timeout when dependencies change
     if (requestTimeout.current) {
       clearTimeout(requestTimeout.current);
     }
-
-    // Only start polling if we have all required conditions
     if (orderId && isComplete && transactionSignature && !orderConfirmed) {
       const pollOrder = () => {
         getOrderById(orderId).then((res) => {
-          console.log("polling order", res);
           setOrder(res);
         });
       };
-
-      // Initial request
       pollOrder();
-
-      // Set up polling interval
       requestTimeout.current = setInterval(pollOrder, 6000);
     }
-
-    // Cleanup function
     return () => {
       if (requestTimeout.current) {
         clearInterval(requestTimeout.current);
@@ -362,19 +169,31 @@ export default function PaymentPage() {
   }, [isComplete, transactionSignature, orderConfirmed, orderId]);
 
   // Render error state
-  if (error) {
+  const errorMsg =
+    typeof error === "string"
+      ? error
+      : error &&
+          typeof (error as unknown) === "object" &&
+          "message" in (error as object)
+        ? String((error as { message?: string }).message)
+        : "";
+  const paymentErrorMsg =
+    typeof paymentError === "string"
+      ? paymentError
+      : paymentError &&
+          typeof (paymentError as unknown) === "object" &&
+          "message" in (paymentError as object)
+        ? String((paymentError as { message?: string }).message)
+        : "";
+  if (errorMsg || paymentErrorMsg) {
     return (
       <div className="hero bg-base-200 min-h-screen">
         <div className="hero-content text-center">
           <div className="max-w-md">
-            {order?.paymentStatus !== "success" ? (
-              <h1 className="text-5xl font-bold">Error</h1>
-            ) : (
-              <h1 className="text-5xl font-bold">Success</h1>
-            )}
-
-            <p className="py-6">{error}</p>
-
+            <h1 className="text-5xl font-bold">
+              {order?.paymentStatus !== "success" ? "Error" : "Success"}
+            </h1>
+            <p className="py-6">{errorMsg || paymentErrorMsg}</p>
             {order?.paymentStatus !== "success" ? (
               <button
                 className="btn btn-primary"
@@ -394,6 +213,7 @@ export default function PaymentPage() {
     <div className="flex h-full bg-gray-50 w-full justify-center items-center">
       <div className="h-full max-w-md bg-base-100 shadow-md w-full p-4 pb-24 overflow-hidden relative md:rounded-xl md:h-auto">
         <div className="font-semibold my-6 text-center">Merchant Connect</div>
+        <WalletSelector className="mb-4" />
         {order ? (
           <>
             <div className="font-semibold my-2 leading-tight text-3xl">
@@ -423,12 +243,6 @@ export default function PaymentPage() {
                     {paymentToken?.symbol}
                   </span>
                 </div>
-                {/* <div className="flex items-center">
-              <span className="text-neutral-content">Merchant Address</span>
-              <span className="font-mono flex-1 text-xs text-base-content text-right ml-2 break-all overflow-hidden">
-                {order.merchantSolanaAddress}
-              </span>
-            </div> */}
                 <div className="flex items-center">
                   <span className="text-neutral-content">Amount</span>
                   <span className="flex-1 text-base-content text-ellipsis text-right overflow-hidden">
@@ -493,38 +307,39 @@ export default function PaymentPage() {
 
         {/* 支付按钮 */}
         <div className="p-4 right-0 bottom-2 left-0 absolute">
-          {!phantomConnected ? (
+          {!connected ? (
             <button
               className="btn btn-primary btn-block btn-lg"
-              onClick={handleConnectWallet}
+              onClick={() => connect()}
+              disabled={connecting}
             >
-              Connect Phantom Wallet
+              连接钱包
             </button>
           ) : isComplete && transactionSignature ? (
             <>
               <div className="text-xs text-base-content text-center p-4">
-                Pay Success!{" "}
+                支付成功！{" "}
                 <a
-                  href={getSolanaExplorerUrl(transactionSignature)}
+                  href={
+                    transactionSignature
+                      ? getSolanaExplorerUrl(transactionSignature)
+                      : "#"
+                  }
                   target="_blank"
                   className="text-success hover:underline"
                 >
-                  View on Solana Explorer
+                  查看区块链交易
                 </a>
-                .{" "}
-                {orderConfirmed
-                  ? "Order Confirmed!"
-                  : "Confirming transaction..."}
+                。{orderConfirmed ? "订单已确认！" : "订单确认中..."}
               </div>
               {orderConfirmed ? (
                 <button className="btn btn-success btn-block btn-lg">
-                  Order Confirmed!
+                  订单已确认！
                 </button>
               ) : (
                 <button className="btn btn-primary btn-block btn-lg" disabled>
                   <span className="loading loading-spinner loading-xs"></span>
-                  Pay {coinCalculator?.payTokenAmount}{" "}
-                  {coinCalculator?.payTokenSymbol}
+                  支付中...
                 </button>
               )}
             </>
@@ -532,9 +347,9 @@ export default function PaymentPage() {
             <button
               className="btn btn-primary btn-block btn-lg"
               onClick={handlePay}
-              disabled={!tx}
+              disabled={paymentProcessing || !coinCalculator}
             >
-              Pay {coinCalculator?.payTokenAmount}{" "}
+              支付 {coinCalculator?.payTokenAmount}{" "}
               {coinCalculator?.payTokenSymbol}
             </button>
           )}

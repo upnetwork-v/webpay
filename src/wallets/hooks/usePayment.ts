@@ -1,6 +1,8 @@
-import { useCallback, useState } from 'react';
-import { Transaction, PublicKey, SystemProgram, LAMPORTS_PER_SOL } from '@solana/web3.js';
-import { useWallet } from './useWallet';
+import { useCallback, useState } from "react";
+import { Transaction, PublicKey, SystemProgram } from "@solana/web3.js";
+import { useWallet } from "./useWallet";
+import { createSPLTransferTransaction } from "@/utils/transaction";
+import { createMemoInstruction } from "@/utils/transaction";
 
 interface PaymentState {
   processing: boolean;
@@ -10,7 +12,12 @@ interface PaymentState {
 }
 
 interface PaymentActions {
-  sendPayment: (recipient: string, amount: number, memo?: string) => Promise<string>;
+  sendPayment: (params: {
+    recipient: string;
+    amount: bigint;
+    tokenAddress?: string;
+    memo?: string;
+  }) => Promise<string>;
   resetPaymentState: () => void;
 }
 
@@ -21,66 +28,75 @@ interface UsePaymentResult extends PaymentState, PaymentActions {}
  */
 export function usePayment(): UsePaymentResult {
   const { connected, publicKey, signAndSendTransaction } = useWallet();
-  
+
   const [state, setState] = useState<PaymentState>({
     processing: false,
     success: false,
     error: null,
     txSignature: null,
   });
-  
+
   /**
-   * u53d1u9001u652fu4ed8u4ea4u6613
-   * @param recipient u63a5u6536u65b9u5730u5740
-   * @param amount u91d1u989duff08SOLuff09
-   * @param memo u5907u6ce8u4fe1u606f
-   * @returns u4ea4u6613u7b7eu540d
+   * 发送支付交易（支持 SOL/SPL Token，支持 memo）
+   * @param params { recipient, amount, token, memo }
+   * @returns 交易签名
    */
   const sendPayment = useCallback(
-    async (recipient: string, amount: number, memo?: string): Promise<string> => {
+    async ({
+      recipient,
+      amount,
+      tokenAddress,
+      memo,
+    }: {
+      recipient: string;
+      amount: bigint;
+      tokenAddress?: string;
+      memo?: string;
+    }): Promise<string> => {
       if (!connected || !publicKey) {
-        throw new Error('Wallet not connected');
+        throw new Error("Wallet not connected");
       }
-      
       try {
-        setState(prev => ({ ...prev, processing: true, error: null }));
-        
-        // u521bu5efau4ea4u6613
-        const transaction = new Transaction();
-        
-        // u6dfbu52a0u8f6cu8d26u6307u4ee4
-        transaction.add(
-          SystemProgram.transfer({
-            fromPubkey: publicKey,
-            toPubkey: new PublicKey(recipient),
-            lamports: amount * LAMPORTS_PER_SOL,
-          })
-        );
-        
-        // u6dfbu52a0u5907u6ce8uff08u5982u679cu6709uff09
-        if (memo) {
-          // u5728u8fd9u91ccu6dfbu52a0u5907u6ce8u6307u4ee4uff0cu5982u679cu9700u8981u7684u8bdd
-          // u9700u8981u5bfcu5165u5907u6ce8u7a0bu5e8fu5e76u6dfbu52a0u5230u4ea4u6613u4e2d
+        setState((prev) => ({ ...prev, processing: true, error: null }));
+        let transaction: Transaction;
+        if (tokenAddress) {
+          // SPL Token 支付
+          transaction = await createSPLTransferTransaction({
+            from: publicKey.toBase58(),
+            to: recipient,
+            tokenAmount: amount,
+            tokenAddress,
+            memo,
+          });
+        } else {
+          // SOL 支付
+          transaction = new Transaction();
+          transaction.add(
+            SystemProgram.transfer({
+              fromPubkey: publicKey,
+              toPubkey: new PublicKey(recipient),
+              lamports: amount,
+            })
+          );
+          // 添加 Memo 指令（如有）
+          if (memo) {
+            transaction.add(createMemoInstruction(memo, publicKey));
+          }
         }
-        
-        // u7b7eu540du5e76u53d1u9001u4ea4u6613
         const signature = await signAndSendTransaction(transaction, {
           skipPreflight: false,
           maxRetries: 3,
-          commitment: 'confirmed',
         });
-        
-        setState(prev => ({
+        setState((prev) => ({
           ...prev,
           processing: false,
           success: true,
           txSignature: signature,
         }));
-        
         return signature;
       } catch (error) {
         const err = error as Error;
-        setState(prev => ({
+        setState((prev) => ({
           ...prev,
           processing: false,
           success: false,
@@ -91,7 +107,7 @@ export function usePayment(): UsePaymentResult {
     },
     [connected, publicKey, signAndSendTransaction]
   );
-  
+
   /**
    * u91cdu7f6eu652fu4ed8u72b6u6001
    */
@@ -103,7 +119,7 @@ export function usePayment(): UsePaymentResult {
       txSignature: null,
     });
   }, []);
-  
+
   return {
     ...state,
     sendPayment,
