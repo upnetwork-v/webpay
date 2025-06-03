@@ -17,3 +17,17 @@ export interface WalletState {
   error: string | null;
   isLoading: boolean;
 }
+
+export interface WalletContextProps {
+  state: WalletState;
+  selectWallet: (type: WalletType) => void;
+  connect: () => Promise<void>;
+  disconnect: () => Promise<void>;
+  signAndSendTransaction: (transaction: Transaction) => Promise<string>;
+  handleConnectCallback: (
+    phantomPk: string,
+    nonce: string,
+    data: string
+  ) => boolean;
+  getDappKeyPair: () => nacl.BoxKeyPair | null;
+}

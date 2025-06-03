@@ -1,29 +1,8 @@
-import React, {
-  createContext,
-  useContext,
-  useState,
-  useEffect,
-  type ReactNode,
-} from "react";
+import React, { useState, useEffect, type ReactNode, useCallback } from "react";
 import type { WalletState, WalletType } from "@/wallets/types/wallet";
 import { PhantomWalletAdapter } from "@/wallets/phantom/PhantomWalletAdapter";
 import type { Transaction } from "@solana/web3.js";
-
-interface WalletContextProps {
-  state: WalletState;
-  selectWallet: (type: WalletType) => void;
-  connect: () => Promise<void>;
-  disconnect: () => Promise<void>;
-  signAndSendTransaction: (transaction: Transaction) => Promise<string>;
-  handleConnectCallback: (
-    phantomPk: string,
-    nonce: string,
-    data: string
-  ) => boolean;
-  getDappKeyPair: () => nacl.BoxKeyPair | null;
-}
-
-const WalletContext = createContext<WalletContextProps | null>(null);
+import { WalletContext } from "./WalletContext";
 
 export const WalletProvider: React.FC<{ children: ReactNode }> = ({
   children,
@@ -42,7 +21,14 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
     if (type === "phantom") {
       const newAdapter = new PhantomWalletAdapter();
       setAdapter(newAdapter);
-      setState((prev) => ({ ...prev, walletType: type }));
+      setState((prev) => ({
+        ...prev,
+        walletType: type,
+      }));
+
+      console.log("select phantom wallet");
+    } else {
+      // TODO: 添加其他钱包类型
     }
   };
 
@@ -96,27 +82,28 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
   };
 
   // 处理回调更新状态
-  const handleConnectCallback = (
-    phantomPk: string,
-    nonce: string,
-    data: string
-  ) => {
-    if (adapter && adapter.handleConnectCallback(phantomPk, nonce, data)) {
-      setState((prev) => ({
-        ...prev,
-        isConnected: true,
-        publicKey: adapter.getPublicKey(),
-        isLoading: false,
-      }));
+  const handleConnectCallback = useCallback(
+    (phantomPk: string, nonce: string, data: string) => {
+      console.log("handleConnectCallback 1", phantomPk, nonce, data);
+      console.log("adapter", adapter);
+      if (adapter && adapter.handleConnectCallback(phantomPk, nonce, data)) {
+        setState((prev) => ({
+          ...prev,
+          isConnected: true,
+          publicKey: adapter.getPublicKey(),
+          isLoading: false,
+        }));
 
-      // 清除 URL 参数
-      const cleanUrl = window.location.pathname;
-      window.history.replaceState({}, document.title, cleanUrl);
+        // 清除 URL 参数
+        const cleanUrl = window.location.pathname;
+        window.history.replaceState({}, document.title, cleanUrl);
 
-      return true;
-    }
-    return false;
-  };
+        return true;
+      }
+      return false;
+    },
+    [adapter]
+  );
 
   const getDappKeyPair = () => {
     if (adapter instanceof PhantomWalletAdapter) {
@@ -125,28 +112,32 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
     return null;
   };
 
+  // 1. 检测到 Phantom 回调参数时，如果 adapter 为空，自动 selectWallet("phantom")
   useEffect(() => {
-    const handleUrlCallback = () => {
-      const urlParams = new URLSearchParams(window.location.search);
-      const phantomPk = urlParams.get("phantom_encryption_public_key");
-      const nonce = urlParams.get("nonce");
-      const data = urlParams.get("data");
+    const urlParams = new URLSearchParams(window.location.search);
+    const phantomPk = urlParams.get("phantom_encryption_public_key");
+    const nonce = urlParams.get("nonce");
+    const data = urlParams.get("data");
 
-      if (phantomPk && nonce && data) {
-        handleConnectCallback(phantomPk, nonce, data);
-      }
-    };
+    if (phantomPk && nonce && data && !adapter) {
+      selectWallet("phantom");
+    }
+    // 不在这里直接调用 handleConnectCallback，等 adapter 初始化后再处理
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // 只在挂载时执行
 
-    // 初始检查
-    handleUrlCallback();
+  // 2. adapter 初始化后，如果 URL 有 Phantom 回调参数，则执行 handleConnectCallback
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const phantomPk = urlParams.get("phantom_encryption_public_key");
+    const nonce = urlParams.get("nonce");
+    const data = urlParams.get("data");
 
-    // 监听 URL 变化
-    window.addEventListener("popstate", handleUrlCallback);
-
-    return () => {
-      window.removeEventListener("popstate", handleUrlCallback);
-    };
-  }, [handleConnectCallback]);
+    if (adapter && phantomPk && nonce && data) {
+      handleConnectCallback(phantomPk, nonce, data);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [adapter]);
 
   return (
     <WalletContext.Provider
@@ -163,12 +154,4 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
       {children}
     </WalletContext.Provider>
   );
-};
-
-export const useWallet = () => {
-  const context = useContext(WalletContext);
-  if (!context) {
-    throw new Error("useWallet must be used within a WalletProvider");
-  }
-  return context;
 };

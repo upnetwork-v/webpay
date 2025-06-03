@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { getOrderById, coinCalculatorQuery } from "@/api/order";
 import type { Order, CoinCalculator } from "@/types/payment";
-import { useWallet } from "@/wallets/WalletProvider";
+import { useWallet } from "@/wallets/useWallet";
 import {
   getSolanaExplorerUrl,
   decryptTransactionResponse,
@@ -62,7 +62,9 @@ export default function PaymentPage() {
         createPaymentTransaction()
           .then((tx) => {
             console.log("create payment transaction", tx);
-            tx && setTx(tx);
+            if (tx) {
+              setTx(tx);
+            }
           })
           .catch((err) => {
             console.error("Error creating payment transaction:", err);
@@ -76,7 +78,7 @@ export default function PaymentPage() {
         );
       }
     }
-  }, [tx, createPaymentTransaction, publicKey]);
+  }, [tx, createPaymentTransaction, publicKey, setError]);
 
   useEffect(() => {
     if (tx) {
@@ -154,7 +156,7 @@ export default function PaymentPage() {
       selectWallet("phantom");
     }
     await connect();
-  }, [walletType, connect]);
+  }, [walletType, connect, selectWallet]);
 
   // Fetch order details
   useEffect(() => {
