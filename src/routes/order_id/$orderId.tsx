@@ -2,17 +2,15 @@ import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { getOrderById, coinCalculatorQuery } from "@/api/order";
 import type { Order, CoinCalculator } from "@/types/payment";
-import { usePhantomWallet } from "@/hooks/usePhantomWallet";
-import { usePayment } from "@/hooks/usePayment";
+import { useWallet } from "@/wallets/WalletProvider";
 import {
   getSolanaExplorerUrl,
-  openPhantomSignAndSendTransactionDeeplink,
   decryptTransactionResponse,
 } from "@/utils/phantom";
 import { estimateTransactionFee } from "@/utils/feeEstimator";
 import Logo from "@/assets/logo.svg";
-import * as nacl from "tweetnacl";
 import type { Transaction } from "@solana/web3.js";
+import { usePayment } from "@/hooks/usePayment";
 
 export default function PaymentPage() {
   const { orderId } = Route.useParams();
@@ -28,16 +26,15 @@ export default function PaymentPage() {
   const [estimatedFee, setEstimatedFee] = useState<string>("0");
   const [isEstimatingFee, setIsEstimatingFee] = useState<boolean>(false);
 
-  // Initialize Phantom wallet
   const {
-    phantomConnected,
-    phantomPublicKey,
-    connectPhantom,
-    dappKeyPair,
-    phantomEncryptionPublicKey,
-    phantomSession,
-    processConnectCallback,
-  } = usePhantomWallet();
+    state,
+    connect,
+    selectWallet,
+    signAndSendTransaction,
+    handleConnectCallback,
+    getDappKeyPair,
+  } = useWallet();
+  const { walletType, isConnected, publicKey } = state;
 
   // Get payment token
   const paymentToken = useMemo(() => {
@@ -54,18 +51,14 @@ export default function PaymentPage() {
     order: order,
     paymentToken: paymentToken,
     coinCalculator: coinCalculator,
-    phantomPublicKey: phantomPublicKey,
+    phantomPublicKey: publicKey,
   });
 
   const [tx, setTx] = useState<Transaction | null>(null);
 
   useEffect(() => {
     if (!tx) {
-      if (
-        createPaymentTransaction &&
-        phantomEncryptionPublicKey &&
-        phantomPublicKey
-      ) {
+      if (createPaymentTransaction && publicKey) {
         createPaymentTransaction()
           .then((tx) => {
             console.log("create payment transaction", tx);
@@ -79,17 +72,11 @@ export default function PaymentPage() {
         console.log(
           "missing init params",
           typeof createPaymentTransaction,
-          phantomEncryptionPublicKey,
-          phantomPublicKey
+          publicKey
         );
       }
     }
-  }, [
-    tx,
-    createPaymentTransaction,
-    phantomEncryptionPublicKey,
-    phantomPublicKey,
-  ]);
+  }, [tx, createPaymentTransaction, publicKey]);
 
   useEffect(() => {
     if (tx) {
@@ -111,34 +98,25 @@ export default function PaymentPage() {
 
     // Handle connection callback
     if (phantomPk && nonce && data) {
-      try {
-        console.log("Processing Phantom connection callback");
-        const success = processConnectCallback(phantomPk, nonce, data);
-
-        if (success) {
-          console.log("Phantom connection callback processed successfully");
-          // Clean up the URL
-          window.history.replaceState(
-            {},
-            document.title,
-            window.location.pathname
-          );
-        }
-      } catch (error) {
-        console.error("Error processing Phantom connection:", error);
-        setError(`Failed to connect to Phantom wallet: ${error}`);
-      }
+      handleConnectCallback(phantomPk, nonce, data);
     }
     // Handle payment response
-    else if (nonce && data && dappKeyPair && phantomEncryptionPublicKey) {
+    else if (nonce && data && publicKey) {
       const processPaymentResponse = async () => {
         try {
           console.log("Processing payment response from Phantom");
+
+          // 从钱包适配器获取 dappKeyPair
+          const dappKeyPair = getDappKeyPair();
+          if (!dappKeyPair) {
+            throw new Error("DApp key pair not available");
+          }
+
           const response = decryptTransactionResponse(
-            phantomEncryptionPublicKey,
+            publicKey, // 这里应该是 phantomEncryptionPublicKey
             nonce,
             data,
-            dappKeyPair as nacl.BoxKeyPair
+            dappKeyPair
           );
 
           console.log("Payment successful:", response);
@@ -167,36 +145,16 @@ export default function PaymentPage() {
       const cleanUrl = window.location.pathname;
       window.history.replaceState({}, document.title, cleanUrl);
     }
-  }, [
-    orderId,
-    processConnectCallback,
-    dappKeyPair,
-    phantomEncryptionPublicKey,
-    setError,
-  ]);
+  }, [orderId, handleConnectCallback, publicKey, setError, getDappKeyPair]);
 
   // Connect to Phantom wallet
   const handleConnectWallet = useCallback(async () => {
-    try {
-      if (!dappKeyPair) {
-        throw new Error("Wallet initialization in progress. Please try again.");
-      }
-
-      // Clear any existing connection state
-      localStorage.removeItem("phantom_encryption_public_key");
-      localStorage.removeItem("phantom_public_key");
-      localStorage.removeItem("phantom_session");
-
-      await connectPhantom();
-    } catch (err) {
-      console.error("Wallet connection error:", err);
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Failed to connect wallet. Please try again."
-      );
+    if (!walletType) {
+      // 未来会显示钱包选择器，现在默认使用 Phantom
+      selectWallet("phantom");
     }
-  }, [connectPhantom, setError, dappKeyPair]);
+    await connect();
+  }, [walletType, connect]);
 
   // Fetch order details
   useEffect(() => {
@@ -252,7 +210,7 @@ export default function PaymentPage() {
 
   // Handle payment
   const handlePay = useCallback(async () => {
-    if (!phantomConnected || !phantomPublicKey) {
+    if (!isConnected || !publicKey) {
       await handleConnectWallet();
       return;
     }
@@ -269,57 +227,23 @@ export default function PaymentPage() {
         throw new Error("Failed to create transaction");
       }
 
-      if (!phantomEncryptionPublicKey) {
-        throw new Error("Missing Phantom encryption public key");
-      }
-
-      if (!phantomSession) {
-        throw new Error("Missing Phantom session token");
-      }
-
-      if (!dappKeyPair) {
-        throw new Error("DApp key pair not initialized");
-      }
-
-      // Get the current URL for redirect
-      const redirectUrl = `${window.location.origin}${window.location.pathname}`;
-
-      console.log("Opening Phantom deeplink with transaction:", {
-        feePayer: tx.feePayer?.toBase58(),
-        recentBlockhash: tx.recentBlockhash,
-        instructions: tx.instructions.length,
-        signers: tx.signatures.length,
-        redirectUrl,
-      });
-
-      // Open Phantom deeplink for signing
-      openPhantomSignAndSendTransactionDeeplink(
-        tx,
-        redirectUrl,
-        phantomEncryptionPublicKey,
-        dappKeyPair as nacl.BoxKeyPair,
-        phantomSession
-      );
-
-      console.log("Phantom deeplink opened with redirectUrl:", redirectUrl);
-    } catch (err) {
-      console.error("Payment error:", err);
-      setError(
-        err instanceof Error
-          ? `Payment error: ${err.message}`
-          : "Payment failed"
-      );
+      // 使用 signAndSendTransaction 方法
+      const signature = await signAndSendTransaction(tx);
+      setTransactionSignature(signature);
+      setIsComplete(true);
+    } catch (err: unknown) {
+      const errorMessage =
+        err instanceof Error ? err.message : "Payment failed";
+      setError(errorMessage);
       setIsLoading(false);
     }
   }, [
-    phantomConnected,
-    phantomPublicKey,
+    isConnected,
+    publicKey,
     order,
     tx,
     handleConnectWallet,
-    phantomEncryptionPublicKey,
-    phantomSession,
-    dappKeyPair,
+    signAndSendTransaction,
     setError,
   ]);
 
@@ -494,7 +418,7 @@ export default function PaymentPage() {
 
         {/* 支付按钮 */}
         <div className="p-4 right-0 bottom-2 left-0 absolute">
-          {!phantomConnected ? (
+          {!isConnected ? (
             <button
               className="btn btn-primary btn-block btn-lg"
               onClick={handleConnectWallet}
