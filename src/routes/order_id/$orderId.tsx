@@ -116,6 +116,7 @@ export default function PaymentPage() {
         const success = processConnectCallback(phantomPk, nonce, data);
 
         if (success) {
+          console.log("Phantom connection callback processed successfully");
           // Clean up the URL
           window.history.replaceState(
             {},
@@ -364,13 +365,13 @@ export default function PaymentPage() {
   // Render error state
   if (error) {
     return (
-      <div className="hero bg-base-200 min-h-screen">
-        <div className="hero-content text-center">
+      <div className="min-h-screen bg-base-200 hero">
+        <div className="text-center hero-content">
           <div className="max-w-md">
             {order?.paymentStatus !== "success" ? (
-              <h1 className="text-5xl font-bold">Error</h1>
+              <h1 className="font-bold text-5xl">Error</h1>
             ) : (
-              <h1 className="text-5xl font-bold">Success</h1>
+              <h1 className="font-bold text-5xl">Success</h1>
             )}
 
             <p className="py-6">{error}</p>
@@ -467,7 +468,7 @@ export default function PaymentPage() {
                 </div>
 
                 {!paymentToken?.isNative && (
-                  <div className="text-xs text-gray-400 text-right">
+                  <div className="text-xs text-right text-gray-400">
                     * Network fee will be paid in SOL
                   </div>
                 )}
@@ -484,7 +485,7 @@ export default function PaymentPage() {
             )}
           </div>
         )}
-        <div className="flex flex-col text-center leading-none gap-3 py-6">
+        <div className="flex flex-col text-center leading-none py-6 gap-3">
           <div className=" text-xs text-base-content">Powered by</div>
           <div className="flex justify-center">
             <img src={Logo} alt="Up Network" className="h-6" />
