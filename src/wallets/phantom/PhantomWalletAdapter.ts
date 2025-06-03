@@ -7,6 +7,7 @@ import { processConnectCallback } from "@/wallets/utils/callbacks";
 import bs58 from "bs58";
 
 const DAPP_KEYPAIR_SESSION_KEY = "phantom_dapp_keypair";
+const PHANTOM_WALLET_STATE_KEY = "phantom_wallet_state";
 
 function saveDappKeyPairToSession(dappKeyPair: nacl.BoxKeyPair) {
   localStorage.setItem(
@@ -36,6 +37,32 @@ function clearDappKeyPairFromSession() {
   localStorage.removeItem(DAPP_KEYPAIR_SESSION_KEY);
 }
 
+function savePhantomWalletState(state: {
+  publicKey: string;
+  session: string;
+  phantomEncryptionPublicKey: string;
+}) {
+  localStorage.setItem(PHANTOM_WALLET_STATE_KEY, JSON.stringify(state));
+}
+
+function loadPhantomWalletState(): {
+  publicKey: string;
+  session: string;
+  phantomEncryptionPublicKey: string;
+} | null {
+  const raw = localStorage.getItem(PHANTOM_WALLET_STATE_KEY);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function clearPhantomWalletState() {
+  localStorage.removeItem(PHANTOM_WALLET_STATE_KEY);
+}
+
 export class PhantomWalletAdapter implements WalletAdapter {
   private _publicKey: string | null = null;
   private _connected: boolean = false;
@@ -45,16 +72,29 @@ export class PhantomWalletAdapter implements WalletAdapter {
 
   constructor() {
     this.dappKeyPair = loadDappKeyPairFromSession();
+    console.log(
+      "[PhantomWalletAdapter 构造] dappKeyPair from localStorage",
+      this.dappKeyPair
+    );
+    const state = loadPhantomWalletState();
+    if (state) {
+      this._publicKey = state.publicKey;
+      this.session = state.session;
+      this.phantomEncryptionPublicKey = state.phantomEncryptionPublicKey;
+      this._connected = true;
+    }
   }
 
   async connect(): Promise<void> {
-    // 生成 dappKeyPair
-    this.dappKeyPair = nacl.box.keyPair();
-    saveDappKeyPairToSession(this.dappKeyPair);
-
+    if (!this.dappKeyPair) {
+      this.dappKeyPair = nacl.box.keyPair();
+      saveDappKeyPairToSession(this.dappKeyPair);
+      console.log("[connect] 新生成并保存 dappKeyPair", this.dappKeyPair);
+    } else {
+      console.log("[connect] 已存在 dappKeyPair，不重复生成", this.dappKeyPair);
+    }
     // 生成重定向链接
     const redirectLink = window.location.href;
-
     // 生成 deeplink
     const deeplink = generateDeeplink({
       baseUrl: "https://phantom.app/ul/v1/connect",
@@ -64,26 +104,31 @@ export class PhantomWalletAdapter implements WalletAdapter {
         redirect_link: redirectLink,
       },
     });
-
     // 打开 deeplink
     window.location.href = deeplink;
   }
 
   async disconnect(): Promise<void> {
+    console.log("[disconnect] 清理 dappKeyPair");
     this._publicKey = null;
     this._connected = false;
     this.dappKeyPair = null;
     this.phantomEncryptionPublicKey = null;
     this.session = null;
-
     // 清除本地存储
     localStorage.removeItem("phantom_public_key");
     localStorage.removeItem("phantom_encryption_public_key");
     localStorage.removeItem("phantom_session");
     clearDappKeyPairFromSession();
+    clearPhantomWalletState();
   }
 
   async signAndSendTransaction(transaction: Transaction): Promise<string> {
+    console.log("signAndSendTransaction", {
+      phantomEncryptionPublicKey: this.phantomEncryptionPublicKey,
+      session: this.session,
+      dappKeyPair: this.dappKeyPair,
+    });
     if (
       !this.phantomEncryptionPublicKey ||
       !this.session ||
@@ -91,7 +136,6 @@ export class PhantomWalletAdapter implements WalletAdapter {
     ) {
       throw new Error("Wallet not connected");
     }
-
     const redirectUrl = `${window.location.origin}${window.location.pathname}`;
     return openPhantomSignAndSendTransactionDeeplink(
       transaction,
@@ -108,9 +152,7 @@ export class PhantomWalletAdapter implements WalletAdapter {
     nonce: string,
     data: string
   ): boolean {
-    // dappKeyPair 已在构造函数自动恢复，无需再判断
-    console.log("handleConnectCallback 2", phantomPk, nonce, data);
-    console.log("dappKeyPair", this.dappKeyPair);
+    console.log("[handleConnectCallback] dappKeyPair", this.dappKeyPair);
     const result = processConnectCallback(
       phantomPk,
       nonce,
@@ -122,7 +164,12 @@ export class PhantomWalletAdapter implements WalletAdapter {
       this.phantomEncryptionPublicKey = phantomPk;
       this.session = result.session;
       this._connected = true;
-      clearDappKeyPairFromSession(); // 用完后清理
+      savePhantomWalletState({
+        publicKey: result.publicKey,
+        session: result.session,
+        phantomEncryptionPublicKey: phantomPk,
+      });
+      // 不再清理dappKeyPair，只有disconnect时清理
       return true;
     }
     return false;

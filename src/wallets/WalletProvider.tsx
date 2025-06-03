@@ -139,6 +139,19 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [adapter]);
 
+  // 3. adapter 初始化后自动同步连接状态到 state
+  useEffect(() => {
+    if (adapter && adapter.isConnected()) {
+      setState((prev) => ({
+        ...prev,
+        isConnected: true,
+        publicKey: adapter.getPublicKey(),
+        isLoading: false,
+        error: null,
+      }));
+    }
+  }, [adapter]);
+
   return (
     <WalletContext.Provider
       value={{

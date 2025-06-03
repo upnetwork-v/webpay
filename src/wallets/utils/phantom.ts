@@ -43,6 +43,7 @@ export function openPhantomSignAndSendTransactionDeeplink(
       data: bs58.encode(encryptedPayload),
     },
   });
+  console.log("openPhantomSignAndSendTransactionDeeplink deeplink", deeplink);
 
   // 打开 deeplink
   window.location.href = deeplink;
