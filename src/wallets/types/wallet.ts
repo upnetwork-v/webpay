@@ -1,6 +1,6 @@
 import type { Transaction } from "@solana/web3.js";
 
-export type WalletType = "phantom"; // 未来可扩展 'okx' | 'metamask' 等
+export type WalletType = "phantom" | "okx"; // 未来可扩展更多钱包
 
 export interface WalletAdapter {
   connect: () => Promise<void>;
@@ -41,4 +41,12 @@ export interface WalletContextProps {
     params: WalletCallbackRequest
   ) => Promise<WalletCallbackResponse>;
   adapter: WalletAdapter | null;
+  openWalletSelector: () => void;
+  closeWalletSelector: () => void;
+}
+
+export interface WalletOption {
+  type: WalletType;
+  name: string;
+  icon: React.ReactNode;
 }

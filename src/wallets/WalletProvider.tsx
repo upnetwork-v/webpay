@@ -1,8 +1,13 @@
 import React, { useState, useEffect, type ReactNode, useCallback } from "react";
-import type { WalletState, WalletType } from "@/wallets/types/wallet";
+import type {
+  WalletState,
+  WalletType,
+  WalletOption,
+} from "@/wallets/types/wallet";
 import { PhantomWalletAdapter } from "@/wallets/phantom/PhantomWalletAdapter";
 import type { Transaction } from "@solana/web3.js";
 import { WalletContext } from "./WalletContext";
+import WalletSelector from "@/wallets/components/WalletSelector";
 
 export const WalletProvider: React.FC<{ children: ReactNode }> = ({
   children,
@@ -17,7 +22,10 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
 
   const [adapter, setAdapter] = useState<PhantomWalletAdapter | null>(null);
 
+  const [walletSelectorOpen, setWalletSelectorOpen] = useState(false);
+
   const selectWallet = (type: WalletType) => {
+    localStorage.setItem("wallet_type", type);
     if (type === "phantom") {
       const newAdapter = new PhantomWalletAdapter();
       setAdapter(newAdapter);
@@ -25,7 +33,6 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
         ...prev,
         walletType: type,
       }));
-
       console.log("select phantom wallet");
     } else {
       // TODO: 添加其他钱包类型
@@ -38,11 +45,10 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
       setState((prev) => ({ ...prev, error: "Wallet not selected" }));
       return;
     }
-
     setState((prev) => ({ ...prev, isLoading: true, error: null }));
-
     try {
       await adapter.connect();
+      localStorage.setItem("wallet_is_connected", "true");
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error ? error.message : "Connection failed";
@@ -65,6 +71,8 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
           error: null,
           isLoading: false,
         });
+        localStorage.removeItem("wallet_type");
+        localStorage.removeItem("wallet_is_connected");
       } catch (error: unknown) {
         const errorMessage =
           error instanceof Error ? error.message : "Disconnection failed";
@@ -121,20 +129,6 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
     return adapter.handleCallback(params);
   };
 
-  // 1. 检测到 Phantom 回调参数时，如果 adapter 为空，自动 selectWallet("phantom")
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const phantomPk = urlParams.get("phantom_encryption_public_key");
-    const nonce = urlParams.get("nonce");
-    const data = urlParams.get("data");
-
-    if (phantomPk && nonce && data && !adapter) {
-      selectWallet("phantom");
-    }
-    // 不在这里直接调用 handleConnectCallback，等 adapter 初始化后再处理
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // 只在挂载时执行
-
   // 2. adapter 初始化后，如果 URL 有 Phantom 回调参数，则执行 handleConnectCallback
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -165,6 +159,52 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
     }
   }, [adapter]);
 
+  // 1. 页面加载时自动恢复 walletType 和连接状态
+  useEffect(() => {
+    const savedType = localStorage.getItem("wallet_type") as WalletType | null;
+    const savedIsConnected =
+      localStorage.getItem("wallet_is_connected") === "true";
+    if (savedType) {
+      selectWallet(savedType);
+      // Phantom 钱包自动恢复连接
+      if (savedType === "phantom" && savedIsConnected) {
+        // adapter 会在构造时自动恢复 session
+        // 这里等待 adapter 初始化后自动同步 isConnected
+      }
+      // TODO: 其他钱包类型 autoConnect 入口
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const openWalletSelector = () => setWalletSelectorOpen(true);
+  const closeWalletSelector = () => setWalletSelectorOpen(false);
+
+  // 钱包列表配置
+  const walletOptions: WalletOption[] = [
+    {
+      type: "phantom",
+      name: "Phantom",
+      icon: (
+        <img
+          src={new URL("./phantom/logo.svg", import.meta.url).href}
+          alt="Phantom"
+          className="h-6 w-6"
+        />
+      ),
+    },
+    {
+      type: "okx",
+      name: "OKX Wallet",
+      icon: (
+        <img
+          src={new URL("./okx/logo.png", import.meta.url).href}
+          alt="OKX"
+          className="h-6 w-6"
+        />
+      ),
+    },
+  ];
+
   return (
     <WalletContext.Provider
       value={{
@@ -176,9 +216,23 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
         handleConnectCallback,
         handlePaymentCallback,
         adapter,
+        openWalletSelector,
+        closeWalletSelector,
       }}
     >
       {children}
+      <WalletSelector
+        open={walletSelectorOpen}
+        onClose={closeWalletSelector}
+        wallets={walletOptions}
+        selectedWalletType={state.walletType}
+        isConnected={state.isConnected}
+        isLoading={state.isLoading}
+        error={state.error}
+        onSelectWallet={selectWallet}
+        onConnect={connect}
+        onDisconnect={disconnect}
+      />
     </WalletContext.Provider>
   );
 };

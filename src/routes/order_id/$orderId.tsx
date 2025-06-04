@@ -25,13 +25,12 @@ export default function PaymentPage() {
 
   const {
     state,
-    connect,
-    selectWallet,
     signAndSendTransaction,
     handleConnectCallback,
     handlePaymentCallback,
+    openWalletSelector,
   } = useWallet();
-  const { walletType, isConnected, publicKey } = state;
+  const { isConnected, publicKey } = state;
 
   // Get payment token
   const paymentToken = useMemo(() => {
@@ -166,13 +165,9 @@ export default function PaymentPage() {
   ]);
 
   // Connect to Phantom wallet
-  const handleConnectWallet = useCallback(async () => {
-    if (!walletType) {
-      // 未来会显示钱包选择器，现在默认使用 Phantom
-      selectWallet("phantom");
-    }
-    await connect();
-  }, [walletType, connect, selectWallet]);
+  const handleConnectWallet = useCallback(() => {
+    openWalletSelector();
+  }, [openWalletSelector]);
 
   // Fetch order details
   useEffect(() => {
@@ -439,7 +434,7 @@ export default function PaymentPage() {
               className="btn btn-primary btn-block btn-lg"
               onClick={handleConnectWallet}
             >
-              Connect Phantom Wallet
+              Connect Wallet
             </button>
           ) : isComplete && transactionSignature ? (
             <>
