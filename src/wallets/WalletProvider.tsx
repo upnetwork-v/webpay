@@ -34,6 +34,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
 
   const connect = async () => {
     if (!adapter) {
+      console.error("Wallet adapter not initialized");
       setState((prev) => ({ ...prev, error: "Wallet not selected" }));
       return;
     }
@@ -83,33 +84,41 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
 
   // 处理回调更新状态
   const handleConnectCallback = useCallback(
-    (phantomPk: string, nonce: string, data: string) => {
+    async (params: Record<string, string>) => {
+      const phantomPk = params.phantom_encryption_public_key;
+      const nonce = params.nonce;
+      const data = params.data;
+      if (!phantomPk || !nonce || !data) {
+        throw new Error("Invalid parameters");
+      }
       console.log("handleConnectCallback 1", phantomPk, nonce, data);
-      console.log("adapter", adapter);
-      if (adapter && adapter.handleConnectCallback(phantomPk, nonce, data)) {
+      if (!adapter) {
+        throw new Error("Wallet adapter not initialized");
+      }
+      const result = await adapter.handleCallback(params);
+      if (result.success && result.type === "connect") {
         setState((prev) => ({
           ...prev,
           isConnected: true,
           publicKey: adapter.getPublicKey(),
           isLoading: false,
         }));
-
-        // 清除 URL 参数
-        const cleanUrl = window.location.pathname;
-        window.history.replaceState({}, document.title, cleanUrl);
-
-        return true;
       }
-      return false;
+      return result;
     },
     [adapter]
   );
 
-  const getDappKeyPair = () => {
-    if (adapter instanceof PhantomWalletAdapter) {
-      return adapter.dappKeyPair;
+  const handlePaymentCallback = async (params: Record<string, string>) => {
+    const nonce = params.nonce;
+    const data = params.data;
+    if (!nonce || !data) {
+      throw new Error("Invalid parameters");
     }
-    return null;
+    if (!adapter) {
+      throw new Error("Wallet adapter not initialized");
+    }
+    return adapter.handleCallback(params);
   };
 
   // 1. 检测到 Phantom 回调参数时，如果 adapter 为空，自动 selectWallet("phantom")
@@ -134,7 +143,11 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
     const data = urlParams.get("data");
 
     if (adapter && phantomPk && nonce && data) {
-      handleConnectCallback(phantomPk, nonce, data);
+      handleConnectCallback({
+        phantom_encryption_public_key: phantomPk,
+        nonce: nonce,
+        data: data,
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [adapter]);
@@ -161,7 +174,8 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
         disconnect,
         signAndSendTransaction,
         handleConnectCallback,
-        getDappKeyPair,
+        handlePaymentCallback,
+        adapter,
       }}
     >
       {children}

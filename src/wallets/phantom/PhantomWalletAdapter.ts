@@ -184,4 +184,74 @@ export class PhantomWalletAdapter implements WalletAdapter {
   getPublicKey(): string | null {
     return this._publicKey;
   }
+
+  /**
+   * 统一处理 Phantom deeplink 回调
+   * @param params URLSearchParams 或 Record<string, string>
+   * @returns { type, success, data, error }
+   */
+  async handleCallback(
+    params: Record<string, string>
+  ): Promise<{ type: string; success: boolean; data?: any; error?: string }> {
+    try {
+      // 连接回调
+      if (params.phantom_encryption_public_key && params.nonce && params.data) {
+        const ok = this.handleConnectCallback(
+          params.phantom_encryption_public_key,
+          params.nonce,
+          params.data
+        );
+        if (ok) {
+          return {
+            type: "connect",
+            success: true,
+            data: { publicKey: this._publicKey },
+          };
+        } else {
+          return {
+            type: "connect",
+            success: false,
+            error: "Failed to handle connect callback",
+          };
+        }
+      }
+      // 支付回调
+      else if (params.nonce && params.data) {
+        if (!this.phantomEncryptionPublicKey || !this.dappKeyPair) {
+          return {
+            type: "signAndSendTransaction",
+            success: false,
+            error: "Wallet not connected",
+          };
+        }
+        // 动态引入，避免循环依赖
+        const { decryptTransactionResponse } = await import(
+          "@/wallets/utils/phantom"
+        );
+        const response = decryptTransactionResponse(
+          this.phantomEncryptionPublicKey,
+          params.nonce,
+          params.data,
+          this.dappKeyPair
+        );
+        return {
+          type: "signAndSendTransaction",
+          success: true,
+          data: response,
+        };
+      }
+      // 其他情况
+      return {
+        type: "unknown",
+        success: false,
+        error: "Unknown callback type",
+      };
+    } catch (err: any) {
+      return {
+        type: "error",
+        success: false,
+        error: err?.message || String(err),
+      };
+    }
+  }
 }

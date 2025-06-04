@@ -18,6 +18,16 @@ export interface WalletState {
   isLoading: boolean;
 }
 
+export interface WalletCallbackResponse {
+  type: string;
+  success: boolean;
+  data?: any;
+  error?: string;
+}
+export interface WalletCallbackRequest {
+  [key: string]: string;
+}
+
 export interface WalletContextProps {
   state: WalletState;
   selectWallet: (type: WalletType) => void;
@@ -25,9 +35,10 @@ export interface WalletContextProps {
   disconnect: () => Promise<void>;
   signAndSendTransaction: (transaction: Transaction) => Promise<string>;
   handleConnectCallback: (
-    phantomPk: string,
-    nonce: string,
-    data: string
-  ) => boolean;
-  getDappKeyPair: () => nacl.BoxKeyPair | null;
+    params: WalletCallbackRequest
+  ) => Promise<WalletCallbackResponse>;
+  handlePaymentCallback: (
+    params: WalletCallbackRequest
+  ) => Promise<WalletCallbackResponse>;
+  adapter: WalletAdapter | null;
 }

@@ -3,15 +3,11 @@ import { createFileRoute } from "@tanstack/react-router";
 import { getOrderById, coinCalculatorQuery } from "@/api/order";
 import type { Order, CoinCalculator } from "@/types/payment";
 import { useWallet } from "@/wallets/useWallet";
-import {
-  getSolanaExplorerUrl,
-  decryptTransactionResponse,
-} from "@/utils/phantom";
+import { getSolanaExplorerUrl } from "@/utils/phantom";
 import { estimateTransactionFee } from "@/utils/feeEstimator";
 import Logo from "@/assets/logo.svg";
 import type { Transaction } from "@solana/web3.js";
 import { usePayment } from "@/hooks/usePayment";
-import { loadPhantomWalletState } from "@/wallets/phantom/PhantomWalletAdapter";
 
 export default function PaymentPage() {
   const { orderId } = Route.useParams();
@@ -33,7 +29,7 @@ export default function PaymentPage() {
     selectWallet,
     signAndSendTransaction,
     handleConnectCallback,
-    getDappKeyPair,
+    handlePaymentCallback,
   } = useWallet();
   const { walletType, isConnected, publicKey } = state;
 
@@ -101,35 +97,39 @@ export default function PaymentPage() {
 
     // Handle connection callback
     if (phantomPk && nonce && data) {
-      handleConnectCallback(phantomPk, nonce, data);
+      const processConnectCallback = async () => {
+        const result = await handleConnectCallback({
+          phantom_encryption_public_key: phantomPk,
+          nonce: nonce,
+          data: data,
+        });
+        if (result.success && result.type === "connect") {
+          // 清除 URL 参数
+          const cleanUrl = window.location.pathname;
+          window.history.replaceState({}, document.title, cleanUrl);
+        } else if (!result.success) {
+          setError(result.error || "Connection failed");
+        }
+      };
+      processConnectCallback();
     }
     // Handle payment response
-    else if (nonce && data && publicKey) {
+    else if (nonce && data) {
       const processPaymentResponse = async () => {
         try {
           console.log("Processing payment response from Phantom...");
 
-          // 从钱包适配器获取 dappKeyPair
-          const dappKeyPair = getDappKeyPair();
-          if (!dappKeyPair) {
-            throw new Error("DApp key pair not available");
+          // 通过 useWallet 暴露的 handlePaymentCallback 统一处理回调
+          const result = await handlePaymentCallback({
+            nonce: nonce,
+            data: data,
+          });
+          if (result.success && result.type === "signAndSendTransaction") {
+            setTransactionSignature(result.data.signature);
+            setIsComplete(true);
+          } else if (!result.success) {
+            setError(result.error || "Payment failed");
           }
-
-          // 正确获取 Phantom 的 encryption public key
-          const { phantomEncryptionPublicKey } = loadPhantomWalletState() || {};
-          if (!phantomEncryptionPublicKey)
-            throw new Error("Phantom encryption public key not found");
-
-          const response = decryptTransactionResponse(
-            phantomEncryptionPublicKey,
-            nonce,
-            data,
-            dappKeyPair
-          );
-
-          console.log("Payment successful:", response);
-          setTransactionSignature(response.signature);
-          setIsComplete(true);
 
           // Clean up the URL
           const cleanUrl = window.location.pathname;
@@ -140,7 +140,11 @@ export default function PaymentPage() {
         }
       };
 
-      processPaymentResponse();
+      if (publicKey) {
+        processPaymentResponse();
+      } else {
+        setError("Wallet not connected");
+      }
     }
     // Handle payment errors
     else if (errorCode) {
@@ -153,7 +157,13 @@ export default function PaymentPage() {
       const cleanUrl = window.location.pathname;
       window.history.replaceState({}, document.title, cleanUrl);
     }
-  }, [orderId, handleConnectCallback, publicKey, setError, getDappKeyPair]);
+  }, [
+    orderId,
+    handleConnectCallback,
+    publicKey,
+    setError,
+    handlePaymentCallback,
+  ]);
 
   // Connect to Phantom wallet
   const handleConnectWallet = useCallback(async () => {
@@ -422,7 +432,7 @@ export default function PaymentPage() {
           </div>
         </div>
 
-        {/* 支付按钮 */}
+        {/* 按钮 */}
         <div className="p-4 right-0 bottom-2 left-0 absolute">
           {!isConnected ? (
             <button
