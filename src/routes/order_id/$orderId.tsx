@@ -61,7 +61,7 @@ export default function PaymentPage() {
       if (createPaymentTransaction && publicKey) {
         createPaymentTransaction()
           .then((tx) => {
-            console.log("create payment transaction", tx);
+            console.log("create payment transaction success", tx);
             if (tx) {
               setTx(tx);
             }
@@ -106,7 +106,7 @@ export default function PaymentPage() {
     else if (nonce && data && publicKey) {
       const processPaymentResponse = async () => {
         try {
-          console.log("Processing payment response from Phantom");
+          console.log("Processing payment response from Phantom...");
 
           // 从钱包适配器获取 dappKeyPair
           const dappKeyPair = getDappKeyPair();
@@ -141,7 +141,7 @@ export default function PaymentPage() {
       const errorMessage =
         urlParams.get("errorMessage") || "Payment was cancelled or failed";
       console.error("Payment error:", { errorCode, errorMessage });
-      setError(`Payment failed: ${errorMessage}`);
+      setError(`Payment failed: ${errorCode} ${errorMessage}`);
 
       // Clean up the URL
       const cleanUrl = window.location.pathname;
@@ -229,10 +229,8 @@ export default function PaymentPage() {
         throw new Error("Failed to create transaction");
       }
 
-      // 使用 signAndSendTransaction 方法
-      const signature = await signAndSendTransaction(tx);
-      setTransactionSignature(signature);
-      setIsComplete(true);
+      // signAndSendTransaction 方法在 PhantomWalletAdapter 中返回deeplink url
+      await signAndSendTransaction(tx);
     } catch (err: unknown) {
       const errorMessage =
         err instanceof Error ? err.message : "Payment failed";

@@ -115,7 +115,7 @@ export function openPhantomSignAndSendTransactionDeeplink(
     });
 
     const deeplinkUrl = buildUrl("signAndSendTransaction", params);
-    console.log("Opening Phantom deeplink", deeplinkUrl);
+    console.log("Opening Phantom signAndSendTransaction deeplink", deeplinkUrl);
 
     // 使用替代方法打开deeplink
     if (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {

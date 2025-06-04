@@ -1,8 +1,10 @@
 import type { WalletAdapter } from "@/wallets/types/wallet";
 import * as nacl from "tweetnacl";
 import type { Transaction } from "@solana/web3.js";
-import { openPhantomSignAndSendTransactionDeeplink } from "@/wallets/utils/phantom";
-import { generateDeeplink } from "@/wallets/utils/deeplink";
+import {
+  openPhantomSignAndSendTransactionDeeplink,
+  buildUrl,
+} from "@/wallets/utils/phantom";
 import { processConnectCallback } from "@/wallets/utils/callbacks";
 import bs58 from "bs58";
 
@@ -96,14 +98,14 @@ export class PhantomWalletAdapter implements WalletAdapter {
     // 生成重定向链接
     const redirectLink = window.location.href;
     // 生成 deeplink
-    const deeplink = generateDeeplink({
-      baseUrl: "https://phantom.app/ul/v1/connect",
-      params: {
+    const deeplink = buildUrl(
+      "connect",
+      new URLSearchParams({
         app_url: window.location.origin,
         dapp_encryption_public_key: bs58.encode(this.dappKeyPair.publicKey),
         redirect_link: redirectLink,
-      },
-    });
+      })
+    );
     // 打开 deeplink
     window.location.href = deeplink;
   }
