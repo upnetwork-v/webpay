@@ -5,6 +5,10 @@
   name: "dark";
   default: true;
   --color-primary: #9886e5;
+  --color-base-200: #101011;
+  --color-base-300: #1c1c1d;
+  --color-base-content: #ffffff;
+  --color-neutral-content: #777777;
 }
 
 body,
