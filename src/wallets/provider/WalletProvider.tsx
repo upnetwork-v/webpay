@@ -4,7 +4,7 @@ import type {
   WalletType,
   WalletOption,
 } from "@/wallets/types/wallet";
-import { PhantomWalletAdapter } from "@/wallets/phantom/PhantomWalletAdapter";
+import { PhantomWalletAdapter } from "@/wallets/adapters/phantom/PhantomWalletAdapter";
 import type { Transaction } from "@solana/web3.js";
 import { WalletContext } from "./WalletContext";
 import WalletSelector from "@/wallets/components/WalletSelector";
@@ -173,7 +173,6 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
       }
       // TODO: 其他钱包类型 autoConnect 入口
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const openWalletSelector = () => setWalletSelectorOpen(true);
@@ -186,7 +185,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
       name: "Phantom",
       icon: (
         <img
-          src={new URL("./phantom/logo.svg", import.meta.url).href}
+          src={new URL("../adapters/phantom/logo.svg", import.meta.url).href}
           alt="Phantom"
           className="h-6 w-6"
         />
@@ -197,7 +196,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
       name: "OKX Wallet",
       icon: (
         <img
-          src={new URL("./okx/logo.png", import.meta.url).href}
+          src={new URL("../adapters/okx/logo.png", import.meta.url).href}
           alt="OKX"
           className="h-6 w-6"
         />

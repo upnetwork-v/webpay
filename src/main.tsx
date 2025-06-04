@@ -1,7 +1,7 @@
 import { StrictMode } from "react";
 import ReactDOM from "react-dom/client";
 import { RouterProvider, createRouter } from "@tanstack/react-router";
-import { WalletProvider } from "@/wallets/WalletProvider";
+import { WalletProvider } from "@/wallets/provider/WalletProvider";
 
 // Import the generated route tree
 import { routeTree } from "./routeTree.gen";

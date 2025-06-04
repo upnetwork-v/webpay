@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { getOrderById, coinCalculatorQuery } from "@/api/order";
 import type { Order, CoinCalculator } from "@/types/payment";
-import { useWallet } from "@/wallets/useWallet";
+import { useWallet } from "@/wallets/provider/useWallet";
 import { getSolanaExplorerUrl } from "@/utils/phantom";
 import { estimateTransactionFee } from "@/utils/feeEstimator";
 import Logo from "@/assets/logo.svg";
