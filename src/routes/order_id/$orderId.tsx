@@ -124,8 +124,20 @@ export default function PaymentPage() {
             data: data,
           });
           if (result.success && result.type === "signAndSendTransaction") {
-            setTransactionSignature(result.data.signature);
-            setIsComplete(true);
+            if (
+              typeof result.data === "object" &&
+              result.data !== null &&
+              "signature" in result.data &&
+              typeof (result.data as { signature?: unknown }).signature ===
+                "string"
+            ) {
+              setTransactionSignature(
+                (result.data as { signature: string }).signature
+              );
+              setIsComplete(true);
+            } else {
+              setError("Payment response missing signature");
+            }
           } else if (!result.success) {
             setError(result.error || "Payment failed");
           }

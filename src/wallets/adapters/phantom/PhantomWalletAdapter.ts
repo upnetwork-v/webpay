@@ -7,6 +7,10 @@ import {
 } from "@/wallets/utils/phantom";
 import { processConnectCallback } from "@/wallets/utils/callbacks";
 import bs58 from "bs58";
+import type {
+  WalletCallbackRequest,
+  WalletCallbackResponse,
+} from "@/wallets/types/wallet";
 
 const DAPP_KEYPAIR_SESSION_KEY = "phantom_dapp_keypair";
 const PHANTOM_WALLET_STATE_KEY = "phantom_wallet_state";
@@ -191,8 +195,8 @@ export class PhantomWalletAdapter implements WalletAdapter {
    * @returns { type, success, data, error }
    */
   async handleCallback(
-    params: Record<string, string>
-  ): Promise<{ type: string; success: boolean; data?: any; error?: string }> {
+    params: WalletCallbackRequest
+  ): Promise<WalletCallbackResponse> {
     try {
       // 连接回调
       if (params.phantom_encryption_public_key && params.nonce && params.data) {
@@ -205,7 +209,7 @@ export class PhantomWalletAdapter implements WalletAdapter {
           return {
             type: "connect",
             success: true,
-            data: { publicKey: this._publicKey },
+            data: { publicKey: this._publicKey } as unknown,
           };
         } else {
           return {
@@ -237,7 +241,7 @@ export class PhantomWalletAdapter implements WalletAdapter {
         return {
           type: "signAndSendTransaction",
           success: true,
-          data: response,
+          data: response as unknown,
         };
       }
       // 其他情况

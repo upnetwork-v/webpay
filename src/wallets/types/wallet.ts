@@ -8,6 +8,9 @@ export interface WalletAdapter {
   signAndSendTransaction: (transaction: Transaction) => Promise<string>;
   isConnected: () => boolean;
   getPublicKey: () => string | null;
+  handleCallback: (
+    params: WalletCallbackRequest
+  ) => Promise<WalletCallbackResponse>;
 }
 
 export interface WalletState {
@@ -21,7 +24,7 @@ export interface WalletState {
 export interface WalletCallbackResponse {
   type: string;
   success: boolean;
-  data?: any;
+  data?: unknown;
   error?: string;
 }
 export interface WalletCallbackRequest {

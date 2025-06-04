@@ -4,7 +4,8 @@ import type {
   WalletType,
   WalletOption,
 } from "@/wallets/types/wallet";
-import { PhantomWalletAdapter } from "@/wallets/adapters/phantom/PhantomWalletAdapter";
+import { createAdapter } from "@/wallets/adapters/adapterFactory";
+import type { WalletAdapter } from "@/wallets/types/wallet";
 import type { Transaction } from "@solana/web3.js";
 import { WalletContext } from "./WalletContext";
 import WalletSelector from "@/wallets/components/WalletSelector";
@@ -20,28 +21,27 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
     isLoading: false,
   });
 
-  const [adapter, setAdapter] = useState<PhantomWalletAdapter | null>(null);
+  const [adapter, setAdapter] = useState<WalletAdapter | null>(null);
 
   const [walletSelectorOpen, setWalletSelectorOpen] = useState(false);
 
   const selectWallet = (type: WalletType) => {
     localStorage.setItem("wallet_type", type);
-    if (type === "phantom") {
-      console.log("select phantom wallet");
-      const newAdapter = new PhantomWalletAdapter();
+    try {
+      const newAdapter = createAdapter(type);
       setAdapter(newAdapter);
       setState((prev) => ({
         ...prev,
         walletType: type,
       }));
-    } else {
-      // TODO: 添加其他钱包类型
+    } catch (e) {
+      setAdapter(null);
+      setState((prev) => ({ ...prev, error: (e as Error).message }));
     }
   };
 
   const connect = async () => {
     if (!adapter) {
-      console.error("Wallet adapter not initialized");
       setState((prev) => ({ ...prev, error: "Wallet not selected" }));
       return;
     }
@@ -93,13 +93,6 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
   // 处理回调更新状态
   const handleConnectCallback = useCallback(
     async (params: Record<string, string>) => {
-      const phantomPk = params.phantom_encryption_public_key;
-      const nonce = params.nonce;
-      const data = params.data;
-      if (!phantomPk || !nonce || !data) {
-        throw new Error("Invalid parameters");
-      }
-      console.log("handleConnectCallback 1", phantomPk, nonce, data);
       if (!adapter) {
         throw new Error("Wallet adapter not initialized");
       }
@@ -118,11 +111,6 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
   );
 
   const handlePaymentCallback = async (params: Record<string, string>) => {
-    const nonce = params.nonce;
-    const data = params.data;
-    if (!nonce || !data) {
-      throw new Error("Invalid parameters");
-    }
     if (!adapter) {
       throw new Error("Wallet adapter not initialized");
     }
