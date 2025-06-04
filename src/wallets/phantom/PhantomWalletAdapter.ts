@@ -47,7 +47,7 @@ function savePhantomWalletState(state: {
   localStorage.setItem(PHANTOM_WALLET_STATE_KEY, JSON.stringify(state));
 }
 
-function loadPhantomWalletState(): {
+export function loadPhantomWalletState(): {
   publicKey: string;
   session: string;
   phantomEncryptionPublicKey: string;

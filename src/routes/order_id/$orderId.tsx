@@ -11,6 +11,7 @@ import { estimateTransactionFee } from "@/utils/feeEstimator";
 import Logo from "@/assets/logo.svg";
 import type { Transaction } from "@solana/web3.js";
 import { usePayment } from "@/hooks/usePayment";
+import { loadPhantomWalletState } from "@/wallets/phantom/PhantomWalletAdapter";
 
 export default function PaymentPage() {
   const { orderId } = Route.useParams();
@@ -114,8 +115,13 @@ export default function PaymentPage() {
             throw new Error("DApp key pair not available");
           }
 
+          // 正确获取 Phantom 的 encryption public key
+          const { phantomEncryptionPublicKey } = loadPhantomWalletState() || {};
+          if (!phantomEncryptionPublicKey)
+            throw new Error("Phantom encryption public key not found");
+
           const response = decryptTransactionResponse(
-            publicKey, // 这里应该是 phantomEncryptionPublicKey
+            phantomEncryptionPublicKey,
             nonce,
             data,
             dappKeyPair
