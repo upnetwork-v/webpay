@@ -40,8 +40,10 @@ const WalletSelector: React.FC<WalletSelectorProps> = ({
     if (isConnected) {
       onDisconnect();
     } else {
-      if (localSelected) onSelectWallet(localSelected);
-      onConnect();
+      if (localSelected) {
+        onSelectWallet(localSelected);
+        onConnect();
+      }
     }
   };
 

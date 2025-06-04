@@ -27,13 +27,13 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
   const selectWallet = (type: WalletType) => {
     localStorage.setItem("wallet_type", type);
     if (type === "phantom") {
+      console.log("select phantom wallet");
       const newAdapter = new PhantomWalletAdapter();
       setAdapter(newAdapter);
       setState((prev) => ({
         ...prev,
         walletType: type,
       }));
-      console.log("select phantom wallet");
     } else {
       // TODO: 添加其他钱包类型
     }
