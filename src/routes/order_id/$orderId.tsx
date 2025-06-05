@@ -7,6 +7,7 @@ import { getSolanaExplorerUrl, estimateTransactionFee } from "@/utils";
 import Logo from "@/assets/img/logo.svg";
 import { usePayment } from "@/hooks";
 import OrderDetailCard from "@/components/orderDetailCard";
+import CheckIcon from "@/assets/img/check.png";
 
 export default function PaymentPage() {
   const { orderId } = Route.useParams();
@@ -205,7 +206,8 @@ export default function PaymentPage() {
       }
 
       if (order.paymentStatus === "success") {
-        setError("Order already paid");
+        console.log("order already paid", order);
+        setIsComplete(true);
         return;
       }
 
@@ -314,35 +316,46 @@ export default function PaymentPage() {
       <div className="min-h-screen bg-base-200 hero">
         <div className="text-center hero-content">
           <div className="max-w-md">
-            {order?.paymentStatus !== "success" ? (
-              <h1 className="font-bold text-5xl">Error</h1>
-            ) : (
-              <h1 className="font-bold text-5xl">Success</h1>
-            )}
+            <h1 className="font-bold text-5xl">Error</h1>
 
             <p className="py-6">{error}</p>
 
-            {order?.paymentStatus !== "success" ? (
-              <button
-                className="btn btn-primary"
-                onClick={() => window.location.reload()}
-              >
-                Try Again
-              </button>
-            ) : null}
+            <button
+              className="btn btn-primary"
+              onClick={() => window.location.reload()}
+            >
+              Try Again
+            </button>
           </div>
         </div>
       </div>
     );
   }
 
+  const MainButtonClass =
+    "bg-gradient-to-b from-white rounded-full to-neutral-200 border-[0] text-neutral btn btn-primary btn-block btn-lg";
+
+  const PaidBackgroundClass =
+    "shadow-[inset_0px_0px_240px_0px_rgba(38,255,0,0.35)]";
   // Render payment form
   return (
     <div className="flex h-full bg-base-300 w-full justify-center items-center">
-      <div className="h-full max-w-md bg-base-300 shadow-md w-full p-4 pb-24 overflow-hidden relative md:rounded-xl md:h-auto">
-        <div className="my-4 text-center gap-y-4">
+      <div
+        className={
+          "h-full max-w-md bg-base-300 w-full p-4 pb-24 overflow-hidden relative md:rounded-xl md:h-auto " +
+          (orderConfirmed ? PaidBackgroundClass : "shadow-md")
+        }
+      >
+        <div className="flex flex-col my-6 text-center gap-y-4">
           <img src={Logo} alt="Onta pay" className="mx-auto h-6" />
-          <div className="text-lg  leading-loose">Pay order with crypto</div>
+          {orderConfirmed ? (
+            <div className="flex gap-2 items-center justify-center">
+              <img src={CheckIcon} alt="Check" className="h-5" />
+              Order paid
+            </div>
+          ) : (
+            <div className="text-base-content">Pay order with crypto</div>
+          )}
         </div>
 
         {/* 订单详情 */}
@@ -352,56 +365,50 @@ export default function PaymentPage() {
           coinCalculator={coinCalculator}
           isEstimatingFee={isEstimatingFee}
           estimatedFee={estimatedFee}
+          backgroundColor={orderConfirmed ? "bg-success" : undefined}
         />
 
         {/* 按钮 */}
-        <div className="p-4 right-0 bottom-2 left-0 absolute">
-          {!isConnected ? (
-            <button
-              className="btn btn-primary btn-block btn-lg"
-              onClick={handleConnectWallet}
-            >
-              Connect Wallet
-            </button>
-          ) : isComplete && transactionSignature ? (
-            <>
-              <div className="text-xs text-base-content text-center p-4">
-                Pay Success!{" "}
-                <a
-                  href={getSolanaExplorerUrl(transactionSignature)}
-                  target="_blank"
-                  className="text-success hover:underline"
+        {!orderConfirmed && (
+          <div className="p-4 right-0 bottom-2 left-0 absolute">
+            <div className="mx-auto max-w-md px-1">
+              {!isConnected ? (
+                <button
+                  className={MainButtonClass}
+                  onClick={handleConnectWallet}
                 >
-                  View on Solana Explorer
-                </a>
-                .{" "}
-                {orderConfirmed
-                  ? "Order Confirmed!"
-                  : "Confirming transaction..."}
-              </div>
-              {orderConfirmed ? (
-                <button className="btn btn-success btn-block btn-lg">
-                  Order Confirmed!
+                  Connect Wallet
                 </button>
+              ) : isComplete && transactionSignature ? (
+                <>
+                  <div className="text-xs text-base-content text-center p-4">
+                    Pay Success!{" "}
+                    <a
+                      href={getSolanaExplorerUrl(transactionSignature)}
+                      target="_blank"
+                      className="link link-primary"
+                    >
+                      View on Solana Explorer
+                    </a>
+                    .
+                  </div>
+                  <button className={MainButtonClass} disabled>
+                    <span className="loading loading-spinner loading-xs"></span>
+                    Confirming transaction...
+                  </button>
+                </>
               ) : (
-                <button className="btn btn-primary btn-block btn-lg" disabled>
-                  <span className="loading loading-spinner loading-xs"></span>
-                  Pay {coinCalculator?.payTokenAmount}{" "}
-                  {coinCalculator?.payTokenSymbol}
+                <button
+                  className={MainButtonClass}
+                  onClick={handlePay}
+                  disabled={!tx}
+                >
+                  Pay Now
                 </button>
               )}
-            </>
-          ) : (
-            <button
-              className="btn btn-primary btn-block btn-lg"
-              onClick={handlePay}
-              disabled={!tx}
-            >
-              Pay {coinCalculator?.payTokenAmount}{" "}
-              {coinCalculator?.payTokenSymbol}
-            </button>
-          )}
-        </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

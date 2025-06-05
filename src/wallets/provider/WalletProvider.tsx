@@ -175,7 +175,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
         <img
           src={new URL("../adapters/phantom/logo.svg", import.meta.url).href}
           alt="Phantom"
-          className="h-6 w-6"
+          className="rounded-full object-cover h-10 w-10"
         />
       ),
     },
@@ -186,7 +186,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
         <img
           src={new URL("../adapters/okx/logo.png", import.meta.url).href}
           alt="OKX"
-          className="h-6 w-6"
+          className="rounded-full object-cover h-10 w-10"
         />
       ),
     },

@@ -8,7 +8,9 @@
   --color-base-200: #1c1c1d;
   --color-base-300: #101011;
   --color-base-content: #ffffff;
+  --color-neutral: #000000;
   --color-neutral-content: #777777;
+  --color-success: #1c3616;
 }
 
 body,

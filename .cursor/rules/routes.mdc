@@ -1,0 +1,19 @@
+---
+description:
+globs:
+alwaysApply: true
+---
+# Routes Directory Structure
+
+The `src/routes` directory defines the application's page routes and their components:
+
+- [index.tsx](mdc:src/routes/index.tsx): Main entry route for the app.
+- [__root.tsx](mdc:src/routes/__root.tsx): Root layout or wrapper for all routes.
+- [about.tsx](mdc:src/routes/about.tsx): About page route.
+- [order_id/](mdc:src/routes/order_id): Contains dynamic route for order details:
+  - [$orderId.tsx](mdc:src/routes/order_id/$orderId.tsx): Handles order detail pages for a given order ID (dynamic segment).
+
+## Usage
+- Place new route components in this directory to add new pages.
+- Use subdirectories for nested or dynamic routes (e.g., `[order_id]`).
+- The root and layout files (e.g., `__root.tsx`) can be used for shared layout or logic across all routes.

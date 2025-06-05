@@ -8,21 +8,26 @@ interface OrderDetailCardProps {
   coinCalculator: CoinCalculator | null;
   isEstimatingFee: boolean;
   estimatedFee: string;
+  backgroundColor?: string;
 }
 
-const CardSplitter = () => {
+const CardSplitter = ({ backgroundColor }: { backgroundColor?: string }) => {
   return (
     <div className="h-6 my-4 -mx-7 relative">
       <div className="border-t border-dashed border-base-content/10 h-[0px] top-3 right-8 left-8 absolute"></div>
-      <div className="rounded-full bg-base-300 h-6 top-0 left-0 w-6 absolute"></div>
-      <div className="rounded-full bg-base-300 h-6 top-0 right-0 w-6 absolute"></div>
+      <div
+        className={`rounded-full ${backgroundColor || "bg-base-300"} h-6 top-0 left-0 w-6 absolute`}
+      ></div>
+      <div
+        className={`rounded-full ${backgroundColor || "bg-base-300"} h-6 top-0 right-0 w-6 absolute`}
+      ></div>
     </div>
   );
 };
 
 const OrderDetailCard: React.FC<OrderDetailCardProps> = ({
   order,
-  paymentToken,
+  backgroundColor,
   coinCalculator,
   isEstimatingFee,
   estimatedFee,
@@ -30,7 +35,7 @@ const OrderDetailCard: React.FC<OrderDetailCardProps> = ({
   if (order) {
     return (
       <div className="bg-base-200 rounded-2xl my-4 p-4">
-        <div className="flex my-6 gap-2 items-center">
+        <div className="flex gap-2 items-center">
           {/* 头像 placeholder */}
           <div className="rounded flex bg-gray-300 h-10 text-2xl w-10 items-center justify-center">
             {order.merchantName?.[0] || "S"}
@@ -43,21 +48,21 @@ const OrderDetailCard: React.FC<OrderDetailCardProps> = ({
           </div>
         </div>
 
-        <CardSplitter />
+        <CardSplitter backgroundColor={backgroundColor} />
 
-        <div className="space-y-2 text-sm">
+        <div className="space-y-2">
           <div className="flex items-center">
             <span className="text-neutral-content">Pay</span>
             <span className="flex-1 text-base-content text-ellipsis text-right overflow-hidden">
               {(Number(order.orderValue) / 100).toFixed(2)} {order.currency}
             </span>
           </div>
-          <div className="flex items-center">
+          {/* <div className="flex items-center">
             <span className="text-neutral-content">Payment Token</span>
             <span className="flex-1 text-base-content text-ellipsis text-right overflow-hidden">
               {paymentToken?.symbol}
             </span>
-          </div>
+          </div> */}
 
           <div className="flex items-center">
             <span className="text-neutral-content">In Crypto</span>
@@ -106,10 +111,15 @@ const OrderDetailCard: React.FC<OrderDetailCardProps> = ({
           )} */}
         </div>
 
-        <CardSplitter />
+        <CardSplitter backgroundColor={backgroundColor} />
 
         <div className="flex flex-col opacity-40 gap-2 relative">
-          <img src={Logo} alt="logo" className="right-2 bottom-4 absolute" />
+          {/* logo */}
+          <img
+            src={Logo}
+            alt="logo"
+            className="right-2 bottom-4 w-10 absolute"
+          />
 
           <div className="flex flex-col gap-y-1">
             <div className=" text-base-content text-xs ">Order ID</div>
