@@ -4,8 +4,9 @@ import { getOrderById, coinCalculatorQuery } from "@/api/order";
 import type { Order, CoinCalculator, Transaction } from "@/types";
 import { useWallet } from "@/wallets/provider/useWallet";
 import { getSolanaExplorerUrl, estimateTransactionFee } from "@/utils";
-import Logo from "@/assets/logo.svg";
+import Logo from "@/assets/img/logo.svg";
 import { usePayment } from "@/hooks";
+import OrderDetailCard from "@/components/orderDetailCard";
 
 export default function PaymentPage() {
   const { orderId } = Route.useParams();
@@ -337,105 +338,21 @@ export default function PaymentPage() {
 
   // Render payment form
   return (
-    <div className="flex h-full bg-gray-50 w-full justify-center items-center">
-      <div className="h-full max-w-md bg-base-100 shadow-md w-full p-4 pb-24 overflow-hidden relative md:rounded-xl md:h-auto">
-        <div className="font-semibold my-6 text-center">Merchant Connect</div>
-        {order ? (
-          <>
-            <div className="font-semibold my-2 leading-tight text-3xl">
-              {order.merchantName}
-            </div>
-            <div className="my-2 text-xs leading-tight">
-              Order ID: {order.orderId}
-            </div>
-
-            {/* 订单详情 */}
-            <div className=" rounded-lg bg-base-300 my-4 p-4">
-              <div className="font-semibold text-white mb-4">
-                Payment Details
-              </div>
-
-              <div className="space-y-2 text-sm">
-                <div className="flex items-center">
-                  <span className="text-neutral-content">Order Value</span>
-                  <span className="flex-1 text-base-content text-ellipsis text-right overflow-hidden">
-                    {(Number(order.orderValue) / 100).toFixed(2)}{" "}
-                    {order.currency}
-                  </span>
-                </div>
-                <div className="flex items-center">
-                  <span className="text-neutral-content">Payment Token</span>
-                  <span className="flex-1 text-base-content text-ellipsis text-right overflow-hidden">
-                    {paymentToken?.symbol}
-                  </span>
-                </div>
-                {/* <div className="flex items-center">
-              <span className="text-neutral-content">Merchant Address</span>
-              <span className="font-mono flex-1 text-xs text-base-content text-right ml-2 break-all overflow-hidden">
-                {order.merchantSolanaAddress}
-              </span>
-            </div> */}
-                <div className="flex items-center">
-                  <span className="text-neutral-content">Amount</span>
-                  <span className="flex-1 text-base-content text-ellipsis text-right overflow-hidden">
-                    {!coinCalculator && (
-                      <div className="loading loading-spinner loading-xs"></div>
-                    )}
-                    {coinCalculator?.payTokenAmount}{" "}
-                    {coinCalculator?.payTokenSymbol}
-                  </span>
-                </div>
-
-                <div className="flex items-center">
-                  <span className="text-neutral-content">Network Fee</span>
-                  <span className="flex-1 text-base-content text-ellipsis text-right overflow-hidden">
-                    {isEstimatingFee ? (
-                      <div className="loading loading-spinner loading-xs"></div>
-                    ) : (
-                      `${estimatedFee} SOL`
-                    )}
-                  </span>
-                </div>
-
-                <div className="flex items-center">
-                  <span className="font-semibold text-white text-lg">
-                    Sub Total
-                  </span>
-
-                  <div className="font-semibold flex-1 text-white text-right">
-                    ≈{" "}
-                    {!coinCalculator ? (
-                      <div className="loading loading-spinner loading-xs"></div>
-                    ) : (
-                      `${coinCalculator.payTokenAmount} ${coinCalculator.payTokenSymbol}`
-                    )}
-                  </div>
-                </div>
-
-                {!paymentToken?.isNative && (
-                  <div className="text-xs text-right text-gray-400">
-                    * Network fee will be paid in SOL
-                  </div>
-                )}
-              </div>
-            </div>
-          </>
-        ) : (
-          <div className="rounded-lg bg-base-300 my-4 p-4">
-            <div className="font-semibold text-white mb-4">Payment Details</div>
-            {isLoading && (
-              <div className="flex min-h-48 justify-center items-center">
-                <div className="loading loading-spinner loading-lg"></div>
-              </div>
-            )}
-          </div>
-        )}
-        <div className="flex flex-col text-center leading-none py-6 gap-3">
-          <div className=" text-xs text-base-content">Powered by</div>
-          <div className="flex justify-center">
-            <img src={Logo} alt="Up Network" className="h-6" />
-          </div>
+    <div className="flex h-full bg-base-300 w-full justify-center items-center">
+      <div className="h-full max-w-md bg-base-300 shadow-md w-full p-4 pb-24 overflow-hidden relative md:rounded-xl md:h-auto">
+        <div className="my-4 text-center gap-y-4">
+          <img src={Logo} alt="Onta pay" className="mx-auto h-6" />
+          <div className="text-lg  leading-loose">Pay order with crypto</div>
         </div>
+
+        {/* 订单详情 */}
+        <OrderDetailCard
+          order={order}
+          paymentToken={paymentToken}
+          coinCalculator={coinCalculator}
+          isEstimatingFee={isEstimatingFee}
+          estimatedFee={estimatedFee}
+        />
 
         {/* 按钮 */}
         <div className="p-4 right-0 bottom-2 left-0 absolute">

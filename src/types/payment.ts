@@ -15,6 +15,7 @@ export interface Order {
   supportTokenList: Token[];
   transaction_limit?: number;
   transaction_total?: number;
+  createTime: number;
 }
 
 export interface Token {
