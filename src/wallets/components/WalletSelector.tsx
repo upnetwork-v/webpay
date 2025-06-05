@@ -38,7 +38,7 @@ const WalletSelector: React.FC<WalletSelectorProps> = ({
         onSelectWallet(wallets[0]?.type);
       }
     }
-  }, [open, selectedWalletType]);
+  }, [open, selectedWalletType, wallets, onSelectWallet]);
 
   // 连接/断开按钮
   const handleAction = () => {
@@ -59,10 +59,10 @@ const WalletSelector: React.FC<WalletSelectorProps> = ({
         style={{ pointerEvents: open ? "auto" : "none" }}
       >
         <div className="mb-4 p-0 modal-box">
-          <h3 className="text-center text-lg py-4">
+          <h3 className="text-center text-lg py-6">
             Select a wallet to continue
           </h3>
-          <div className="px-6 pt-2 pb-4">
+          <div className="px-6 pb-4">
             <div className="flex flex-col gap-2">
               {wallets.map((w) => (
                 <div
@@ -85,10 +85,12 @@ const WalletSelector: React.FC<WalletSelectorProps> = ({
                 </div>
               ))}
             </div>
-            {error && <div className="mt-3 text-sm text-error">{error}</div>}
+            {error && <div className="mt-3 text-xs text-error">{error}</div>}
             <button
               className="rounded-full mt-4 btn btn-primary btn-block btn-lg"
-              disabled={isLoading || (!isConnected && !localSelected)}
+              disabled={
+                !!error || isLoading || (!isConnected && !localSelected)
+              }
               onClick={handleAction}
             >
               {isLoading && <Loader2 className="mr-2 animate-spin size-4" />}

@@ -33,6 +33,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
       setState((prev) => ({
         ...prev,
         walletType: type,
+        error: null,
       }));
     } catch (e) {
       setAdapter(null);

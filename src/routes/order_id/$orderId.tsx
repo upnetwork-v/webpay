@@ -37,7 +37,11 @@ export default function PaymentPage() {
     if (!order) return null;
     return (
       order.supportTokenList.find(
-        (token) => token.symbol === order.defaultPaymentToken
+        (token) =>
+          token.symbol ===
+          (order.paymentStatus === "success"
+            ? order.paymentResult?.symbol
+            : order.defaultPaymentToken)
       ) || null
     );
   }, [order]);
@@ -342,11 +346,11 @@ export default function PaymentPage() {
     <div className="flex h-full bg-base-300 w-full justify-center items-center">
       <div
         className={
-          "h-full max-w-md bg-base-300 w-full p-4 pb-24 overflow-hidden relative md:rounded-xl md:h-auto " +
+          "h-full max-w-md bg-base-300 w-full py-4 px-8 pb-24 overflow-hidden relative md:rounded-xl md:h-auto " +
           (orderConfirmed ? PaidBackgroundClass : "shadow-md")
         }
       >
-        <div className="flex flex-col my-6 text-center gap-y-4">
+        <div className="flex flex-col my-10 text-center gap-y-4">
           <img src={Logo} alt="Onta pay" className="mx-auto h-6" />
           {orderConfirmed ? (
             <div className="flex gap-2 items-center justify-center">
@@ -370,7 +374,7 @@ export default function PaymentPage() {
 
         {/* 按钮 */}
         {!orderConfirmed && (
-          <div className="p-4 right-0 bottom-2 left-0 absolute">
+          <div className="py-4 px-8 right-0 bottom-2 left-0 absolute">
             <div className="mx-auto max-w-md px-1">
               {!isConnected ? (
                 <button

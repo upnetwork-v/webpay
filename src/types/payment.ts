@@ -16,6 +16,11 @@ export interface Order {
   transaction_limit?: number;
   transaction_total?: number;
   createTime: number;
+  paymentResult?: {
+    symbol: string;
+    amount: string;
+    txHash: string;
+  };
 }
 
 export interface Token {

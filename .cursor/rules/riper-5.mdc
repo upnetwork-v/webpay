@@ -1,6 +1,6 @@
 ---
-description:
-globs:
+description: 当出现以下关键词时候使用：- “ENTER RESEARCH MODE” - “ENTER INNOVATE MODE” - “ENTER PLAN MODE” - “ENTER EXECUTE MODE” - “ENTER REVIEW MODE”
+globs: 
 alwaysApply: false
 ---
 

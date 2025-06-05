@@ -1,6 +1,8 @@
 import type { Order, CoinCalculator, Token } from "@/types";
 import React from "react";
 import Logo from "@/assets/img/Vector.png";
+import SolanaLogo from "@/assets/img/solana-logo.png";
+import { formatUnits } from "viem";
 
 interface OrderDetailCardProps {
   order: Order | null;
@@ -27,6 +29,7 @@ const CardSplitter = ({ backgroundColor }: { backgroundColor?: string }) => {
 
 const OrderDetailCard: React.FC<OrderDetailCardProps> = ({
   order,
+  paymentToken,
   backgroundColor,
   coinCalculator,
   isEstimatingFee,
@@ -67,10 +70,20 @@ const OrderDetailCard: React.FC<OrderDetailCardProps> = ({
           <div className="flex items-center">
             <span className="text-neutral-content">In Crypto</span>
             <span className="flex-1 text-base-content text-ellipsis text-right overflow-hidden">
-              {!coinCalculator && (
-                <div className="loading loading-spinner loading-xs"></div>
+              {order.paymentStatus === "success" ? (
+                `${formatUnits(
+                  BigInt(order.paymentResult?.amount || "0"),
+                  paymentToken?.decimal || 0
+                )} ${order.paymentResult?.symbol}`
+              ) : (
+                <>
+                  {!coinCalculator && (
+                    <div className="loading loading-spinner loading-xs"></div>
+                  )}
+                  {coinCalculator?.payTokenAmount}{" "}
+                  {coinCalculator?.payTokenSymbol}
+                </>
               )}
-              {coinCalculator?.payTokenAmount} {coinCalculator?.payTokenSymbol}
             </span>
           </div>
 
@@ -85,21 +98,38 @@ const OrderDetailCard: React.FC<OrderDetailCardProps> = ({
             </span>
           </div>
 
-          <div className="flex items-center">
+          {/* <div className="flex items-center">
             <span className="text-neutral-content">Total</span>
             <div className="font-semibold flex-1 text-white text-right">
-              ≈{" "}
-              {!coinCalculator ? (
-                <div className="loading loading-spinner loading-xs"></div>
+              {order.paymentStatus === "success" ? (
+                <>
+                  {formatUnits(
+                    BigInt(order.paymentResult?.amount || "0"),
+                    paymentToken?.decimal || 0
+                  )}{" "}
+                  {order.paymentResult?.symbol}
+                </>
               ) : (
-                `${coinCalculator.payTokenAmount} ${coinCalculator.payTokenSymbol}`
+                <>
+                  ≈{" "}
+                  {!coinCalculator ? (
+                    <div className="loading loading-spinner loading-xs"></div>
+                  ) : (
+                    `${coinCalculator.payTokenAmount} ${coinCalculator.payTokenSymbol}`
+                  )}
+                </>
               )}
             </div>
-          </div>
+          </div> */}
 
           <div className="flex items-center">
             <span className="text-neutral-content">Chain</span>
             <div className="flex-1 text-base-content text-ellipsis text-right overflow-hidden">
+              <img
+                src={SolanaLogo}
+                alt="solana"
+                className="w-8 h-8 inline-block mx-1"
+              />
               Solana
             </div>
           </div>
