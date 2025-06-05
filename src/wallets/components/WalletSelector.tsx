@@ -1,5 +1,5 @@
 import * as React from "react";
-import type { WalletOption, WalletType } from "@/wallets/types/wallet";
+import type { WalletOption, WalletType } from "../types/wallet";
 import { Loader2 } from "lucide-react";
 
 interface WalletSelectorProps {

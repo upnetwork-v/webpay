@@ -38,3 +38,5 @@ export interface CoinCalculator {
   payTokenSymbol: string;
   payTokenDecimal: number;
 }
+
+export type { Transaction } from "@solana/web3.js";

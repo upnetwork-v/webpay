@@ -2,8 +2,8 @@ import { useState } from "react";
 import {
   createSolTransferTransaction,
   createSPLTransferTransaction,
-} from "@/utils/transaction";
-import type { Order, CoinCalculator, Token } from "@/types/payment";
+} from "@/utils";
+import type { Order, CoinCalculator, Token } from "@/types";
 import { parseUnits } from "viem";
 
 interface UsePaymentProps {

@@ -1,13 +1,11 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { getOrderById, coinCalculatorQuery } from "@/api/order";
-import type { Order, CoinCalculator } from "@/types/payment";
+import type { Order, CoinCalculator, Transaction } from "@/types";
 import { useWallet } from "@/wallets/provider/useWallet";
-import { getSolanaExplorerUrl } from "@/utils/phantom";
-import { estimateTransactionFee } from "@/utils/feeEstimator";
+import { getSolanaExplorerUrl, estimateTransactionFee } from "@/utils";
 import Logo from "@/assets/logo.svg";
-import type { Transaction } from "@solana/web3.js";
-import { usePayment } from "@/hooks/usePayment";
+import { usePayment } from "@/hooks";
 
 export default function PaymentPage() {
   const { orderId } = Route.useParams();

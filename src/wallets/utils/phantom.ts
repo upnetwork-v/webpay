@@ -1,7 +1,7 @@
 import * as nacl from "tweetnacl";
 import { Transaction } from "@solana/web3.js";
 import bs58 from "bs58";
-import { encryptPayload } from "@/utils/phantom";
+import { encryptPayload } from "@/utils";
 
 const useUniversalLinks = false;
 

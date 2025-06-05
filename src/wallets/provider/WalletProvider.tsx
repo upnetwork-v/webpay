@@ -3,12 +3,12 @@ import type {
   WalletState,
   WalletType,
   WalletOption,
-} from "@/wallets/types/wallet";
-import { createAdapter } from "@/wallets/adapters/adapterFactory";
-import type { WalletAdapter } from "@/wallets/types/wallet";
-import type { Transaction } from "@solana/web3.js";
+  WalletAdapter,
+} from "../types/wallet";
+import { createAdapter } from "../adapters/adapterFactory";
+import type { Transaction } from "@/types";
 import { WalletContext } from "./WalletContext";
-import WalletSelector from "@/wallets/components/WalletSelector";
+import WalletSelector from "../components/WalletSelector";
 
 export const WalletProvider: React.FC<{ children: ReactNode }> = ({
   children,

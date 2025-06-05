@@ -1,16 +1,16 @@
-import type { WalletAdapter } from "@/wallets/types/wallet";
+import type { WalletAdapter } from "../../types/wallet";
 import * as nacl from "tweetnacl";
 import type { Transaction } from "@solana/web3.js";
 import {
   openPhantomSignAndSendTransactionDeeplink,
   buildUrl,
-} from "@/wallets/utils/phantom";
-import { processConnectCallback } from "@/wallets/utils/callbacks";
+} from "../../utils/phantom";
+import { processConnectCallback } from "../../utils/callbacks";
 import bs58 from "bs58";
 import type {
   WalletCallbackRequest,
   WalletCallbackResponse,
-} from "@/wallets/types/wallet";
+} from "../../types/wallet";
 
 const DAPP_KEYPAIR_SESSION_KEY = "phantom_dapp_keypair";
 const PHANTOM_WALLET_STATE_KEY = "phantom_wallet_state";
