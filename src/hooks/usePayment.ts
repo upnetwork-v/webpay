@@ -4,7 +4,6 @@ import {
   createSPLTransferTransaction,
 } from "@/utils";
 import type { Order, CoinCalculator, Token } from "@/types";
-import { parseUnits } from "viem";
 
 interface UsePaymentProps {
   order: Order | null;
@@ -49,10 +48,7 @@ export const usePayment = ({
         tx = await createSPLTransferTransaction({
           from: phantomPublicKey,
           to: order.merchantSolanaAddress, //"9iusfh8hawwYU3iMW8UqNSR1wjbWTy6UkJKMZ8D65Fx3", //
-          tokenAmount: parseUnits(
-            String(coinCalculator.payTokenAmount),
-            paymentToken.decimal
-          ),
+          tokenAmount: coinCalculator.payTokenAmount,
           tokenAddress: paymentToken.tokenAddress,
           orderId: order.orderId,
         });
@@ -65,10 +61,7 @@ export const usePayment = ({
         tx = await createSolTransferTransaction({
           from: phantomPublicKey,
           to: order.merchantSolanaAddress,
-          tokenAmount: parseUnits(
-            String(coinCalculator.payTokenAmount),
-            paymentToken.decimal
-          ),
+          tokenAmount: coinCalculator.payTokenAmount,
           orderId: order.orderId,
         });
       }
