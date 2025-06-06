@@ -2,8 +2,8 @@ import { useState } from "react";
 import {
   createSolTransferTransaction,
   createSPLTransferTransaction,
-} from "@/utils/transaction";
-import type { Order, CoinCalculator, Token } from "@/types/payment";
+} from "@/utils";
+import type { Order, CoinCalculator, Token } from "@/types";
 import { parseUnits } from "viem";
 
 interface UsePaymentProps {
@@ -24,7 +24,12 @@ export const usePayment = ({
 
   const createPaymentTransaction = async () => {
     if (!order || !phantomPublicKey || !paymentToken) {
-      console.warn("Missing required payment information");
+      console.warn(
+        "Missing required payment information",
+        order,
+        phantomPublicKey,
+        paymentToken
+      );
       return;
     }
 
@@ -40,11 +45,12 @@ export const usePayment = ({
           console.warn("Coin calculator is required for SPL token payment");
           return tx;
         }
+
         tx = await createSPLTransferTransaction({
           from: phantomPublicKey,
           to: order.merchantSolanaAddress, //"9iusfh8hawwYU3iMW8UqNSR1wjbWTy6UkJKMZ8D65Fx3", //
           tokenAmount: parseUnits(
-            coinCalculator.payTokenAmount,
+            String(coinCalculator.payTokenAmount),
             paymentToken.decimal
           ),
           tokenAddress: paymentToken.tokenAddress,
@@ -60,7 +66,7 @@ export const usePayment = ({
           from: phantomPublicKey,
           to: order.merchantSolanaAddress,
           tokenAmount: parseUnits(
-            coinCalculator.payTokenAmount,
+            String(coinCalculator.payTokenAmount),
             paymentToken.decimal
           ),
           orderId: order.orderId,

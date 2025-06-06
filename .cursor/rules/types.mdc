@@ -1,0 +1,15 @@
+---
+description:
+globs:
+alwaysApply: true
+---
+# Types Directory Structure
+
+The `src/types` directory contains TypeScript type definitions shared across the project.
+
+- [payment.ts](mdc:src/types/payment.ts): Defines types related to payments.
+- [index.ts](mdc:src/types/index.ts): Main type export or aggregation file.
+
+## Usage
+- Add new files here for additional type definitions.
+- Import types from this directory to ensure type safety across your codebase.

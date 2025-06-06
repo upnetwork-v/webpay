@@ -15,6 +15,13 @@ export interface Order {
   supportTokenList: Token[];
   transaction_limit?: number;
   transaction_total?: number;
+  createTime: number;
+  paymentResult?: {
+    symbol: string;
+    amount: string;
+    txHash: string;
+    gasFee: string;
+  };
 }
 
 export interface Token {
@@ -38,3 +45,5 @@ export interface CoinCalculator {
   payTokenSymbol: string;
   payTokenDecimal: number;
 }
+
+export type { Transaction } from "@solana/web3.js";

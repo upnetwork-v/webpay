@@ -1,16 +1,15 @@
 ---
-description: 
-globs: 
-alwaysApply: false
+description:
+globs:
+alwaysApply: true
 ---
-# API Directory
+# API Directory Structure
 
-The [`src/api/`](mdc:src/api) directory contains logic for communicating with backend services and external APIs. It includes:
+The `src/api` directory contains modules for interacting with backend APIs.
 
-- API endpoint definitions (e.g., `endpoint.ts`, `icp.ts`, `blink.ts`)
-- Axios instance configuration (`axiosInstance.ts`)
-- Backend service wrappers (`backend.ts`)
-- Central API exports (`index.ts`)
+- [order.ts](mdc:src/api/order.ts): Functions for order-related API requests.
+- [index.ts](mdc:src/api/index.ts): Main API entry point, may aggregate or export API functions.
 
-Use this directory for all code related to API requests, backend communication, and service integration.
-
+## Usage
+- Add new files here for additional API modules.
+- Import and use API functions from this directory in your components or hooks.

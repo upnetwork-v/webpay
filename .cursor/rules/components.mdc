@@ -1,0 +1,14 @@
+---
+description:
+globs:
+alwaysApply: true
+---
+# Components Directory Structure
+
+The `src/components` directory contains shared UI components used across the application.
+
+- [orderDetailCard.tsx](mdc:src/components/orderDetailCard.tsx): Displays detailed information for an order. Used in order-related pages.
+
+## Usage
+- Place reusable UI components in this directory.
+- Import components from here into pages or other components as needed.

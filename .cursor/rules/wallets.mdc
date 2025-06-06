@@ -1,0 +1,30 @@
+---
+description:
+globs:
+alwaysApply: true
+---
+# Wallets Module Structure and Usage
+
+The `src/wallets` directory implements the wallet connection and management system for the project. It is organized as follows:
+
+- **Adapters** ([adapters/](mdc:src/wallets/adapters))
+  - Contains wallet-specific adapter implementations, e.g. [phantom/PhantomWalletAdapter.ts](mdc:src/wallets/adapters/phantom/PhantomWalletAdapter.ts).
+  - The [adapterFactory.ts](mdc:src/wallets/adapters/adapterFactory.ts) provides a `createAdapter(type)` function to instantiate the correct adapter based on `WalletType`.
+- **Provider** ([provider/](mdc:src/wallets/provider))
+  - [WalletProvider.tsx](mdc:src/wallets/provider/WalletProvider.tsx) is a React context provider that manages wallet state, connection, and exposes wallet actions to the app.
+  - [WalletContext.ts](mdc:src/wallets/provider/WalletContext.ts) defines the React context for wallet state and actions.
+  - [useWallet.ts](mdc:src/wallets/provider/useWallet.ts) is a custom hook for accessing wallet context.
+- **Components** ([components/](mdc:src/wallets/components))
+  - [WalletSelector.tsx](mdc:src/wallets/components/WalletSelector.tsx) is a modal UI component for selecting and connecting/disconnecting wallets.
+- **Types** ([types/wallet.ts](mdc:src/wallets/types/wallet.ts))
+  - Defines `WalletType`, `WalletAdapter` interface, wallet state, and context types.
+- **Utils** ([utils/](mdc:src/wallets/utils))
+  - Helper functions for wallet adapters, e.g. Phantom deeplink utilities and callback processing.
+
+## Usage
+- Use `<WalletProvider>` at the root of your app to provide wallet context.
+- Use the `useWallet` hook to access wallet state and actions in components.
+- The wallet system supports multiple wallet types (e.g. Phantom, OKX) via the adapter pattern.
+- The wallet selector modal allows users to choose and connect/disconnect wallets.
+
+See [PhantomWalletAdapter.ts](mdc:src/wallets/adapters/phantom/PhantomWalletAdapter.ts) for a concrete adapter implementation and [WalletProvider.tsx](mdc:src/wallets/provider/WalletProvider.tsx) for provider logic.
