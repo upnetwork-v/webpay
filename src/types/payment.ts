@@ -20,6 +20,7 @@ export interface Order {
     symbol: string;
     amount: string;
     txHash: string;
+    gasFee: string;
   };
 }
 

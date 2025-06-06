@@ -3,6 +3,7 @@ import React from "react";
 import Logo from "@/assets/img/Vector.png";
 import SolanaLogo from "@/assets/img/solana-logo.png";
 import { formatUnits } from "viem";
+import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 
 interface OrderDetailCardProps {
   order: Order | null;
@@ -80,7 +81,10 @@ const OrderDetailCard: React.FC<OrderDetailCardProps> = ({
                   {!coinCalculator && (
                     <div className="loading loading-spinner loading-xs"></div>
                   )}
-                  {coinCalculator?.payTokenAmount}{" "}
+                  {formatUnits(
+                    BigInt(coinCalculator?.payTokenAmount || "0"),
+                    coinCalculator?.payTokenDecimal || 0
+                  )}{" "}
                   {coinCalculator?.payTokenSymbol}
                 </>
               )}
@@ -90,7 +94,12 @@ const OrderDetailCard: React.FC<OrderDetailCardProps> = ({
           <div className="flex items-center">
             <span className="text-neutral-content">Fees</span>
             <span className="flex-1 text-base-content text-ellipsis text-right overflow-hidden">
-              {isEstimatingFee ? (
+              {order.paymentStatus === "success" ? (
+                <div>
+                  {Number(order.paymentResult?.gasFee || 0) / LAMPORTS_PER_SOL}{" "}
+                  SOL
+                </div>
+              ) : isEstimatingFee ? (
                 <div className="loading loading-spinner loading-xs"></div>
               ) : (
                 `${estimatedFee} SOL`
@@ -128,7 +137,7 @@ const OrderDetailCard: React.FC<OrderDetailCardProps> = ({
               <img
                 src={SolanaLogo}
                 alt="solana"
-                className="w-8 h-8 inline-block mx-1"
+                className="h-8 mx-1 w-8 inline-block"
               />
               Solana
             </div>
