@@ -363,10 +363,10 @@ export default function PaymentPage() {
     <div className="flex h-full bg-base-300 w-full justify-center items-center">
       <div
         className={
-          "h-full max-w-md bg-base-300 w-full py-4 px-8 pb-24 overflow-hidden relative md:rounded-xl md:h-auto " +
-          (orderConfirmed ? PaidBackgroundClass : "shadow-md")
+          "h-full max-w-md bg-base-300 w-full py-4 px-8 pb-24 overflow-hidden shadow-md relative md:rounded-xl md:h-auto "
         }
       >
+        {orderConfirmed && <div className="paid-bg-gradient"></div>}
         <div className="flex flex-col my-10 text-center gap-y-4">
           <img src={Logo} alt="Onta pay" className="mx-auto h-6" />
           {orderConfirmed ? (
