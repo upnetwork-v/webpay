@@ -3,7 +3,7 @@ import { Transaction } from "@solana/web3.js";
 import bs58 from "bs58";
 import { encryptPayload } from "@/utils";
 
-const useUniversalLinks = false;
+const useUniversalLinks = true;
 
 export const buildUrl = (path: string, params: URLSearchParams) =>
   `${useUniversalLinks ? "https://phantom.app/ul/" : "phantom://"}v1/${path}?${params.toString()}`;
