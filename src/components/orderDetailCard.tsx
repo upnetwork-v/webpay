@@ -12,6 +12,7 @@ interface OrderDetailCardProps {
   isEstimatingFee: boolean;
   estimatedFee: string;
   backgroundColor?: string;
+  isLoading?: boolean;
 }
 
 const CardSplitter = ({ backgroundColor }: { backgroundColor?: string }) => {
@@ -35,8 +36,9 @@ const OrderDetailCard: React.FC<OrderDetailCardProps> = ({
   coinCalculator,
   isEstimatingFee,
   estimatedFee,
+  isLoading,
 }) => {
-  if (order) {
+  if (order && !isLoading) {
     return (
       <div className="bg-base-200 rounded-2xl my-4 p-4">
         <div className="flex gap-2 items-center">

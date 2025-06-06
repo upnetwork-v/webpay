@@ -370,6 +370,7 @@ export default function PaymentPage() {
           isEstimatingFee={isEstimatingFee}
           estimatedFee={estimatedFee}
           backgroundColor={orderConfirmed ? "bg-success" : undefined}
+          isLoading={isLoading}
         />
 
         {/* 按钮 */}
