@@ -7,9 +7,11 @@ import { WalletProvider } from "@/wallets/provider/WalletProvider";
 import { routeTree } from "./routeTree.gen";
 
 // Create a new router instance
+const basepath = import.meta.env.VITE_APP_BASE || "";
+
 const router = createRouter({
   routeTree,
-  basepath: "/webpay",
+  basepath,
 });
 
 // Render the app

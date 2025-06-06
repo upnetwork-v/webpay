@@ -418,7 +418,7 @@ export default function PaymentPage() {
   );
 }
 
-export const Route = createFileRoute("/order_id/$orderId")({
+export const Route = createFileRoute("/webpay/order_id/$orderId")({
   component: PaymentPage,
   validateSearch: (search: Record<string, unknown>): { orderId: string } => {
     return {

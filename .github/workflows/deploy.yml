@@ -31,7 +31,7 @@ jobs:
         run: yarn install
 
       - name: Build
-        run: yarn build
+        run: yarn build:test
 
       - name: Copy index.html to 404.html
         run: cp dist/index.html dist/404.html

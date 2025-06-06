@@ -5,17 +5,23 @@ import { TanStackRouterVite } from "@tanstack/router-plugin/vite";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
 
 // https://vite.dev/config/
-export default defineConfig({
-  base: "/webpay/",
-  resolve: {
-    alias: {
-      "@": "/src",
+export default defineConfig(({ mode }) => {
+  const base = mode === "test" ? "/webpay/" : "/";
+  return {
+    base,
+    define: {
+      "import.meta.env.VITE_APP_BASE": JSON.stringify(base),
     },
-  },
-  plugins: [
-    nodePolyfills(),
-    TanStackRouterVite({ target: "react", autoCodeSplitting: true }),
-    react(),
-    tailwindcss(),
-  ],
+    resolve: {
+      alias: {
+        "@": "/src",
+      },
+    },
+    plugins: [
+      nodePolyfills(),
+      TanStackRouterVite({ target: "react", autoCodeSplitting: true }),
+      react(),
+      tailwindcss(),
+    ],
+  };
 });
