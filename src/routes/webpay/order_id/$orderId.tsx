@@ -356,8 +356,6 @@ export default function PaymentPage() {
   const MainButtonClass =
     "bg-gradient-to-b from-white rounded-full to-neutral-200 border-[0] text-neutral btn btn-primary btn-block btn-lg";
 
-  const PaidBackgroundClass =
-    "shadow-[inset_0px_0px_240px_0px_rgba(38,255,0,0.35)]";
   // Render payment form
   return (
     <div className="flex h-full bg-base-300 w-full justify-center items-center">
