@@ -36,9 +36,8 @@ const OrderDetailCard: React.FC<OrderDetailCardProps> = ({
   coinCalculator,
   isEstimatingFee,
   estimatedFee,
-  isLoading,
 }) => {
-  if (order && !isLoading) {
+  if (order) {
     return (
       <div className="bg-base-200 rounded-2xl my-4 p-4">
         <div className="flex gap-2 items-center">

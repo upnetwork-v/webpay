@@ -3,7 +3,11 @@ import { createFileRoute } from "@tanstack/react-router";
 import { getOrderById, coinCalculatorQuery } from "@/api/order";
 import type { Order, CoinCalculator, Transaction } from "@/types";
 import { useWallet } from "@/wallets/provider/useWallet";
-import { getSolanaExplorerUrl, estimateTransactionFee } from "@/utils";
+import {
+  getSolanaExplorerUrl,
+  estimateTransactionFee,
+  isValidSolanaTxHash,
+} from "@/utils";
 import Logo from "@/assets/img/logo.svg";
 import { usePayment } from "@/hooks";
 import OrderDetailCard from "@/components/orderDetailCard";
@@ -241,6 +245,7 @@ export default function PaymentPage() {
   // Handle payment
   const handlePay = useCallback(async () => {
     if (!isConnected || !publicKey) {
+      console.log("handlePay not connected", isConnected, publicKey);
       await handleConnectWallet();
       return;
     }
@@ -258,7 +263,19 @@ export default function PaymentPage() {
       }
 
       // signAndSendTransaction 方法在 PhantomWalletAdapter 中返回deeplink url
-      await signAndSendTransaction(tx);
+      const result = await signAndSendTransaction(tx);
+      // okx wallet return tx hash
+      console.log("signAndSendTransaction result", result);
+      // 如果是 okx 钱包，而且 result 是否是合法的 Solana tx hash，则认为支付成功
+      if (state.walletType === "okx") {
+        if (isValidSolanaTxHash(result)) {
+          setTransactionSignature(result);
+          setIsComplete(true);
+        } else {
+          console.error("Invalid tx hash", result);
+          setError("Payment failed");
+        }
+      }
     } catch (err: unknown) {
       const errorMessage =
         err instanceof Error ? err.message : "Payment failed";
@@ -406,7 +423,7 @@ export default function PaymentPage() {
                 <button
                   className={MainButtonClass}
                   onClick={handlePay}
-                  disabled={!tx}
+                  disabled={!tx || isLoading}
                 >
                   Pay Now
                 </button>

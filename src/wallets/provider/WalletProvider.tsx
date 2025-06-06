@@ -25,14 +25,19 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
 
   const [walletSelectorOpen, setWalletSelectorOpen] = useState(false);
 
-  const selectWallet = (type: WalletType) => {
+  const selectWallet = async (type: WalletType) => {
     localStorage.setItem("wallet_type", type);
     try {
       const newAdapter = createAdapter(type);
+      if (typeof (newAdapter as any).init === "function") {
+        await (newAdapter as any).init();
+      }
       setAdapter(newAdapter);
       setState((prev) => ({
         ...prev,
         walletType: type,
+        publicKey: newAdapter.getPublicKey(),
+        isConnected: newAdapter.isConnected(),
         error: null,
       }));
     } catch (e) {
@@ -50,6 +55,17 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
     try {
       await adapter.connect();
       localStorage.setItem("wallet_is_connected", "true");
+      // 如果 walletType 是 okx，则设置为已连接状态
+      if (state.walletType === "okx") {
+        setState((prev) => ({
+          ...prev,
+          isConnected: true,
+          publicKey: adapter.getPublicKey(),
+          isLoading: false,
+        }));
+
+        setWalletSelectorOpen(false);
+      }
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error ? error.message : "Connection failed";
@@ -154,13 +170,15 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
     const savedIsConnected =
       localStorage.getItem("wallet_is_connected") === "true";
     if (savedType) {
-      selectWallet(savedType);
-      // Phantom 钱包自动恢复连接
-      if (savedType === "phantom" && savedIsConnected) {
-        // adapter 会在构造时自动恢复 session
-        // 这里等待 adapter 初始化后自动同步 isConnected
-      }
-      // TODO: 其他钱包类型 autoConnect 入口
+      (async () => {
+        await selectWallet(savedType);
+        // Phantom 钱包自动恢复连接
+        if (savedType === "phantom" && savedIsConnected) {
+          // adapter 会在构造时自动恢复 session
+          // 这里等待 adapter 初始化后自动同步 isConnected
+        }
+        // TODO: 其他钱包类型 autoConnect 入口
+      })();
     }
   }, []);
 
