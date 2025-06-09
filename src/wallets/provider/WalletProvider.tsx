@@ -33,13 +33,35 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
         await (newAdapter as any).init();
       }
       setAdapter(newAdapter);
-      setState((prev) => ({
-        ...prev,
-        walletType: type,
-        publicKey: newAdapter.getPublicKey(),
-        isConnected: newAdapter.isConnected(),
-        error: null,
-      }));
+
+      // 对于 Trust Wallet，先从 localStorage 恢复状态
+      // 真实的连接状态会在 tryReconnect 后更新
+      if (type === "trust") {
+        const savedIsConnected =
+          localStorage.getItem("wallet_is_connected") === "true";
+        console.log(
+          "[WalletProvider] Restoring Trust Wallet state from localStorage:",
+          { savedIsConnected }
+        );
+
+        setState((prev) => ({
+          ...prev,
+          walletType: type,
+          // 暂时使用保存的状态，真实状态会在重连后更新
+          isConnected: savedIsConnected,
+          publicKey: null, // 公钥会在重连成功后获取
+          error: null,
+        }));
+      } else {
+        // 其他钱包正常处理
+        setState((prev) => ({
+          ...prev,
+          walletType: type,
+          publicKey: newAdapter.getPublicKey(),
+          isConnected: newAdapter.isConnected(),
+          error: null,
+        }));
+      }
     } catch (e) {
       setAdapter(null);
       setState((prev) => ({ ...prev, error: (e as Error).message }));
@@ -53,6 +75,10 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
     }
     setState((prev) => ({ ...prev, isLoading: true, error: null }));
     try {
+      // 如果 walletType 是 trust，则关闭 wallet selector 的 modal
+      if (state.walletType === "trust") {
+        setWalletSelectorOpen(false);
+      }
       await adapter.connect();
       localStorage.setItem("wallet_is_connected", "true");
       // 如果 walletType 是 okx 或 trust，则设置为已连接状态
@@ -166,7 +192,15 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
 
   // 3. adapter 初始化后自动同步连接状态到 state
   useEffect(() => {
+    console.log("[WalletProvider] Checking adapter connection state:", {
+      hasAdapter: !!adapter,
+      adapterType: state.walletType,
+      isConnected: adapter?.isConnected(),
+      publicKey: adapter?.getPublicKey(),
+    });
+
     if (adapter && adapter.isConnected()) {
+      console.log("[WalletProvider] Syncing connected state to context");
       setState((prev) => ({
         ...prev,
         isConnected: true,
@@ -191,16 +225,61 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
           // 这里等待 adapter 初始化后自动同步 isConnected
         }
 
-        // Trust Wallet 自动恢复连接
-        if (savedType === "trust" && savedIsConnected) {
-          // Trust Wallet 通过 Deep Link 机制恢复连接
-          // 检查 localStorage 中的连接状态即可
-        }
+        // Trust Wallet 恢复连接逻辑移动到单独的 useEffect 中处理
+        // 因为这里的 adapter 作用域问题导致无法正确访问
 
         // TODO: 其他钱包类型 autoConnect 入口
       })();
     }
   }, []);
+
+  // Trust Wallet 自动恢复连接逻辑
+  useEffect(() => {
+    const savedType = localStorage.getItem("wallet_type") as WalletType | null;
+    const savedIsConnected =
+      localStorage.getItem("wallet_is_connected") === "true";
+
+    if (savedType === "trust" && savedIsConnected && adapter) {
+      // Trust Wallet 使用 WalletConnect 会话恢复机制
+      const trustAdapter = adapter as any;
+      if (trustAdapter && typeof trustAdapter.tryReconnect === "function") {
+        (async () => {
+          try {
+            console.log(
+              "[WalletProvider] Attempting Trust Wallet reconnection..."
+            );
+            await trustAdapter.tryReconnect();
+            // 重连成功后，立即同步状态
+            if (trustAdapter.isConnected()) {
+              setState((prev) => ({
+                ...prev,
+                isConnected: true,
+                publicKey: trustAdapter.getPublicKey(),
+                isLoading: false,
+                error: null,
+              }));
+              console.log(
+                "[WalletProvider] Trust Wallet reconnected successfully"
+              );
+            }
+          } catch (error) {
+            console.warn(
+              "[WalletProvider] Trust Wallet reconnection failed:",
+              error
+            );
+            // 重连失败，清理连接状态
+            localStorage.removeItem("wallet_is_connected");
+            setState((prev) => ({
+              ...prev,
+              isConnected: false,
+              publicKey: null,
+              error: "Session expired, please reconnect",
+            }));
+          }
+        })();
+      }
+    }
+  }, [adapter]); // 依赖 adapter，确保 adapter 初始化后再执行
 
   const openWalletSelector = () => setWalletSelectorOpen(true);
   const closeWalletSelector = () => setWalletSelectorOpen(false);

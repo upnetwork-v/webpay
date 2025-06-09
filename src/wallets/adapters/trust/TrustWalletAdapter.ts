@@ -1,8 +1,8 @@
 /**
- * Trust Wallet 适配器
+ * Trust Wallet 适配器 - WalletConnect v2 实现
  *
- * 实现基于 Deep Linking 的 Trust Wallet 集成
- * 注意：Trust Wallet 通过 Deep Link 支付不需要预先连接
+ * 使用 WalletConnect v2 Universal Provider 实现真实的钱包连接和交易签名
+ * 提供完整的回调机制和会话管理
  */
 import type { Transaction } from "@solana/web3.js";
 import type {
@@ -13,32 +13,208 @@ import type {
 import type {
   TrustWalletState,
   TrustWalletConnectionOptions,
-  PaymentParams,
+  WalletConnectConfig,
+  WalletConnectSession,
 } from "./types";
 import { TRUST_WALLET_CONSTANTS } from "./constants";
-import { TrustWalletDeepLink } from "./deeplink";
-import { PublicKey } from "@solana/web3.js";
+import UniversalProvider from "@walletconnect/universal-provider";
+import { WalletConnectModal } from "@walletconnect/modal";
+
+// 本地存储键名
+const TRUST_WALLET_SESSION_KEY = "trust_wallet_wc_session";
+const TRUST_WALLET_STATE_KEY = "trust_wallet_state";
 
 export class TrustWalletAdapter implements WalletAdapter {
   private state: TrustWalletState;
-  private deepLink: TrustWalletDeepLink;
+  private universalProvider: UniversalProvider | null = null;
+  private walletConnectModal: WalletConnectModal | null = null;
+  private session: WalletConnectSession | null = null;
+  private config: WalletConnectConfig;
 
   constructor() {
+    this.config = {
+      projectId: TRUST_WALLET_CONSTANTS.WALLETCONNECT.PROJECT_ID,
+      metadata: TRUST_WALLET_CONSTANTS.WALLETCONNECT.METADATA,
+    };
+
     this.state = {
       isConnected: false,
-      isInstalled: true, // 假定总是可用，通过 deeplink 交互
+      isInstalled: true, // WalletConnect 不需要检测安装
       isConnecting: false,
       address: undefined,
       balance: undefined,
       error: undefined,
+      wcSession: undefined,
+      wcUri: undefined,
     };
 
-    this.deepLink = new TrustWalletDeepLink();
+    // 尝试恢复会话
+    this.restoreSession();
+  }
+
+  /**
+   * 初始化 WalletConnect Universal Provider
+   */
+  private async initializeProvider(): Promise<void> {
+    if (this.universalProvider) {
+      return;
+    }
+
+    try {
+      // 验证配置
+      if (!this.config.projectId) {
+        throw new Error("WalletConnect Project ID is required");
+      }
+
+      // 初始化 Universal Provider
+      this.universalProvider = await UniversalProvider.init({
+        logger: "warn",
+        projectId: this.config.projectId,
+        metadata: this.config.metadata,
+      });
+
+      // 初始化 Modal
+      this.walletConnectModal = new WalletConnectModal({
+        projectId: this.config.projectId,
+        chains: ["solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp"],
+      });
+
+      // 设置事件监听器
+      this.setupEventListeners();
+
+      console.log("[TrustWalletAdapter] WalletConnect provider initialized");
+    } catch (error) {
+      console.error(
+        "[TrustWalletAdapter] Failed to initialize provider:",
+        error
+      );
+      this.state.error =
+        TRUST_WALLET_CONSTANTS.ERRORS.WALLETCONNECT_INIT_FAILED;
+      throw error;
+    }
+  }
+
+  /**
+   * 设置 WalletConnect 事件监听器
+   */
+  private setupEventListeners(): void {
+    if (!this.universalProvider) return;
+
+    // 显示 URI (QR 码)
+    this.universalProvider.on("display_uri", (uri: string) => {
+      console.log("[TrustWalletAdapter] WalletConnect URI:", uri);
+      this.state.wcUri = uri;
+      // 打开 Modal 显示 QR 码
+      if (this.walletConnectModal) {
+        this.walletConnectModal.openModal({ uri });
+      }
+    });
+
+    // 会话连接成功
+    this.universalProvider.on("session_update", (session: any) => {
+      console.log("[TrustWalletAdapter] Session updated:", session);
+      this.handleSessionUpdate(session);
+    });
+
+    // 会话删除/断开
+    this.universalProvider.on("session_delete", (session: any) => {
+      console.log("[TrustWalletAdapter] Session deleted:", session);
+      this.handleSessionDelete();
+    });
+
+    // 连接事件
+    this.universalProvider.on("connect", (session: any) => {
+      console.log("[TrustWalletAdapter] Connected:", session);
+      this.handleSessionConnect(session);
+    });
+
+    // 断开事件
+    this.universalProvider.on("disconnect", (session: any) => {
+      console.log("[TrustWalletAdapter] Disconnected:", session);
+      this.handleSessionDelete();
+    });
+  }
+
+  /**
+   * 处理会话连接
+   */
+  private handleSessionConnect(session: any): void {
+    // WalletConnect v2 session 结构包含 namespaces
+    if (session?.namespaces?.solana?.accounts?.length > 0) {
+      const account = session.namespaces.solana.accounts[0];
+      // 从账户字符串中提取地址 (格式: "solana:chainId:address")
+      const address = account.split(":")[2];
+
+      this.session = {
+        topic: session.topic,
+        accounts: [address],
+        chains: session.namespaces.solana.chains,
+        expiry: session.expiry,
+      };
+
+      this.state = {
+        ...this.state,
+        isConnected: true,
+        isConnecting: false,
+        address: address,
+        wcSession: session,
+        error: undefined,
+      };
+
+      // 保存会话状态
+      this.saveSession();
+
+      // 关闭 Modal
+      if (this.walletConnectModal) {
+        this.walletConnectModal.closeModal();
+      }
+
+      console.log(
+        "[TrustWalletAdapter] Connection successful, address:",
+        address
+      );
+    }
+  }
+
+  /**
+   * 处理会话更新
+   */
+  private handleSessionUpdate(session: any): void {
+    // WalletConnect v2 session 结构包含 namespaces
+    if (session?.namespaces?.solana?.accounts?.length > 0) {
+      const account = session.namespaces.solana.accounts[0];
+      const address = account.split(":")[2];
+
+      this.state = {
+        ...this.state,
+        address: address,
+        wcSession: session,
+      };
+
+      this.saveSession();
+    }
+  }
+
+  /**
+   * 处理会话删除
+   */
+  private handleSessionDelete(): void {
+    this.session = null;
+    this.state = {
+      ...this.state,
+      isConnected: false,
+      isConnecting: false,
+      address: undefined,
+      wcSession: undefined,
+      wcUri: undefined,
+    };
+
+    this.clearSession();
+    console.log("[TrustWalletAdapter] Session cleared");
   }
 
   /**
    * 连接到 Trust Wallet
-   * 注意：Trust Wallet Deep Link 模式下不需要真实连接，直接标记为已连接
    */
   async connect(_options?: TrustWalletConnectionOptions): Promise<void> {
     if (this.state.isConnecting) {
@@ -53,18 +229,37 @@ export class TrustWalletAdapter implements WalletAdapter {
     this.state.error = undefined;
 
     try {
-      // Trust Wallet Deep Link 模式：直接标记为已连接
-      // 实际的钱包交互在支付时通过 Deep Link 进行
-      await this.simulateConnection();
+      // 初始化 Provider
+      await this.initializeProvider();
 
-      this.state.isConnecting = false;
-      this.state.isConnected = true;
-      // 使用占位符地址，实际地址在支付时由用户钱包提供
-      this.state.address = "J2nyQXEpxRJmt9bsCMF8T6pY4Q9vSmHMoUpfuAKuPHrD";
+      if (!this.universalProvider) {
+        throw new Error("Failed to initialize Universal Provider");
+      }
+
+      // 连接钱包
+      await this.universalProvider.connect({
+        namespaces: TRUST_WALLET_CONSTANTS.WALLETCONNECT.SOLANA_NAMESPACE,
+        skipPairing: false,
+      });
+
+      // 连接状态会在事件监听器中更新
+      console.log("[TrustWalletAdapter] Connection initiated");
+
+      // 关闭 wallet selector 的 modal
+      if (this.walletConnectModal) {
+        this.walletConnectModal.closeModal();
+      }
     } catch (error) {
       this.state.error =
-        error instanceof Error ? error.message : "Unknown error";
+        error instanceof Error ? error.message : "Connection failed";
       this.state.isConnecting = false;
+
+      // 关闭 Modal
+      if (this.walletConnectModal) {
+        this.walletConnectModal.closeModal();
+      }
+
+      console.error("[TrustWalletAdapter] Connection failed:", error);
       throw error;
     }
   }
@@ -73,59 +268,77 @@ export class TrustWalletAdapter implements WalletAdapter {
    * 断开连接
    */
   async disconnect(): Promise<void> {
-    this.state = {
-      isConnected: false,
-      isInstalled: this.state.isInstalled,
-      isConnecting: false,
-      address: undefined,
-      balance: undefined,
-      error: undefined,
-    };
+    try {
+      if (this.universalProvider && this.session) {
+        await this.universalProvider.disconnect();
+      }
+
+      // 清理状态
+      this.handleSessionDelete();
+
+      // 关闭 Modal
+      if (this.walletConnectModal) {
+        this.walletConnectModal.closeModal();
+      }
+
+      console.log("[TrustWalletAdapter] Disconnected successfully");
+    } catch (error) {
+      console.error("[TrustWalletAdapter] Disconnect failed:", error);
+      // 即使断开失败，也清理本地状态
+      this.handleSessionDelete();
+    }
   }
 
   /**
    * 签名并发送交易
-   * 通过 Deep Link 直接发起支付，无需预先连接
    */
   async signAndSendTransaction(transaction: Transaction): Promise<string> {
-    // 注意：Trust Wallet Deep Link 模式下不需要预先连接
-    // 直接通过 Deep Link 发起支付即可
+    if (!this.state.isConnected || !this.universalProvider || !this.session) {
+      throw new Error(TRUST_WALLET_CONSTANTS.ERRORS.NO_SESSION);
+    }
 
     try {
-      // 提取交易信息
-      const recipientAddress = this.extractRecipientAddress(transaction);
-      const amount = this.extractAmount(transaction);
-      const memo = this.extractMemo(transaction);
-      const asset = this.extractAsset(transaction);
+      // 序列化交易
+      const serializedTx = transaction.serialize({
+        requireAllSignatures: false,
+        verifySignatures: false,
+      });
 
-      // 构建支付参数
-      const paymentParams: PaymentParams = {
-        address: recipientAddress,
-        amount: amount,
-        memo: memo,
-        asset: asset,
+      // 构建请求参数
+      const params = {
+        transaction: Buffer.from(serializedTx).toString("base64"),
       };
 
-      // 验证支付参数
-      const validation = this.deepLink.validatePaymentParams(paymentParams);
-      if (!validation.valid) {
-        throw new Error(validation.error);
+      // 发送签名并发送交易请求
+      const result = await this.universalProvider.request(
+        {
+          method: "solana_signAndSendTransaction",
+          params: params,
+        },
+        "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp"
+      );
+
+      if (typeof result === "string") {
+        console.log(
+          "[TrustWalletAdapter] Transaction sent successfully:",
+          result
+        );
+        return result;
+      } else if (
+        result &&
+        typeof result === "object" &&
+        "signature" in result
+      ) {
+        return (result as { signature: string }).signature;
+      } else {
+        throw new Error("Invalid transaction response format");
       }
-
-      // 直接发起支付请求 - 无需检查连接状态
-      const success = await this.deepLink.requestPayment(paymentParams);
-
-      if (!success) {
-        throw new Error(TRUST_WALLET_CONSTANTS.ERRORS.TRANSACTION_FAILED);
-      }
-
-      // 返回占位符交易哈希
-      // 实际应用中可能需要通过回调获取真实的交易哈希
-      return this.generatePlaceholderTxHash();
     } catch (error) {
-      this.state.error =
+      const errorMessage =
         error instanceof Error ? error.message : "Transaction failed";
-      throw error;
+      this.state.error = errorMessage;
+      console.error("[TrustWalletAdapter] Transaction failed:", error);
+      throw new Error(errorMessage);
     }
   }
 
@@ -133,35 +346,49 @@ export class TrustWalletAdapter implements WalletAdapter {
    * 检查是否已连接
    */
   isConnected(): boolean {
-    return this.state.isConnected;
+    const connected = this.state.isConnected;
+    console.log(
+      `[TrustWalletAdapter] isConnected() returning: ${connected}, address: ${this.state.address}`
+    );
+    return connected;
   }
 
   /**
    * 获取公钥
    */
   getPublicKey(): string | null {
-    return this.state.address || null;
+    const publicKey = this.state.address || null;
+    console.log(`[TrustWalletAdapter] getPublicKey() returning: ${publicKey}`);
+    return publicKey;
   }
 
   /**
-   * 处理回调
+   * 处理回调 (主要用于兼容现有接口)
    */
   async handleCallback(
     params: WalletCallbackRequest
   ): Promise<WalletCallbackResponse> {
     try {
-      // 根据回调类型处理
-      if (params.type === "connect") {
-        return await this.handleConnectCallback(params);
-      } else if (params.type === "payment") {
-        return await this.handlePaymentCallback(params);
-      } else {
+      // WalletConnect 通过事件处理回调，这里主要用于兼容
+      if (params.type === "connect" && this.state.isConnected) {
         return {
-          type: params.type || "unknown",
-          success: false,
-          error: "Unknown callback type",
+          type: "connect",
+          success: true,
+          data: { address: this.state.address },
+        };
+      } else if (params.type === "transaction" && params.signature) {
+        return {
+          type: "transaction",
+          success: true,
+          data: { signature: params.signature },
         };
       }
+
+      return {
+        type: params.type || "unknown",
+        success: false,
+        error: "Unknown callback type or invalid state",
+      };
     } catch (error) {
       return {
         type: params.type || "unknown",
@@ -180,258 +407,132 @@ export class TrustWalletAdapter implements WalletAdapter {
   }
 
   /**
-   * 模拟连接过程
-   * Trust Wallet Deep Link 模式下不需要真实连接
+   * 保存会话到本地存储
    */
-  private async simulateConnection(): Promise<void> {
-    // 简单的延迟模拟连接过程
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve();
-      }, 500); // 500ms 模拟连接时间
-    });
+  private saveSession(): void {
+    try {
+      if (this.session) {
+        localStorage.setItem(
+          TRUST_WALLET_SESSION_KEY,
+          JSON.stringify(this.session)
+        );
+      }
+      localStorage.setItem(
+        TRUST_WALLET_STATE_KEY,
+        JSON.stringify({
+          isConnected: this.state.isConnected,
+          address: this.state.address,
+        })
+      );
+    } catch (error) {
+      console.warn("[TrustWalletAdapter] Failed to save session:", error);
+    }
   }
 
   /**
-   * 从交易中提取收款地址
+   * 从本地存储恢复会话
    */
-  private extractRecipientAddress(transaction: Transaction): string {
-    // 查找转账指令
-    for (const instruction of transaction.instructions) {
-      // SOL 转账指令 (SystemProgram.transfer)
+  private restoreSession(): void {
+    try {
+      const sessionData = localStorage.getItem(TRUST_WALLET_SESSION_KEY);
+      const stateData = localStorage.getItem(TRUST_WALLET_STATE_KEY);
+
+      if (sessionData && stateData) {
+        this.session = JSON.parse(sessionData);
+        const savedState = JSON.parse(stateData);
+
+        this.state = {
+          ...this.state,
+          isConnected: savedState.isConnected,
+          address: savedState.address,
+        };
+
+        console.log("[TrustWalletAdapter] Session restored from storage");
+
+        // 如果有保存的会话，尝试重新连接到 WalletConnect
+        if (savedState.isConnected && this.session) {
+          this.reconnectToSession();
+        }
+      }
+    } catch (error) {
+      console.warn("[TrustWalletAdapter] Failed to restore session:", error);
+      this.clearSession();
+    }
+  }
+
+  /**
+   * 重新连接到已保存的 WalletConnect 会话
+   */
+  private async reconnectToSession(): Promise<void> {
+    try {
+      if (!this.session) {
+        return;
+      }
+
+      console.log("[TrustWalletAdapter] Attempting to reconnect to session...");
+
+      // 初始化 Provider (如果尚未初始化)
+      await this.initializeProvider();
+
+      if (!this.universalProvider) {
+        throw new Error("Failed to initialize Universal Provider");
+      }
+
+      // 检查会话是否仍然存在于 UniversalProvider 中
+      // UniversalProvider.session 是一个单一的会话对象，如果存在的话
       if (
-        instruction.programId.equals(
-          new PublicKey("11111111111111111111111111111112")
-        )
+        this.universalProvider.session &&
+        this.universalProvider.session.topic === this.session.topic
       ) {
-        // SystemProgram transfer 指令的第二个账户是收款地址
-        if (instruction.keys.length >= 2) {
-          return instruction.keys[1].pubkey.toBase58();
-        }
+        // 会话仍然有效，更新状态
+        console.log(
+          "[TrustWalletAdapter] Existing session found, reconnecting..."
+        );
+        this.handleSessionConnect(this.universalProvider.session);
+      } else {
+        // 会话已过期或不存在，清理本地状态
+        console.log(
+          "[TrustWalletAdapter] Session expired, clearing local state"
+        );
+        this.handleSessionDelete();
       }
-
-      // SPL Token 转账指令
-      if (
-        instruction.programId.equals(
-          new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")
-        )
-      ) {
-        // SPL Token transfer 指令的第二个账户是收款 token 账户
-        // 对于 Trust Wallet Deep Link，我们返回 token 账户地址
-        // Trust Wallet 会自动处理 token 账户到钱包地址的映射
-        // TODO: 需要根据实际的 token 账户地址提取钱包地址
-        if (instruction.keys.length >= 2) {
-          return instruction.keys[1].pubkey.toBase58();
-        }
-      }
+    } catch (error) {
+      console.warn(
+        "[TrustWalletAdapter] Failed to reconnect to session:",
+        error
+      );
+      // 连接失败，清理本地状态
+      this.handleSessionDelete();
     }
-
-    throw new Error("No valid transfer instruction found in transaction");
   }
 
   /**
-   * 从交易中提取支付金额
+   * 清理会话存储
    */
-  private extractAmount(transaction: Transaction): number | undefined {
-    // 查找转账指令
-    for (const instruction of transaction.instructions) {
-      // SOL 转账指令 (SystemProgram.transfer)
-      if (
-        instruction.programId.equals(
-          new PublicKey("11111111111111111111111111111112")
-        )
-      ) {
-        // SystemProgram transfer 指令的 data 包含金额信息
-        if (instruction.data.length >= 12) {
-          // 跳过指令类型 (4 bytes)，读取金额 (8 bytes)
-          const amountBuffer = instruction.data.slice(4, 12);
-          const amount = Number(Buffer.from(amountBuffer).readBigUInt64LE(0));
-          return amount;
-        }
-      }
-
-      // SPL Token 转账指令
-      if (
-        instruction.programId.equals(
-          new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")
-        )
-      ) {
-        // SPL Token transfer 指令的 data 包含金额信息
-        if (instruction.data.length >= 9) {
-          // 跳过指令类型 (1 byte)，读取金额 (8 bytes)
-          const amountBuffer = instruction.data.slice(1, 9);
-          const amount = Number(Buffer.from(amountBuffer).readBigUInt64LE(0));
-          return amount;
-        }
-      }
+  private clearSession(): void {
+    try {
+      localStorage.removeItem(TRUST_WALLET_SESSION_KEY);
+      localStorage.removeItem(TRUST_WALLET_STATE_KEY);
+    } catch (error) {
+      console.warn("[TrustWalletAdapter] Failed to clear session:", error);
     }
-
-    // 如果无法提取金额，返回 undefined，让用户在钱包中输入
-    return undefined;
   }
 
   /**
-   * 从交易中提取备注信息
+   * 手动尝试重新连接到保存的会话（用于调试和恢复）
    */
-  private extractMemo(transaction: Transaction): string | undefined {
-    // 查找 Memo 指令
-    const MEMO_PROGRAM_ID = new PublicKey(
-      "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr"
-    );
+  async tryReconnect(): Promise<void> {
+    console.log("[TrustWalletAdapter] Manual reconnection attempt...");
 
-    for (const instruction of transaction.instructions) {
-      if (instruction.programId.equals(MEMO_PROGRAM_ID)) {
-        try {
-          // Memo 指令的 data 就是备注内容
-          const memoText = new TextDecoder().decode(instruction.data);
-          return memoText;
-        } catch (error) {
-          console.warn("Failed to decode memo:", error);
-          return undefined;
-        }
-      }
+    // 如果已经连接，不需要重新连接
+    if (this.state.isConnected) {
+      console.log(
+        "[TrustWalletAdapter] Already connected, skipping reconnection"
+      );
+      return;
     }
 
-    return undefined;
-  }
-
-  /**
-   * 从交易中提取资产类型
-   */
-  private extractAsset(transaction: Transaction): string {
-    // 检查是否包含 SPL Token 转账指令
-    const SPL_TOKEN_PROGRAM_ID = new PublicKey(
-      "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
-    );
-
-    for (const instruction of transaction.instructions) {
-      if (instruction.programId.equals(SPL_TOKEN_PROGRAM_ID)) {
-        // 这是 SPL Token 转账
-        // 尝试从交易中的其他信息推断 token mint
-        const tokenMint = this.extractTokenMintFromTransaction(transaction);
-
-        if (tokenMint) {
-          // 使用 Trust Wallet UAI 格式：c501_t{token_mint_address}
-          return `${TRUST_WALLET_CONSTANTS.SOLANA_ASSET_PREFIX}_t${tokenMint}`;
-        } else {
-          // 如果无法确定具体的 token mint，使用通用格式
-          console.warn(
-            "Unable to determine token mint, using generic SPL token format"
-          );
-          return `${TRUST_WALLET_CONSTANTS.SOLANA_ASSET_PREFIX}_tSPL_TOKEN`;
-        }
-      }
-    }
-
-    // 默认为 SOL 转账
-    return TRUST_WALLET_CONSTANTS.SOLANA_ASSET_PREFIX;
-  }
-
-  /**
-   * 从交易中提取 token mint 地址
-   * 这是一个辅助方法，尝试从交易的各种来源推断 token mint
-   */
-  private extractTokenMintFromTransaction(
-    transaction: Transaction
-  ): string | null {
-    // 方法1: 检查是否有 transferChecked 指令（包含 mint 信息）
-    const SPL_TOKEN_PROGRAM_ID = new PublicKey(
-      "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
-    );
-
-    for (const instruction of transaction.instructions) {
-      if (instruction.programId.equals(SPL_TOKEN_PROGRAM_ID)) {
-        // 检查指令类型
-        if (instruction.data.length > 0) {
-          const instructionType = instruction.data[0];
-
-          // transferChecked 指令类型通常是 12
-          if (instructionType === 12 && instruction.keys.length >= 4) {
-            // transferChecked 指令的第4个账户是 mint
-            return instruction.keys[3].pubkey.toBase58();
-          }
-        }
-      }
-    }
-
-    // 方法2: 如果是普通 transfer 指令，尝试从 memo 中提取 token 信息
-    // 这需要我们的应用在 memo 中包含 token mint 信息
-    const memo = this.extractMemo(transaction);
-    if (memo) {
-      try {
-        const memoData = JSON.parse(memo);
-        if (memoData.webpay && memoData.webpay.tokenMint) {
-          return memoData.webpay.tokenMint;
-        }
-      } catch (error) {
-        // memo 不是 JSON 格式，忽略
-      }
-    }
-
-    // 方法3: 从交易的其他上下文信息推断（如果有的话）
-    // 这里可以添加更多的推断逻辑
-
-    return null;
-  }
-
-  /**
-   * 生成占位符交易哈希
-   */
-  private generatePlaceholderTxHash(): string {
-    // 生成一个看起来像真实交易哈希的占位符
-    const chars =
-      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-    let result = "";
-    for (let i = 0; i < 64; i++) {
-      result += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return result;
-  }
-
-  /**
-   * 处理连接回调
-   */
-  private async handleConnectCallback(
-    params: WalletCallbackRequest
-  ): Promise<WalletCallbackResponse> {
-    // Trust Wallet Deep Link 模式下连接回调处理
-    if (params.address) {
-      this.state.isConnected = true;
-      this.state.isConnecting = false;
-      this.state.address = params.address;
-
-      return {
-        type: "connect",
-        success: true,
-        data: { address: params.address },
-      };
-    }
-
-    return {
-      type: "connect",
-      success: false,
-      error: "No address provided",
-    };
-  }
-
-  /**
-   * 处理支付回调
-   */
-  private async handlePaymentCallback(
-    params: WalletCallbackRequest
-  ): Promise<WalletCallbackResponse> {
-    if (params.signature) {
-      return {
-        type: "payment",
-        success: true,
-        data: { signature: params.signature },
-      };
-    }
-
-    return {
-      type: "payment",
-      success: false,
-      error: "No transaction signature provided",
-    };
+    // 尝试从本地存储恢复并重新连接
+    await this.reconnectToSession();
   }
 }

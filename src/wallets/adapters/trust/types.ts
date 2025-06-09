@@ -9,6 +9,35 @@ export interface TrustWalletState {
   address?: string;
   balance?: number;
   error?: string;
+  // WalletConnect 相关状态
+  wcSession?: WalletConnectSession;
+  wcUri?: string;
+}
+
+// WalletConnect v2 相关类型
+export interface WalletConnectConfig {
+  projectId: string;
+  metadata: {
+    name: string;
+    description: string;
+    url: string;
+    icons: string[];
+  };
+}
+
+export interface SolanaNamespace {
+  solana: {
+    methods: string[];
+    chains: string[];
+    events: string[];
+  };
+}
+
+export interface WalletConnectSession {
+  topic: string;
+  accounts: string[];
+  chains: string[];
+  expiry: number;
 }
 
 export interface PaymentParams {
@@ -75,9 +104,14 @@ export interface TrustWalletConnectionOptions {
   timeout?: number;
   /** 是否显示安装引导 */
   showInstallGuide?: boolean;
+  /** WalletConnect 配置 (strategy 为 walletconnect 时必需) */
+  walletConnectConfig?: WalletConnectConfig;
 }
 
-export type TrustWalletConnectionStrategy = "deeplink" | "auto";
+export type TrustWalletConnectionStrategy =
+  | "deeplink"
+  | "walletconnect"
+  | "auto";
 
 export type TrustWalletError =
   | "NOT_INSTALLED"
@@ -86,4 +120,7 @@ export type TrustWalletError =
   | "USER_REJECTED"
   | "NETWORK_ERROR"
   | "TIMEOUT"
+  | "WALLETCONNECT_INIT_FAILED"
+  | "NO_SESSION"
+  | "INVALID_TRANSACTION"
   | "UNKNOWN_ERROR";

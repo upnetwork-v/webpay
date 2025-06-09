@@ -395,8 +395,12 @@ export default function PaymentPage() {
               {!isConnected ? (
                 <button
                   className={MainButtonClass}
+                  disabled={state.isLoading}
                   onClick={handleConnectWallet}
                 >
+                  {state.isLoading ? (
+                    <span className="loading loading-spinner loading-xs"></span>
+                  ) : null}
                   Connect Wallet
                 </button>
               ) : isComplete && transactionSignature ? (
