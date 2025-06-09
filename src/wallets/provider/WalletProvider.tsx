@@ -216,7 +216,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
         error: null,
       }));
     }
-  }, [adapter]);
+  }, [adapter, state.walletType]);
 
   // 1. 页面加载时自动恢复 walletType 和连接状态
   useEffect(() => {
@@ -319,50 +319,6 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
 
   const openWalletSelector = () => setWalletSelectorOpen(true);
   const closeWalletSelector = () => setWalletSelectorOpen(false);
-
-  // 调试方法：手动刷新 Trust Wallet 账户
-  const refreshTrustWalletAccounts = async () => {
-    if (state.walletType === "trust" && adapter) {
-      const trustAdapter = adapter as any;
-      if (typeof trustAdapter.refreshAccounts === "function") {
-        try {
-          await trustAdapter.refreshAccounts();
-          // 刷新后更新状态
-          setState((prev) => ({
-            ...prev,
-            publicKey: trustAdapter.getPublicKey(),
-            isConnected: trustAdapter.isConnected(),
-            error: null,
-          }));
-          console.log(
-            "[WalletProvider] Trust Wallet accounts refreshed successfully"
-          );
-        } catch (error) {
-          console.error(
-            "[WalletProvider] Failed to refresh Trust Wallet accounts:",
-            error
-          );
-          setState((prev) => ({
-            ...prev,
-            error:
-              error instanceof Error
-                ? error.message
-                : "Failed to refresh accounts",
-          }));
-        }
-      }
-    }
-  };
-
-  // 开发环境下将方法暴露到 window 对象，方便调试
-  useEffect(() => {
-    if (typeof window !== "undefined" && import.meta.env.DEV) {
-      (window as any).refreshTrustWalletAccounts = refreshTrustWalletAccounts;
-      console.log(
-        "[WalletProvider] Debug method 'refreshTrustWalletAccounts' available on window object"
-      );
-    }
-  }, [state.walletType, adapter]);
 
   // 钱包列表配置
   const walletOptions: WalletOption[] = [
