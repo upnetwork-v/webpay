@@ -244,6 +244,13 @@ export default function PaymentPage() {
 
   // Handle payment
   const handlePay = useCallback(async () => {
+    if (isLoading) {
+      return;
+    }
+    if (!tx) {
+      setError("Failed to create transaction");
+      return;
+    }
     if (!isConnected || !publicKey) {
       console.log("handlePay not connected", isConnected, publicKey);
       await handleConnectWallet();
@@ -422,11 +429,7 @@ export default function PaymentPage() {
                   </button>
                 </>
               ) : (
-                <button
-                  className={MainButtonClass}
-                  onClick={handlePay}
-                  disabled={!tx || isLoading}
-                >
+                <button className={MainButtonClass} onClick={handlePay}>
                   Pay Now
                 </button>
               )}

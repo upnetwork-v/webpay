@@ -44,12 +44,19 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
           { savedIsConnected }
         );
 
+        // 让 adapter 先恢复状态，然后获取 publicKey
+        const currentPublicKey = newAdapter.getPublicKey();
+        console.log(
+          "[WalletProvider] Trust Wallet publicKey from adapter:",
+          currentPublicKey
+        );
+
         setState((prev) => ({
           ...prev,
           walletType: type,
           // 暂时使用保存的状态，真实状态会在重连后更新
           isConnected: savedIsConnected,
-          publicKey: null, // 公钥会在重连成功后获取
+          publicKey: currentPublicKey, // 从 adapter 获取已恢复的 publicKey
           error: null,
         }));
       } else {
@@ -239,9 +246,25 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
     const savedIsConnected =
       localStorage.getItem("wallet_is_connected") === "true";
 
+    console.log(
+      "[WalletProvider] Trust Wallet reconnection conditions check:",
+      {
+        savedType,
+        savedIsConnected,
+        hasAdapter: !!adapter,
+        adapterType: adapter ? (adapter as any).constructor.name : null,
+      }
+    );
+
     if (savedType === "trust" && savedIsConnected && adapter) {
       // Trust Wallet 使用 WalletConnect 会话恢复机制
       const trustAdapter = adapter as any;
+      console.log("[WalletProvider] Trust Wallet adapter check:", {
+        hasTrustAdapter: !!trustAdapter,
+        hasTryReconnectMethod: typeof trustAdapter.tryReconnect === "function",
+        methodType: typeof trustAdapter.tryReconnect,
+      });
+
       if (trustAdapter && typeof trustAdapter.tryReconnect === "function") {
         (async () => {
           try {
@@ -277,12 +300,69 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
             }));
           }
         })();
+      } else {
+        console.warn(
+          "[WalletProvider] Trust Wallet adapter does not have tryReconnect method or is invalid"
+        );
       }
+    } else {
+      console.log(
+        "[WalletProvider] Trust Wallet reconnection conditions not met:",
+        {
+          isTrustWallet: savedType === "trust",
+          wasPreviouslyConnected: savedIsConnected,
+          hasAdapter: !!adapter,
+        }
+      );
     }
   }, [adapter]); // 依赖 adapter，确保 adapter 初始化后再执行
 
   const openWalletSelector = () => setWalletSelectorOpen(true);
   const closeWalletSelector = () => setWalletSelectorOpen(false);
+
+  // 调试方法：手动刷新 Trust Wallet 账户
+  const refreshTrustWalletAccounts = async () => {
+    if (state.walletType === "trust" && adapter) {
+      const trustAdapter = adapter as any;
+      if (typeof trustAdapter.refreshAccounts === "function") {
+        try {
+          await trustAdapter.refreshAccounts();
+          // 刷新后更新状态
+          setState((prev) => ({
+            ...prev,
+            publicKey: trustAdapter.getPublicKey(),
+            isConnected: trustAdapter.isConnected(),
+            error: null,
+          }));
+          console.log(
+            "[WalletProvider] Trust Wallet accounts refreshed successfully"
+          );
+        } catch (error) {
+          console.error(
+            "[WalletProvider] Failed to refresh Trust Wallet accounts:",
+            error
+          );
+          setState((prev) => ({
+            ...prev,
+            error:
+              error instanceof Error
+                ? error.message
+                : "Failed to refresh accounts",
+          }));
+        }
+      }
+    }
+  };
+
+  // 开发环境下将方法暴露到 window 对象，方便调试
+  useEffect(() => {
+    if (typeof window !== "undefined" && import.meta.env.DEV) {
+      (window as any).refreshTrustWalletAccounts = refreshTrustWalletAccounts;
+      console.log(
+        "[WalletProvider] Debug method 'refreshTrustWalletAccounts' available on window object"
+      );
+    }
+  }, [state.walletType, adapter]);
 
   // 钱包列表配置
   const walletOptions: WalletOption[] = [
