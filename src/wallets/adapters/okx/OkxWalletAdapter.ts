@@ -10,7 +10,7 @@ const OKX_CHAIN_ID = "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp"; // mainnet，可
 export class OkxWalletAdapter implements WalletAdapter {
   private universalProvider: any = null;
   private solanaProvider: any = null;
-  private session: any = null;
+  private _session: any = null;
   private publicKey: string | null = null;
   private connected: boolean = false;
 
@@ -19,10 +19,10 @@ export class OkxWalletAdapter implements WalletAdapter {
     const sessionRaw = localStorage.getItem(OKX_SESSION_KEY);
     if (sessionRaw) {
       try {
-        this.session = JSON.parse(sessionRaw);
+        this._session = JSON.parse(sessionRaw);
         this.connected = true;
       } catch {
-        this.session = null;
+        this._session = null;
         this.connected = false;
       }
     }
@@ -66,7 +66,7 @@ export class OkxWalletAdapter implements WalletAdapter {
       //     redirect: window.location.href,
       //   },
     });
-    this.session = session;
+    this._session = session;
     localStorage.setItem(OKX_SESSION_KEY, JSON.stringify(session));
     this.solanaProvider = new OKXSolanaProvider(this.universalProvider);
     // 获取账户
@@ -81,7 +81,7 @@ export class OkxWalletAdapter implements WalletAdapter {
     }
     this.universalProvider = null;
     this.solanaProvider = null;
-    this.session = null;
+    this._session = null;
     this.publicKey = null;
     this.connected = false;
     localStorage.removeItem(OKX_SESSION_KEY);
@@ -95,6 +95,10 @@ export class OkxWalletAdapter implements WalletAdapter {
     return this.publicKey;
   }
 
+  getSession(): any {
+    return this._session;
+  }
+
   async signAndSendTransaction(transaction: Transaction): Promise<string> {
     if (!this.solanaProvider) {
       throw new Error("Wallet not connected");
@@ -106,7 +110,7 @@ export class OkxWalletAdapter implements WalletAdapter {
     return txHash;
   }
 
-  async handleCallback(params: Record<string, string>) {
+  async handleCallback(_params: Record<string, string>) {
     // OKX 钱包一般通过 session 恢复，不需要特殊回调处理
     // 可根据需要扩展
     return {

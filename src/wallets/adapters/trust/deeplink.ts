@@ -1,15 +1,14 @@
 /**
  * Trust Wallet Deep Link 工具函数
+ *
+ * 专注于支付 Deep Link 功能，移除不必要的连接逻辑
  */
 import type { PaymentParams } from "./types";
 import { TRUST_WALLET_CONSTANTS } from "./constants";
-import { TrustWalletDetector } from "./detector";
 
 export class TrustWalletDeepLink {
-  private detector: TrustWalletDetector;
-
   constructor() {
-    this.detector = new TrustWalletDetector();
+    // 移动端专用，无需检测器
   }
 
   /**
@@ -45,15 +44,6 @@ export class TrustWalletDeepLink {
   }
 
   /**
-   * 生成 WalletConnect 连接 Deep Link
-   */
-  generateConnectionLink(wcUri: string): string {
-    const baseUrl = this.getDeepLinkBase();
-    const encodedUri = encodeURIComponent(wcUri);
-    return `${baseUrl}/wc?uri=${encodedUri}`;
-  }
-
-  /**
    * 生成 DApp 浏览器 Deep Link
    */
   generateDAppLink(url: string, coinId?: string): string {
@@ -82,18 +72,9 @@ export class TrustWalletDeepLink {
    */
   async openTrustWallet(link: string): Promise<boolean> {
     try {
-      // 检测设备类型
-      const browserInfo = this.detector.getBrowserInfo();
-
-      if (browserInfo.isMobile) {
-        // 移动端直接跳转
-        window.location.href = link;
-        return true;
-      } else {
-        // 桌面端在新窗口打开
-        const popup = window.open(link, "_blank", "noopener,noreferrer");
-        return popup !== null;
-      }
+      // 移动端专用，直接跳转
+      window.location.href = link;
+      return true;
     } catch (error) {
       console.error("Failed to open Trust Wallet:", error);
       return false;
@@ -104,16 +85,9 @@ export class TrustWalletDeepLink {
    * 处理降级方案
    */
   async handleFallback(originalLink: string): Promise<void> {
-    const isInstalled = await this.detector.isTrustWalletInstalled();
-
-    if (!isInstalled) {
-      // 如果未安装，转换为 Web Deep Link 引导下载
-      const webLink = this.convertToWebDeepLink(originalLink);
-      window.open(webLink, "_blank", "noopener,noreferrer");
-    } else {
-      // 如果已安装但跳转失败，重试或显示错误
-      throw new Error(TRUST_WALLET_CONSTANTS.ERRORS.CONNECTION_FAILED);
-    }
+    // 移动端专用，直接转换为 Web Deep Link
+    const webLink = this.convertToWebDeepLink(originalLink);
+    window.open(webLink, "_blank", "noopener,noreferrer");
   }
 
   /**
@@ -122,6 +96,8 @@ export class TrustWalletDeepLink {
   async requestPayment(params: PaymentParams): Promise<boolean> {
     try {
       const paymentLink = this.generatePaymentLink(params);
+      console.log("Trust Wallet 支付链接:", paymentLink);
+
       const success = await this.openTrustWallet(paymentLink);
 
       if (!success) {
@@ -136,35 +112,10 @@ export class TrustWalletDeepLink {
   }
 
   /**
-   * 发起连接请求
-   */
-  async requestConnection(wcUri: string): Promise<boolean> {
-    try {
-      const connectionLink = this.generateConnectionLink(wcUri);
-      const success = await this.openTrustWallet(connectionLink);
-
-      if (!success) {
-        await this.handleFallback(connectionLink);
-      }
-
-      return true;
-    } catch (error) {
-      console.error("Connection request failed:", error);
-      return false;
-    }
-  }
-
-  /**
    * 获取 Deep Link 基础 URL
    */
   private getDeepLinkBase(): string {
-    const browserInfo = this.detector.getBrowserInfo();
-
-    // 移动端优先使用原生协议，桌面端使用 Web 协议
-    if (browserInfo.isMobile && this.detector.supportsFeature("deeplink")) {
-      return TRUST_WALLET_CONSTANTS.NATIVE_DEEP_LINK_BASE.slice(0, -3); // 去掉 '://'
-    }
-
+    // 移动端专用，使用 Web Deep Link 以确保兼容性
     return TRUST_WALLET_CONSTANTS.WEB_DEEP_LINK_BASE;
   }
 

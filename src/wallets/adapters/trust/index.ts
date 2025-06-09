@@ -1,5 +1,5 @@
-export { TrustWalletAdapter } from "./TrustWalletAdapter";
-export { TrustWalletDetector } from "./detector";
+export { TrustWalletAdapter } from "./TrustWalletAdapter.js";
+
 export { TrustWalletDeepLink } from "./deeplink";
 export * from "./types";
 export * from "./constants";
