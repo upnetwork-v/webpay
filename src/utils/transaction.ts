@@ -130,7 +130,6 @@ export async function createSPLTransferTransaction({
       JSON.stringify({
         webpay: {
           orderId,
-          tokenMint: tokenAddress,
         },
       }),
       new PublicKey(from)

@@ -4,9 +4,9 @@ import type {
   WalletType,
   WalletOption,
   WalletAdapter,
+  PaymentRequest,
 } from "../types/wallet";
 import { createAdapter } from "../adapters/adapterFactory";
-import type { Transaction } from "@/types";
 import { WalletContext } from "./WalletContext";
 import WalletSelector from "../components/WalletSelector";
 
@@ -132,12 +132,12 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
   };
 
   const signAndSendTransaction = async (
-    transaction: Transaction
+    request: PaymentRequest
   ): Promise<string> => {
     if (!adapter) {
       throw new Error("Wallet adapter not initialized");
     }
-    return adapter.signAndSendTransaction(transaction);
+    return adapter.signAndSendTransaction(request);
   };
 
   // 处理回调更新状态

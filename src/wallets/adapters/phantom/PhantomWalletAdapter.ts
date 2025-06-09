@@ -1,6 +1,9 @@
-import type { WalletAdapter } from "../../types/wallet";
+import type { WalletAdapter, PaymentRequest } from "../../types/wallet";
 import * as nacl from "tweetnacl";
-import type { Transaction } from "@solana/web3.js";
+import {
+  createSolTransferTransaction,
+  createSPLTransferTransaction,
+} from "../../../utils/transaction";
 import {
   openPhantomSignAndSendTransactionDeeplink,
   buildUrl,
@@ -129,11 +132,45 @@ export class PhantomWalletAdapter implements WalletAdapter {
     clearPhantomWalletState();
   }
 
-  async signAndSendTransaction(transaction: Transaction): Promise<string> {
+  /**
+   * 使用现有的公共方法构建交易
+   */
+  private async buildTransaction(request: PaymentRequest) {
+    if (!this._publicKey) {
+      throw new Error("No sender public key available");
+    }
+
+    console.log("[PhantomWalletAdapter] Building transaction:", request);
+
+    if (
+      !request.tokenMint ||
+      request.tokenMint === "So11111111111111111111111111111111111111112"
+    ) {
+      // SOL 转账
+      return await createSolTransferTransaction({
+        from: this._publicKey,
+        to: request.recipientAddress,
+        tokenAmount: request.amount,
+        orderId: request.orderId,
+      });
+    } else {
+      // SPL Token 转账
+      return await createSPLTransferTransaction({
+        from: this._publicKey,
+        to: request.recipientAddress,
+        tokenAmount: request.amount,
+        tokenAddress: request.tokenMint,
+        orderId: request.orderId,
+      });
+    }
+  }
+
+  async signAndSendTransaction(request: PaymentRequest): Promise<string> {
     console.log("signAndSendTransaction", {
       phantomEncryptionPublicKey: this.phantomEncryptionPublicKey,
       session: this.session,
       dappKeyPair: this.dappKeyPair,
+      request,
     });
     if (
       !this.phantomEncryptionPublicKey ||
@@ -142,6 +179,10 @@ export class PhantomWalletAdapter implements WalletAdapter {
     ) {
       throw new Error("Wallet not connected");
     }
+
+    // 构建交易
+    const transaction = await this.buildTransaction(request);
+
     const redirectUrl = `${window.location.origin}${window.location.pathname}`;
     return openPhantomSignAndSendTransactionDeeplink(
       transaction,
@@ -250,11 +291,11 @@ export class PhantomWalletAdapter implements WalletAdapter {
         success: false,
         error: "Unknown callback type",
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
       return {
         type: "error",
         success: false,
-        error: err?.message || String(err),
+        error: err instanceof Error ? err.message : String(err),
       };
     }
   }

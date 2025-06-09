@@ -1,8 +1,15 @@
-import type { WalletAdapter } from "@/wallets/types/wallet";
-import type { Transaction } from "@solana/web3.js";
+import type { WalletAdapter, PaymentRequest } from "@/wallets/types/wallet";
+import {
+  createSolTransferTransaction,
+  createSPLTransferTransaction,
+} from "@/utils/transaction";
 import { OKXUniversalProvider } from "@okxconnect/universal-provider";
 import { OKXSolanaProvider } from "@okxconnect/solana-provider";
 import { DAPP_NAME, DAPP_ICON } from "@/wallets/utils/dapp";
+import type {
+  WalletCallbackRequest,
+  WalletCallbackResponse,
+} from "@/wallets/types/wallet";
 
 const OKX_SESSION_KEY = "okx_wallet_session";
 const OKX_CHAIN_ID = "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp"; // mainnet，可根据需要调整
@@ -99,10 +106,49 @@ export class OkxWalletAdapter implements WalletAdapter {
     return this._session;
   }
 
-  async signAndSendTransaction(transaction: Transaction): Promise<string> {
+  /**
+   * 使用现有的公共方法构建交易
+   */
+  private async buildTransaction(request: PaymentRequest) {
+    if (!this.publicKey) {
+      throw new Error("No sender public key available");
+    }
+
+    console.log("[OKXWalletAdapter] Building transaction:", request);
+
+    if (
+      !request.tokenMint ||
+      request.tokenMint === "So11111111111111111111111111111111111111112"
+    ) {
+      // SOL 转账
+      return await createSolTransferTransaction({
+        from: this.publicKey,
+        to: request.recipientAddress,
+        tokenAmount: request.amount,
+        orderId: request.orderId,
+      });
+    } else {
+      // SPL Token 转账
+      return await createSPLTransferTransaction({
+        from: this.publicKey,
+        to: request.recipientAddress,
+        tokenAmount: request.amount,
+        tokenAddress: request.tokenMint,
+        orderId: request.orderId,
+      });
+    }
+  }
+
+  async signAndSendTransaction(request: PaymentRequest): Promise<string> {
     if (!this.solanaProvider) {
       throw new Error("Wallet not connected");
     }
+
+    console.log("[OKXWalletAdapter] signAndSendTransaction:", request);
+
+    // 构建交易
+    const transaction = await this.buildTransaction(request);
+
     const txHash = await this.solanaProvider.signAndSendTransaction(
       transaction,
       OKX_CHAIN_ID
@@ -110,7 +156,9 @@ export class OkxWalletAdapter implements WalletAdapter {
     return txHash;
   }
 
-  async handleCallback(_params: Record<string, string>) {
+  async handleCallback(
+    _params: WalletCallbackRequest
+  ): Promise<WalletCallbackResponse> {
     // OKX 钱包一般通过 session 恢复，不需要特殊回调处理
     // 可根据需要扩展
     return {

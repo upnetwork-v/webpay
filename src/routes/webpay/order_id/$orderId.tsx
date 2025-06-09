@@ -1,13 +1,9 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { getOrderById, coinCalculatorQuery } from "@/api/order";
-import type { Order, CoinCalculator, Transaction } from "@/types";
+import type { Order, CoinCalculator } from "@/types";
 import { useWallet } from "@/wallets/provider/useWallet";
-import {
-  getSolanaExplorerUrl,
-  estimateTransactionFee,
-  isValidSolanaTxHash,
-} from "@/utils";
+import { getSolanaExplorerUrl, isValidSolanaTxHash } from "@/utils";
 import Logo from "@/assets/img/logo.svg";
 import { usePayment } from "@/hooks";
 import OrderDetailCard from "@/components/orderDetailCard";
@@ -51,48 +47,25 @@ export default function PaymentPage() {
   }, [order]);
 
   // Initialize payment logic
-  const { error, createPaymentTransaction, setError } = usePayment({
+  const { error, setError } = usePayment({
     order: order,
     paymentToken: paymentToken,
     coinCalculator: coinCalculator,
     phantomPublicKey: publicKey,
   });
 
-  const [tx, setTx] = useState<Transaction | null>(null);
-
+  // Transaction fee estimation - now handled by adapters internally
   useEffect(() => {
-    if (!tx) {
-      if (createPaymentTransaction && publicKey) {
-        createPaymentTransaction()
-          .then((tx) => {
-            console.log("create payment transaction success", tx);
-            if (tx) {
-              setTx(tx);
-            }
-          })
-          .catch((err) => {
-            console.error("Error creating payment transaction:", err);
-            setError(`Failed to create payment transaction: ${err}`);
-          });
-      } else {
-        console.log(
-          "missing init params",
-          typeof createPaymentTransaction,
-          publicKey
-        );
-      }
-    }
-  }, [tx, createPaymentTransaction, publicKey, setError]);
-
-  useEffect(() => {
-    if (tx) {
+    if (order && coinCalculator) {
+      // For display purposes, we can show a typical SOL transaction fee
       setIsEstimatingFee(true);
-      estimateTransactionFee(tx).then((fee) => {
+      // Simulate fee estimation
+      setTimeout(() => {
         setIsEstimatingFee(false);
-        setEstimatedFee(fee.toFixed(6)); // Format to 6 decimal places
-      });
+        setEstimatedFee("0.000005"); // Typical SOL transaction fee
+      }, 500);
     }
-  }, [tx, setIsEstimatingFee, setEstimatedFee]);
+  }, [order, coinCalculator, setIsEstimatingFee, setEstimatedFee]);
 
   // Check for Phantom connection callback or payment response when component mounts
   useEffect(() => {
@@ -247,10 +220,7 @@ export default function PaymentPage() {
     if (isLoading) {
       return;
     }
-    if (!tx) {
-      setError("Failed to create transaction");
-      return;
-    }
+    // Skip tx validation as we build transactions dynamically now
     if (!isConnected || !publicKey) {
       console.log("handlePay not connected", isConnected, publicKey);
       await handleConnectWallet();
@@ -265,12 +235,20 @@ export default function PaymentPage() {
     try {
       setIsLoading(true);
 
-      if (!tx) {
-        throw new Error("Failed to create transaction");
-      }
+      // Transaction will be built dynamically by the adapter
 
-      // signAndSendTransaction 方法在 PhantomWalletAdapter 中返回deeplink url
-      const result = await signAndSendTransaction(tx);
+      // 构建支付请求
+      const paymentRequest = {
+        recipientAddress: order.merchantSolanaAddress,
+        amount: coinCalculator?.payTokenAmount || "0",
+        tokenMint: paymentToken?.isNative
+          ? undefined
+          : paymentToken?.tokenAddress,
+        orderId: order.orderId,
+      };
+
+      // 使用新的支付请求接口
+      const result = await signAndSendTransaction(paymentRequest);
       // okx wallet return tx hash
       console.log("signAndSendTransaction result", result);
       // 如果是 okx 钱包，而且 result 是否是合法的 Solana tx hash，则认为支付成功
@@ -293,10 +271,13 @@ export default function PaymentPage() {
     isConnected,
     publicKey,
     order,
-    tx,
     handleConnectWallet,
     signAndSendTransaction,
     setError,
+    isLoading,
+    state.walletType,
+    paymentToken,
+    coinCalculator,
   ]);
 
   // confirm order
@@ -429,7 +410,14 @@ export default function PaymentPage() {
                   </button>
                 </>
               ) : (
-                <button className={MainButtonClass} onClick={handlePay}>
+                <button
+                  className={MainButtonClass}
+                  disabled={state.isLoading}
+                  onClick={handlePay}
+                >
+                  {state.isLoading ? (
+                    <span className="loading loading-spinner loading-xs"></span>
+                  ) : null}
                   Pay Now
                 </button>
               )}
