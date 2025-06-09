@@ -15,9 +15,6 @@ export const TRUST_WALLET_CONSTANTS = {
   CONNECTION_TIMEOUT: 30000, // 30秒
   DETECTION_TIMEOUT: 2000, // 2秒
 
-  // WalletConnect 相关
-  WALLETCONNECT_BRIDGE: "https://bridge.walletconnect.org",
-
   // 错误消息
   ERRORS: {
     NOT_INSTALLED: "Trust Wallet is not installed",
@@ -31,7 +28,6 @@ export const TRUST_WALLET_CONSTANTS = {
 
 export const TRUST_WALLET_FEATURES = {
   DEEP_LINKING: true,
-  WALLET_CONNECT: true,
   MOBILE_SUPPORT: true,
   DESKTOP_EXTENSION: true,
   SOLANA_SUPPORT: true,

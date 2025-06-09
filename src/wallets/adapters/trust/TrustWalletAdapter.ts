@@ -1,14 +1,14 @@
 /**
  * Trust Wallet 适配器
  *
- * 实现基于 Deep Linking 和 WalletConnect 的 Trust Wallet 集成
+ * 实现基于 Deep Linking 的 Trust Wallet 集成
  */
 import type { Transaction } from "@solana/web3.js";
 import type {
   WalletAdapter,
   WalletCallbackRequest,
   WalletCallbackResponse,
-} from "@/wallets/types/wallet";
+} from "../../types/wallet";
 import type {
   TrustWalletState,
   TrustWalletConnectionOptions,
@@ -78,22 +78,8 @@ export class TrustWalletAdapter implements WalletAdapter {
         return;
       }
 
-      // 根据策略选择连接方式
-      const strategy = options?.strategy || this.getOptimalStrategy(detection);
-
-      switch (strategy) {
-        case "deeplink":
-          await this.connectViaDeepLink(options);
-          break;
-        case "walletconnect":
-          await this.connectViaWalletConnect(options);
-          break;
-        case "auto":
-          await this.connectAuto(detection, options);
-          break;
-        default:
-          throw new Error(`Unsupported connection strategy: ${strategy}`);
-      }
+      // 使用 Deep Link 连接
+      await this.connectViaDeepLink(options);
     } catch (error) {
       this.state.error =
         error instanceof Error ? error.message : "Unknown error";
@@ -219,66 +205,33 @@ export class TrustWalletAdapter implements WalletAdapter {
   private async connectViaDeepLink(
     options?: TrustWalletConnectionOptions
   ): Promise<void> {
-    // 生成 WalletConnect URI (这里需要实际的 WC 实现)
-    const wcUri = await this.generateWalletConnectURI();
+    try {
+      // 生成连接请求 URI
+      const connectUri = this.generateConnectURI();
 
-    // 通过 Deep Link 发起连接
-    const success = await this.deepLink.requestConnection(wcUri);
+      // 通过 Deep Link 发起连接
+      const success = await this.deepLink.requestConnection(connectUri);
 
-    if (!success) {
-      throw new Error(TRUST_WALLET_CONSTANTS.ERRORS.CONNECTION_FAILED);
-    }
+      if (!success) {
+        throw new Error(TRUST_WALLET_CONSTANTS.ERRORS.CONNECTION_FAILED);
+      }
 
-    // 设置连接超时
-    const timeout =
-      options?.timeout || TRUST_WALLET_CONSTANTS.CONNECTION_TIMEOUT;
-    this.connectionTimeout = setTimeout(() => {
+      // 设置连接超时
+      const timeout =
+        options?.timeout || TRUST_WALLET_CONSTANTS.CONNECTION_TIMEOUT;
+      this.connectionTimeout = setTimeout(() => {
+        this.state.isConnecting = false;
+        this.state.error = TRUST_WALLET_CONSTANTS.ERRORS.TIMEOUT;
+      }, timeout);
+
+      // 等待连接确认
+      await this.waitForConnectionConfirmation();
+    } catch (error) {
       this.state.isConnecting = false;
-      this.state.error = TRUST_WALLET_CONSTANTS.ERRORS.TIMEOUT;
-    }, timeout);
-
-    // 等待连接确认
-    await this.waitForConnectionConfirmation();
-  }
-
-  /**
-   * 通过 WalletConnect 连接
-   */
-  private async connectViaWalletConnect(
-    _options?: TrustWalletConnectionOptions
-  ): Promise<void> {
-    // 这里需要实现标准的 WalletConnect 连接逻辑
-    throw new Error("WalletConnect implementation pending");
-  }
-
-  /**
-   * 自动选择连接方式
-   */
-  private async connectAuto(
-    detection: any,
-    options?: TrustWalletConnectionOptions
-  ): Promise<void> {
-    if (detection.supportsDeepLink) {
-      await this.connectViaDeepLink(options);
-    } else if (detection.supportsWalletConnect) {
-      await this.connectViaWalletConnect(options);
-    } else {
-      throw new Error("No supported connection method available");
+      this.state.error =
+        error instanceof Error ? error.message : "Deep Link connection failed";
+      throw error;
     }
-  }
-
-  /**
-   * 获取最优连接策略
-   */
-  private getOptimalStrategy(
-    detection: any
-  ): "deeplink" | "walletconnect" | "auto" {
-    if (detection.browserInfo.isMobile && detection.isInstalled) {
-      return "deeplink";
-    } else if (detection.supportsWalletConnect) {
-      return "walletconnect";
-    }
-    return "auto";
   }
 
   /**
@@ -291,12 +244,17 @@ export class TrustWalletAdapter implements WalletAdapter {
   }
 
   /**
-   * 生成 WalletConnect URI
+   * 生成连接 URI
    */
-  private async generateWalletConnectURI(): Promise<string> {
-    // 这里需要实际的 WalletConnect 实现
-    // 临时返回示例 URI
-    return "wc:example-session-key@1?bridge=https://bridge.walletconnect.org&key=example-key";
+  private generateConnectURI(): string {
+    // 这里生成一个简单的连接 URI
+    // 实际应用中可能需要包含更多参数
+    const params = new URLSearchParams({
+      callback: window.location.href,
+      dapp: "OntaPay",
+    });
+
+    return `trust://connect?${params.toString()}`;
   }
 
   /**

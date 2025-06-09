@@ -55,8 +55,8 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
     try {
       await adapter.connect();
       localStorage.setItem("wallet_is_connected", "true");
-      // 如果 walletType 是 okx，则设置为已连接状态
-      if (state.walletType === "okx") {
+      // 如果 walletType 是 okx 或 trust，则设置为已连接状态
+      if (state.walletType === "okx" || state.walletType === "trust") {
         setState((prev) => ({
           ...prev,
           isConnected: true,
@@ -134,18 +134,31 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
     return adapter.handleCallback(params);
   };
 
-  // 2. adapter 初始化后，如果 URL 有 Phantom 回调参数，则执行 handleConnectCallback
+  // 2. adapter 初始化后，如果 URL 有钱包回调参数，则执行 handleConnectCallback
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
+
+    // Phantom 回调参数
     const phantomPk = urlParams.get("phantom_encryption_public_key");
     const nonce = urlParams.get("nonce");
     const data = urlParams.get("data");
+
+    // Trust Wallet 回调参数
+    const trustAddress = urlParams.get("trust_address");
+    const trustSignature = urlParams.get("trust_signature");
+    const trustType = urlParams.get("trust_type");
 
     if (adapter && phantomPk && nonce && data) {
       handleConnectCallback({
         phantom_encryption_public_key: phantomPk,
         nonce: nonce,
         data: data,
+      });
+    } else if (adapter && trustAddress && trustType) {
+      handleConnectCallback({
+        type: trustType,
+        address: trustAddress,
+        signature: trustSignature || "",
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -177,6 +190,13 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
           // adapter 会在构造时自动恢复 session
           // 这里等待 adapter 初始化后自动同步 isConnected
         }
+
+        // Trust Wallet 自动恢复连接
+        if (savedType === "trust" && savedIsConnected) {
+          // Trust Wallet 通过 Deep Link 机制恢复连接
+          // 检查 localStorage 中的连接状态即可
+        }
+
         // TODO: 其他钱包类型 autoConnect 入口
       })();
     }
@@ -205,6 +225,17 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
         <img
           src={new URL("../adapters/okx/logo.png", import.meta.url).href}
           alt="OKX"
+          className="rounded-full object-cover h-10 w-10"
+        />
+      ),
+    },
+    {
+      type: "trust",
+      name: "Trust Wallet",
+      icon: (
+        <img
+          src={new URL("../adapters/trust/logo.svg", import.meta.url).href}
+          alt="Trust Wallet"
           className="rounded-full object-cover h-10 w-10"
         />
       ),

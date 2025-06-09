@@ -77,10 +77,7 @@ export interface TrustWalletConnectionOptions {
   showInstallGuide?: boolean;
 }
 
-export type TrustWalletConnectionStrategy =
-  | "deeplink"
-  | "walletconnect"
-  | "auto";
+export type TrustWalletConnectionStrategy = "deeplink" | "auto";
 
 export type TrustWalletError =
   | "NOT_INSTALLED"

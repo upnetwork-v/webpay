@@ -45,8 +45,9 @@ OntaPay 采用现代化的前端架构模式，基于组件化设计和模块化
 
 ### 2. 🧩 Component Composition
 
+- **通用组件**: 统一的钱包交互界面设计
 - **原子化组件**: 基于 Radix UI 的可复用组件
-- **复合组件**: 业务逻辑封装
+- **复合组件**: 业务逻辑封装，兼容多钱包
 - **HOC模式**: 钱包连接状态增强
 
 ### 3. 🔄 State Management
@@ -68,11 +69,11 @@ OntaPay 采用现代化的前端架构模式，基于组件化设计和模块化
 - **错误边界**: 组件级错误处理
 - **CSP策略**: 内容安全策略配置
 
-## 📱 Responsive Design Patterns
+## 📱 Mobile-First Design Patterns
 
-- **移动优先**: Mobile-first CSS 设计
-- **断点系统**: Tailwind 响应式断点
-- **触摸优化**: 移动端交互优化
+- **移动端专用**: 专注手机网页体验设计
+- **触摸优化**: 移动端交互和手势支持
+- **钱包应用交互**: Deep Link 与移动钱包 App 集成
 - **PWA就绪**: 渐进式Web应用支持
 
 ## 🔄 Data Flow Patterns

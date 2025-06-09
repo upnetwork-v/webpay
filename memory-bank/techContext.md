@@ -107,10 +107,10 @@ src/
 
 ### 🌍 Browser Support
 
+- **移动端浏览器**: iOS Safari, Chrome Mobile (主要目标)
 - **现代浏览器**: ES2020+ 支持
-- **移动端**: iOS Safari, Chrome Mobile
-- **桌面端**: Chrome, Firefox, Safari, Edge
-- **Web3**: MetaMask, OKX, Phantom 等钱包扩展
+- **钱包应用**: OKX App, Phantom App, Trust Wallet App
+- **Deep Link**: 支持 trust://, phantom://, okx:// 协议
 
 ## 🔐 Security Considerations
 
