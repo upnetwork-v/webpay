@@ -6,10 +6,6 @@ import {
 import { OKXUniversalProvider } from "@okxconnect/universal-provider";
 import { OKXSolanaProvider } from "@okxconnect/solana-provider";
 import { DAPP_NAME, DAPP_ICON } from "@/wallets/utils/dapp";
-import type {
-  WalletCallbackRequest,
-  WalletCallbackResponse,
-} from "@/wallets/types/wallet";
 
 const OKX_SESSION_KEY = "okx_wallet_session";
 const OKX_CHAIN_ID = "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp"; // mainnet，可根据需要调整
