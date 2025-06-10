@@ -6,6 +6,7 @@ export type WalletType = "phantom" | "okx" | "trust"; // 支持 Trust Wallet
 export interface PaymentRequest {
   recipientAddress: string;
   amount: string;
+  decimal: number;
   tokenMint?: string; // SPL token mint address, undefined for SOL
   orderId: string;
 }

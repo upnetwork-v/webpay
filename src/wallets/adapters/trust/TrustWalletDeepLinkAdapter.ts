@@ -11,6 +11,8 @@ import type {
   WalletCallbackResponse,
 } from "../../types/wallet";
 
+import { formatUnits } from "viem";
+
 // 待确认错误类型
 export class PendingConfirmationError extends Error {
   constructor(message: string) {
@@ -197,13 +199,13 @@ export class TrustWalletDeepLinkAdapter implements WalletAdapter {
     const params = new URLSearchParams({
       asset: this.getAssetIdentifier(request.tokenMint),
       address: request.recipientAddress,
-      amount: request.amount,
+      amount: formatUnits(BigInt(request.amount), request.decimal),
+      memo: JSON.stringify({
+        webpay: {
+          orderId: request.orderId,
+        },
+      }),
     });
-
-    // Trust Wallet 不直接支持 memo，但可以尝试添加
-    // if (request.orderId) {
-    //   params.set('memo', `Order ${request.orderId}`);
-    // }
 
     return `https://link.trustwallet.com/send?${params.toString()}`;
   }

@@ -11,6 +11,7 @@ import CheckIcon from "@/assets/img/check.png";
 import { TrustWalletConfirmationModal } from "@/components/TrustWalletConfirmationModal";
 import { PaymentManager, type PaymentResult } from "@/utils/paymentManager";
 import type { PaymentRequest } from "@/wallets/types/wallet";
+import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 
 export default function PaymentPage() {
   const { orderId } = Route.useParams();
@@ -230,8 +231,14 @@ export default function PaymentPage() {
       return;
     }
     // Skip tx validation as we build transactions dynamically now
-    if (!isConnected || !publicKey) {
-      console.log("handlePay not connected", isConnected, publicKey);
+    if (!isConnected) {
+      console.log("handlePay not connected", isConnected);
+      await handleConnectWallet();
+      return;
+    }
+
+    if (state.walletType !== "trust" && !publicKey) {
+      console.log("publicKey not found", publicKey);
       await handleConnectWallet();
       return;
     }
@@ -248,6 +255,8 @@ export default function PaymentPage() {
       const paymentRequest: PaymentRequest = {
         recipientAddress: order.merchantSolanaAddress,
         amount: coinCalculator?.payTokenAmount || "0",
+        decimal:
+          paymentToken?.decimal || LAMPORTS_PER_SOL.toString().length - 1,
         tokenMint: paymentToken?.isNative
           ? undefined
           : paymentToken?.tokenAddress,
@@ -472,6 +481,7 @@ export default function PaymentPage() {
         onConfirm={handleTrustWalletConfirm}
         onCancel={handleTrustWalletCancel}
         paymentRequest={pendingPaymentRequest}
+        order={order}
       />
     </div>
   );
