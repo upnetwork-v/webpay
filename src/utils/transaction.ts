@@ -67,13 +67,14 @@ export async function createSPLTransferTransaction({
     const toAccountInfo = await connection.getAccountInfo(toTokenAccount);
 
     if (!fromAccountInfo) {
+      // translate to english
       throw new Error(
-        "付款人 Token Account 不存在，请先在 Phantom 钱包内添加 Token 资产并获取 Token。"
+        "Sender Token Account not found, please add Token asset in Phantom wallet and get Token."
       );
     }
     if (!toAccountInfo) {
       throw new Error(
-        "收款人 Token Account 不存在，请联系收款人先添加 Token 资产。"
+        "Receiver Token Account not found, please add Token asset in receiver's wallet."
       );
     }
 
@@ -95,7 +96,7 @@ export async function createSPLTransferTransaction({
       BigInt(fromBalance) < BigInt(tokenAmount)
     ) {
       throw new Error(
-        `付款人 Token 余额不足，当前余额：${fromBalance ?? 0}，需要：${tokenAmount}`
+        `Sender Token balance not enough, current balance: ${fromBalance ?? 0}, need: ${tokenAmount}`
       );
     }
 
@@ -112,7 +113,7 @@ export async function createSPLTransferTransaction({
     }
     if (toAccountState !== undefined && toAccountState !== "initialized") {
       throw new Error(
-        "收款人 USDC Token Account 状态异常，请联系收款人检查账户。"
+        "Receiver Token Account state is abnormal, please check the account."
       );
     }
 
@@ -188,14 +189,14 @@ export async function createSolTransferTransaction({
 
     if (fromBalance < totalNeeded) {
       throw new Error(
-        `付款人 SOL 余额不足，当前余额：${fromBalance / LAMPORTS_PER_SOL}，需要：${tokenAmount} + 手续费`
+        `Sender SOL balance not enough, current balance: ${fromBalance / LAMPORTS_PER_SOL}, need: ${tokenAmount} + fee`
       );
     }
 
     // Check if recipient account exists
     const toAccountInfo = await connection.getAccountInfo(toPubkey);
     if (!toAccountInfo) {
-      throw new Error("收款人账户不存在");
+      throw new Error("Receiver account not found");
     }
 
     // Create a new transaction

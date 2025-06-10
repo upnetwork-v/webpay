@@ -1,9 +1,9 @@
 {
-    "name": "MerchantConnectFrontend",
-    "short_name": "MerchantConnect",
+    "name": "OntaPay",
+    "short_name": "OntaPay",
     "icons": [
         {
-            "src": "/MerchantConnectFrontend/apple-touch-icon.png",
+            "src": "/apple-touch-icon.png",
             "sizes": "180x180",
             "type": "image/png"
         }

@@ -1,7 +1,20 @@
 import nacl from "tweetnacl";
+import bs58 from "bs58";
 
 export const SOLANA_NETWORK = "mainnet-beta"; //"devnet";
 
+export function isValidSolanaTxHash(signature: string): boolean {
+  if (typeof signature !== "string") return false;
+  // Solana signature base58 编码后通常为 87-88 字符
+  if (signature.length < 87 || signature.length > 88) return false;
+  try {
+    const decoded = bs58.decode(signature);
+    // Ed25519 签名原始字节长度为 64
+    return decoded.length === 64;
+  } catch {
+    return false;
+  }
+}
 /**
  * 生成 Solana Explorer 交易 URL
  * @param signature - 交易签名

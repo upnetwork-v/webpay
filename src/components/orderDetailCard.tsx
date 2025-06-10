@@ -36,11 +36,10 @@ const OrderDetailCard: React.FC<OrderDetailCardProps> = ({
   coinCalculator,
   isEstimatingFee,
   estimatedFee,
-  isLoading,
 }) => {
-  if (order && !isLoading) {
+  if (order) {
     return (
-      <div className="bg-base-200 rounded-2xl my-4 p-4">
+      <div className="bg-base-200 rounded-2xl my-4 p-4 z-10 relative">
         <div className="flex gap-2 items-center">
           {/* 头像 placeholder */}
           <div className="rounded flex bg-gray-300 h-10 text-2xl w-10 items-center justify-center">

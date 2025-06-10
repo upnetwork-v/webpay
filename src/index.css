@@ -10,11 +10,28 @@
   --color-base-content: #ffffff;
   --color-neutral: #000000;
   --color-neutral-content: #777777;
-  --color-success: #1c3616;
+  --color-success: #1c3817;
 }
 
 body,
 html,
 #root {
   height: 100%;
+}
+
+.paid-bg-responsive {
+  box-shadow: inset 0 0 68vw 0 rgba(38, 255, 0, 0.4);
+}
+
+.paid-bg-gradient {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  border-radius: inherit;
+  background: radial-gradient(
+    ellipse at center,
+    transparent 32%,
+    rgba(38, 255, 0, 0.35) 100%
+  );
 }
