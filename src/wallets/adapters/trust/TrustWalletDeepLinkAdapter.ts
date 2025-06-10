@@ -200,11 +200,7 @@ export class TrustWalletDeepLinkAdapter implements WalletAdapter {
       asset: this.getAssetIdentifier(request.tokenMint),
       address: request.recipientAddress,
       amount: formatUnits(BigInt(request.amount), request.decimal),
-      memo: JSON.stringify({
-        webpay: {
-          orderId: request.orderId,
-        },
-      }),
+      memo: `webpay_orderId_${request.orderId}`,
     });
 
     return `https://link.trustwallet.com/send?${params.toString()}`;

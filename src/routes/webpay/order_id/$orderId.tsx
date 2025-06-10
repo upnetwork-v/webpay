@@ -331,8 +331,7 @@ export default function PaymentPage() {
     console.log("[Trust Wallet] User cancelled payment");
     setShowTrustConfirmation(false);
     setPendingPaymentRequest(null);
-    setError("Payment cancelled by user");
-  }, [setError]);
+  }, []);
 
   const requestTimeout = useRef<NodeJS.Timeout | null>(null);
 
