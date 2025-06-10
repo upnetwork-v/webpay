@@ -106,7 +106,7 @@ export class OkxWalletAdapter implements WalletAdapter {
     return txHash;
   }
 
-  async handleCallback(params: Record<string, string>) {
+  async handleCallback(_params: Record<string, string>) {
     // OKX 钱包一般通过 session 恢复，不需要特殊回调处理
     // 可根据需要扩展
     return {
@@ -114,5 +114,9 @@ export class OkxWalletAdapter implements WalletAdapter {
       success: this.connected,
       data: { publicKey: this.publicKey },
     };
+  }
+
+  getSession(): any {
+    return this.session;
   }
 }
