@@ -7,8 +7,8 @@ export const Route = createFileRoute("/")({
   component: Index,
   validateSearch: (search: Record<string, unknown>) => {
     return {
-      auth_token: search.auth_token as string | undefined,
-      error: search.error as string | undefined,
+      auth_token: search["auth-token"] as string | undefined,
+      error: search["error"] as string | undefined,
     };
   },
 });

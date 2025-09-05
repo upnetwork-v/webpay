@@ -336,27 +336,6 @@ export default function PaymentPage() {
     };
   }, [isComplete, transactionSignature, orderConfirmed, orderId]);
 
-  // Render login state if not authenticated
-  if (!isAuthenticated) {
-    return (
-      <div className="flex h-full bg-base-300 w-full justify-center items-center">
-        <div className="h-full max-w-md bg-base-300 w-full py-4 px-8 pb-24 overflow-hidden shadow-md relative md:rounded-xl md:h-auto">
-          <div className="flex flex-col my-10 text-center gap-y-4">
-            <img src={Logo} alt="OntaPay" className="mx-auto h-6" />
-            <div className="text-base-content">Please login to continue</div>
-          </div>
-
-          {/* Login Button */}
-          <div className="py-4 px-8 right-0 bottom-2 left-0 absolute">
-            <div className="mx-auto max-w-md px-1">
-              <GoogleLoginButton />
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   // Render error state
   if (error) {
     return (
@@ -415,45 +394,50 @@ export default function PaymentPage() {
         />
 
         {/* 按钮 */}
-        {!orderConfirmed && (
-          <div className="py-4 px-8 right-0 bottom-2 left-0 absolute">
-            <div className="mx-auto max-w-md px-1">
-              {!isConnected ? (
-                <button
-                  className={MainButtonClass}
-                  onClick={handleConnectWallet}
-                >
-                  Connect Wallet
-                </button>
-              ) : isComplete && transactionSignature ? (
-                <>
-                  <div className="text-xs text-base-content text-center p-4">
-                    Pay Success!{" "}
-                    <a
-                      href={getSolanaExplorerUrl(transactionSignature)}
-                      target="_blank"
-                      className="link link-primary"
-                    >
-                      View on Solana Explorer
-                    </a>
-                    .
-                  </div>
-                  <button className={MainButtonClass} disabled>
-                    <span className="loading loading-spinner loading-xs"></span>
-                    Confirming transaction...
+
+        {isAuthenticated ? (
+          !orderConfirmed ? (
+            <div className="py-4 px-8 right-0 bottom-2 left-0 absolute">
+              <div className="mx-auto max-w-md px-1">
+                {!isConnected ? (
+                  <button
+                    className={MainButtonClass}
+                    onClick={handleConnectWallet}
+                  >
+                    Connect Wallet
                   </button>
-                </>
-              ) : (
-                <button
-                  className={MainButtonClass}
-                  onClick={handlePay}
-                  disabled={!tx || isLoading}
-                >
-                  Pay Now
-                </button>
-              )}
+                ) : isComplete && transactionSignature ? (
+                  <>
+                    <div className="text-xs text-base-content text-center p-4">
+                      Pay Success!{" "}
+                      <a
+                        href={getSolanaExplorerUrl(transactionSignature)}
+                        target="_blank"
+                        className="link link-primary"
+                      >
+                        View on Solana Explorer
+                      </a>
+                      .
+                    </div>
+                    <button className={MainButtonClass} disabled>
+                      <span className="loading loading-spinner loading-xs"></span>
+                      Confirming transaction...
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    className={MainButtonClass}
+                    onClick={handlePay}
+                    disabled={!tx || isLoading}
+                  >
+                    Pay Now
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
+          ) : null
+        ) : (
+          <GoogleLoginButton />
         )}
       </div>
     </div>
