@@ -207,9 +207,9 @@ export default function PaymentPage() {
 
   //
   useEffect(() => {
-    if (order) {
-      if (!order.merchantSolanaAddress) {
-        setError("Merchant Solana address not found");
+    if (order && paymentToken) {
+      if (!paymentToken?.paymentAddress) {
+        setError("Payment address is not set");
         return;
       }
 

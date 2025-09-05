@@ -40,6 +40,9 @@ export const usePayment = ({
         if (!paymentToken.tokenAddress) {
           throw new Error("Token address is required for SPL token payment");
         }
+        if (!paymentToken.paymentAddress) {
+          throw new Error("Payment address is required for SPL token payment");
+        }
         if (!coinCalculator) {
           console.warn("Coin calculator is required for SPL token payment");
           return tx;
@@ -47,20 +50,23 @@ export const usePayment = ({
 
         tx = await createSPLTransferTransaction({
           from: phantomPublicKey,
-          to: order.merchantSolanaAddress, //"9iusfh8hawwYU3iMW8UqNSR1wjbWTy6UkJKMZ8D65Fx3", //
+          to: paymentToken.paymentAddress, //"9iusfh8hawwYU3iMW8UqNSR1wjbWTy6UkJKMZ8D65Fx3", //
           tokenAmount: coinCalculator.payTokenAmount,
           tokenAddress: paymentToken.tokenAddress,
           orderId: order.orderId,
         });
       } else {
         // SOL payment
+        if (!paymentToken.paymentAddress) {
+          throw new Error("Payment address is required for SOL payment");
+        }
         if (!coinCalculator) {
           console.warn("Coin calculator is required for SOL payment");
           return tx;
         }
         tx = await createSolTransferTransaction({
           from: phantomPublicKey,
-          to: order.merchantSolanaAddress,
+          to: paymentToken.paymentAddress,
           tokenAmount: coinCalculator.payTokenAmount,
           orderId: order.orderId,
         });
