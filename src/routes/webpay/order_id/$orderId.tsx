@@ -12,6 +12,8 @@ import Logo from "@/assets/img/logo.svg";
 import { usePayment } from "@/hooks";
 import OrderDetailCard from "@/components/orderDetailCard";
 import CheckIcon from "@/assets/img/check.png";
+import { useAuthStore } from "@/stores";
+import GoogleLoginButton from "@/components/GoogleLoginButton";
 
 export default function PaymentPage() {
   const { orderId } = Route.useParams();
@@ -26,6 +28,9 @@ export default function PaymentPage() {
   >(null);
   const [estimatedFee, setEstimatedFee] = useState<string>("0");
   const [isEstimatingFee, setIsEstimatingFee] = useState<boolean>(false);
+
+  // Authentication state
+  const { isAuthenticated } = useAuthStore();
 
   const {
     state,
@@ -330,6 +335,27 @@ export default function PaymentPage() {
       }
     };
   }, [isComplete, transactionSignature, orderConfirmed, orderId]);
+
+  // Render login state if not authenticated
+  if (!isAuthenticated) {
+    return (
+      <div className="flex h-full bg-base-300 w-full justify-center items-center">
+        <div className="h-full max-w-md bg-base-300 w-full py-4 px-8 pb-24 overflow-hidden shadow-md relative md:rounded-xl md:h-auto">
+          <div className="flex flex-col my-10 text-center gap-y-4">
+            <img src={Logo} alt="OntaPay" className="mx-auto h-6" />
+            <div className="text-base-content">Please login to continue</div>
+          </div>
+
+          {/* Login Button */}
+          <div className="py-4 px-8 right-0 bottom-2 left-0 absolute">
+            <div className="mx-auto max-w-md px-1">
+              <GoogleLoginButton />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Render error state
   if (error) {
