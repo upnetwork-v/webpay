@@ -1,6 +1,7 @@
 // 使用 fetch 封装一个前端异步请求通用实例
 // 使用环境变量 API_HOST 作为请求 host
 // 默认设置请求头和超时时间，简化参数传递，类似 axios
+// 支持自动添加认证 token
 
 type RequestMethod = "GET" | "POST" | "PUT" | "DELETE" | "PATCH" | "HEAD";
 
@@ -9,6 +10,7 @@ interface RequestOptions extends Omit<RequestInit, "method" | "body"> {
   data?: any;
   params?: Record<string, any>;
   timeout?: number;
+  skipAuth?: boolean; // 跳过自动添加认证头
 }
 
 const DEFAULT_TIMEOUT = 10000; // 10 seconds
@@ -62,6 +64,16 @@ const handleResponse = async (response: Response) => {
   }
 
   if (!response.ok) {
+    // 处理 401 认证失败
+    if (response.status === 401) {
+      // 动态导入避免循环依赖
+      import("@/stores/authStore").then(({ useAuthStore }) => {
+        useAuthStore.getState().logout();
+        // 重定向到登录页面
+        window.location.href = "/";
+      });
+    }
+
     const error = new Error(
       data?.message || response.statusText || "Request failed"
     );
@@ -79,12 +91,30 @@ const handleResponse = async (response: Response) => {
  * 创建请求配置
  */
 const createRequestConfig = (options: RequestOptions): RequestInit => {
-  const { method = "GET", data, headers, ...rest } = options;
+  const { method = "GET", data, headers, skipAuth = false, ...rest } = options;
 
   const defaultHeaders: HeadersInit = {
     "Content-Type": "application/json",
     Accept: "application/json",
   };
+
+  // 自动添加认证头
+  if (!skipAuth) {
+    try {
+      // 动态导入避免循环依赖
+      const authToken =
+        typeof window !== "undefined" && localStorage.getItem("ontapay_auth")
+          ? JSON.parse(localStorage.getItem("ontapay_auth") || "{}")?.state
+              ?.authToken
+          : null;
+
+      if (authToken) {
+        defaultHeaders.Authorization = `${authToken}`;
+      }
+    } catch (error) {
+      console.warn("Failed to get auth token:", error);
+    }
+  }
 
   const config: RequestInit = {
     method,

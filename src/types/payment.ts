@@ -7,7 +7,6 @@ export interface Order {
   currency: string;
   defaultPaymentToken: string;
   merchantName: string;
-  merchantSolanaAddress: string;
   orderId: string;
   orderValue: string;
   paymentStatus: "new" | "success" | "faile" | "pending";
@@ -29,6 +28,7 @@ export interface Token {
   isNative: boolean;
   symbol: string;
   decimal: number;
+  paymentAddress: string;
 }
 
 export interface TransactionParams {
