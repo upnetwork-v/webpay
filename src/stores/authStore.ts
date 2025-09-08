@@ -1,14 +1,9 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { AuthStore, User } from "@/types/auth";
-import { fetchInstance } from "@/api";
+import type { AuthStore } from "@/types/auth";
+import { getUserInfo } from "@/api/auth";
 
 const AUTH_STORAGE_KEY = "ontapay_auth";
-
-const fetchUserInfo = async () => {
-  const response = await fetchInstance.get<User>("/auth/user");
-  return response;
-};
 
 export const useAuthStore = create<AuthStore>()(
   persist(
@@ -29,7 +24,7 @@ export const useAuthStore = create<AuthStore>()(
           error: null,
         });
 
-        const user = await fetchUserInfo();
+        const user = await getUserInfo();
         set({ user: user });
       },
 
