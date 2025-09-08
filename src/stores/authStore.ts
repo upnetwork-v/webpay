@@ -60,6 +60,44 @@ export const useAuthStore = create<AuthStore>()(
       clearError: () => {
         set({ error: null });
       },
+
+      // 初始化方法：在 store 创建时自动调用
+      initialize: async () => {
+        const { authToken } = get();
+
+        // 如果有 token 但没有用户信息，尝试获取用户信息
+        if (authToken && !get().user) {
+          set({ isLoading: true });
+          try {
+            const user = await getUserInfo();
+            if (user) {
+              set({
+                user,
+                isAuthenticated: true,
+                isLoading: false,
+                error: null,
+              });
+            } else {
+              // 如果获取用户信息失败，清除认证状态
+              set({
+                isAuthenticated: false,
+                authToken: null,
+                user: null,
+                isLoading: false,
+                error: "Failed to get user info",
+              });
+            }
+          } catch (error) {
+            set({
+              isAuthenticated: false,
+              authToken: null,
+              user: null,
+              isLoading: false,
+              error: "Failed to initialize auth",
+            });
+          }
+        }
+      },
     }),
     {
       name: AUTH_STORAGE_KEY,

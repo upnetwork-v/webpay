@@ -51,6 +51,7 @@ export interface AuthActions {
   setError: (error: string | null) => void;
   checkAuth: () => boolean;
   clearError: () => void;
+  initialize: () => Promise<void>;
 }
 
 export interface AuthStore extends AuthState, AuthActions {}
