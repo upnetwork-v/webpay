@@ -3,11 +3,37 @@
  */
 
 export interface User {
+  /**
+   * 徽章数量
+   */
+  badge: number;
+  createdAt: string;
+  google_email: null;
+  google_id: null;
   id: string;
-  email: string;
-  name: string;
-  picture?: string;
-  verified_email: boolean;
+  inviteCode: string;
+  principal_id: string;
+  /**
+   * 白名单标志位
+   */
+  privilege: boolean;
+  transaction_limit: string;
+  transaction_total: string;
+  updatedAt: string;
+  username: string;
+  /**
+   * kyc状态，0 未验证
+   * 1 验证中
+   * 2 验证通过
+   * 3 验证失败
+   */
+  verified: number;
+}
+
+export interface UserResponse {
+  code: number;
+  data: User | null;
+  message: string;
 }
 
 export interface AuthState {
@@ -16,13 +42,6 @@ export interface AuthState {
   user: User | null;
   isLoading: boolean;
   error: string | null;
-}
-
-export interface LoginResponse {
-  success: boolean;
-  token: string;
-  user: User;
-  message?: string;
 }
 
 export interface AuthActions {
@@ -41,10 +60,4 @@ export interface GoogleOAuthConfig {
   redirectUri: string;
   authorizeUrl: string;
   scopes: string[];
-}
-
-export interface TokenValidationResponse {
-  valid: boolean;
-  user?: User;
-  message?: string;
 }
