@@ -1,6 +1,7 @@
 import { createRootRoute, Link, Outlet } from "@tanstack/react-router";
 import "@/index.css";
 import VConsole from "vconsole";
+import { useAuthInitialization } from "@/hooks";
 
 function NotFound() {
   return (
@@ -19,6 +20,9 @@ function NotFound() {
 export const Route = createRootRoute({
   component: () => {
     new VConsole();
+
+    // Initialize auth store when app starts
+    useAuthInitialization();
 
     return (
       <>

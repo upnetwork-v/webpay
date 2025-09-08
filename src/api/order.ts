@@ -6,6 +6,7 @@ export async function getOrderById(orderId: string): Promise<Order> {
     params: {
       id: orderId,
     },
+    skipAuth: true,
   });
 
   if (res.code === 200 && res.data) {
@@ -22,6 +23,7 @@ export async function coinCalculatorQuery(params: {
 }): Promise<CoinCalculator> {
   const data = await fetchInstance.get(`/crypto/coin_calculator`, {
     params,
+    skipAuth: true,
   });
 
   console.log("coinCalculatorQuery", data);

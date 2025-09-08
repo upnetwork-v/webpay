@@ -16,7 +16,14 @@ export const Route = createFileRoute("/")({
 function Index() {
   const navigate = useNavigate();
   const { auth_token, error } = Route.useSearch();
-  const { login, setError } = useAuthStore();
+  const {
+    login,
+    setError,
+    isAuthenticated,
+    user,
+    isLoading,
+    error: authError,
+  } = useAuthStore();
 
   useEffect(() => {
     const handleAuthCallback = async () => {
@@ -71,6 +78,15 @@ function Index() {
           <img src={Logo} alt="OntaPay" className="mx-auto h-8 mb-4" />
           <h1 className="font-bold text-3xl mb-4">Welcome to OntaPay</h1>
           <p className="py-4">Secure cryptocurrency payments for merchants</p>
+
+          {/* Debug info for auth store initialization */}
+          <div className="mt-8 p-4 bg-base-100 rounded-lg text-left text-sm">
+            <h3 className="font-bold mb-2">Auth Store Status:</h3>
+            <p>Authenticated: {isAuthenticated ? "✅" : "❌"}</p>
+            <p>Loading: {isLoading ? "⏳" : "✅"}</p>
+            <p>User: {user ? `✅ ${user.username}` : "❌"}</p>
+            {authError && <p className="text-error">Error: {authError}</p>}
+          </div>
         </div>
       </div>
     </div>
