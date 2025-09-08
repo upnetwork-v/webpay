@@ -109,7 +109,7 @@ const createRequestConfig = (options: RequestOptions): RequestInit => {
           : null;
 
       if (authToken) {
-        defaultHeaders.Authorization = `${authToken}`;
+        defaultHeaders["auth-token"] = `${authToken}`;
       }
     } catch (error) {
       console.warn("Failed to get auth token:", error);
