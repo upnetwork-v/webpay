@@ -28,3 +28,6 @@ memory-bank/*
 .kiro/*
 .trae/*
 .vscode/*
+
+# Security check
+security-check.sh
