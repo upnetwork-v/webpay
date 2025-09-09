@@ -1,7 +1,7 @@
 import { fetchInstance } from "./index";
 
 /**
- * 获取用户信息
+ * 获取token
  */
 
 export type getSumsubTokenResponse = {
