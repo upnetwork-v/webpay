@@ -65,8 +65,8 @@ export const useAuthStore = create<AuthStore>()(
       initialize: async () => {
         const { authToken } = get();
 
-        // 如果有 token 但没有用户信息，尝试获取用户信息
-        if (authToken && !get().user) {
+        // 如果有 token 尝试获取用户信息
+        if (authToken) {
           set({ isLoading: true });
           try {
             const user = await getUserInfo();

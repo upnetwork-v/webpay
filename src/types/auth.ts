@@ -8,8 +8,8 @@ export interface User {
    */
   badge: number;
   createdAt: string;
-  google_email: null;
-  google_id: null;
+  google_email: string;
+  google_id: string;
   id: string;
   inviteCode: string;
   principal_id: string;
@@ -27,7 +27,7 @@ export interface User {
    * 2 验证通过
    * 3 验证失败
    */
-  verified: number;
+  verified: 0 | 1 | 2 | 3;
 }
 
 export interface UserResponse {

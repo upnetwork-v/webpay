@@ -14,6 +14,8 @@ import OrderDetailCard from "@/components/orderDetailCard";
 import CheckIcon from "@/assets/img/check.png";
 import { useAuthStore } from "@/stores";
 import GoogleLoginButton from "@/components/GoogleLoginButton";
+import KYCStatus from "@/components/KYCStatus";
+import { updateOrderStatus } from "@/api/order";
 
 export default function PaymentPage() {
   const { orderId } = Route.useParams();
@@ -30,7 +32,7 @@ export default function PaymentPage() {
   const [isEstimatingFee, setIsEstimatingFee] = useState<boolean>(false);
 
   // Authentication state
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, user } = useAuthStore();
 
   const {
     state,
@@ -336,6 +338,51 @@ export default function PaymentPage() {
     };
   }, [isComplete, transactionSignature, orderConfirmed, orderId]);
 
+  // update order status
+  useEffect(() => {
+    if (
+      order &&
+      orderConfirmed &&
+      transactionSignature &&
+      paymentToken &&
+      coinCalculator &&
+      publicKey
+    ) {
+      const updateOrderStatusParams = {
+        collectWallet: paymentToken?.paymentAddress || "",
+        cryptoAmount: Number(coinCalculator?.payTokenAmount) || 0,
+        cryptoSymbol: coinCalculator?.payTokenSymbol || "",
+        cryptoTxHash: transactionSignature || "",
+        payerWallet: publicKey || "",
+        paymentStatus: "success",
+        transactionId: Number(order.orderId),
+      };
+
+      updateOrderStatus(updateOrderStatusParams)
+        .then((res) => {
+          console.log(
+            "update order status success",
+            updateOrderStatusParams,
+            res
+          );
+        })
+        .catch((err) => {
+          console.error(
+            "Error updating order status:",
+            updateOrderStatusParams,
+            err
+          );
+        });
+    }
+  }, [
+    order,
+    orderConfirmed,
+    transactionSignature,
+    paymentToken,
+    coinCalculator,
+    publicKey,
+  ]);
+
   // Render error state
   if (error) {
     return (
@@ -361,12 +408,18 @@ export default function PaymentPage() {
   const MainButtonClass =
     "bg-gradient-to-b from-white rounded-full to-neutral-200 border-[0] text-neutral btn btn-primary btn-block btn-lg";
 
+  const upToLimit = useMemo(() => {
+    return user && user.transaction_limit
+      ? Number(user.transaction_total) >= Number(user.transaction_limit)
+      : false;
+  }, [user]);
+
   // Render payment form
   return (
     <div className="flex h-full bg-base-300 w-full justify-center items-center">
       <div
         className={
-          "h-full max-w-md bg-base-300 w-full py-4 px-8 pb-24 overflow-hidden shadow-md relative md:rounded-xl md:h-auto "
+          "h-full max-w-md bg-base-300 w-full py-4 px-8 pb-34 overflow-hidden shadow-md relative md:rounded-xl md:h-auto "
         }
       >
         {orderConfirmed && <div className="paid-bg-gradient"></div>}
@@ -424,7 +477,7 @@ export default function PaymentPage() {
                       Confirming transaction...
                     </button>
                   </>
-                ) : (
+                ) : upToLimit ? null : (
                   <button
                     className={MainButtonClass}
                     onClick={handlePay}
@@ -434,6 +487,8 @@ export default function PaymentPage() {
                   </button>
                 )}
               </div>
+              {/* kyc status */}
+              <KYCStatus user={user} upToLimit={upToLimit} />
             </div>
           ) : null
         ) : (
