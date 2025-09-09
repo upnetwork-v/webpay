@@ -15,6 +15,7 @@ import CheckIcon from "@/assets/img/check.png";
 import { useAuthStore } from "@/stores";
 import GoogleLoginButton from "@/components/GoogleLoginButton";
 import KYCStatus from "@/components/KYCStatus";
+import { updateOrderStatus } from "@/api/order";
 
 export default function PaymentPage() {
   const { orderId } = Route.useParams();
@@ -336,6 +337,51 @@ export default function PaymentPage() {
       }
     };
   }, [isComplete, transactionSignature, orderConfirmed, orderId]);
+
+  // update order status
+  useEffect(() => {
+    if (
+      order &&
+      orderConfirmed &&
+      transactionSignature &&
+      paymentToken &&
+      coinCalculator &&
+      publicKey
+    ) {
+      const updateOrderStatusParams = {
+        collectWallet: paymentToken?.paymentAddress || "",
+        cryptoAmount: Number(coinCalculator?.payTokenAmount) || 0,
+        cryptoSymbol: coinCalculator?.payTokenSymbol || "",
+        cryptoTxHash: transactionSignature || "",
+        payerWallet: publicKey || "",
+        paymentStatus: "success",
+        transactionId: Number(order.orderId),
+      };
+
+      updateOrderStatus(updateOrderStatusParams)
+        .then((res) => {
+          console.log(
+            "update order status success",
+            updateOrderStatusParams,
+            res
+          );
+        })
+        .catch((err) => {
+          console.error(
+            "Error updating order status:",
+            updateOrderStatusParams,
+            err
+          );
+        });
+    }
+  }, [
+    order,
+    orderConfirmed,
+    transactionSignature,
+    paymentToken,
+    coinCalculator,
+    publicKey,
+  ]);
 
   // Render error state
   if (error) {

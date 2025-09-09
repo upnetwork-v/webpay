@@ -7,7 +7,7 @@ import type { User, UserResponse } from "@/types/auth";
 export async function getUserInfo(): Promise<User | null> {
   try {
     const response = await fetchInstance.get<UserResponse>(
-      `${import.meta.env.VITE_UP_SERVICE_API_HOST}/api/user`
+      `${import.meta.env.VITE_UP_SERVICE_API_HOST}/api/google/user`
     );
     if (response.code === 200) {
       return response.data as User | null;
