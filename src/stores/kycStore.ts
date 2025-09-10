@@ -112,7 +112,9 @@ export const useKYCStore = create<KYCStore>((set) => ({
       // You can dispatch an event or call a callback here
       console.log("KYC Step completed, should refresh user status");
       // refresh user status
-      useAuthStore.getState().initialize();
+      setTimeout(() => {
+        useAuthStore.getState().initialize();
+      }, 2000);
       // close modal
       set({ isKYCVisible: false });
     }
