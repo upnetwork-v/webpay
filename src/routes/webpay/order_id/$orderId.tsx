@@ -350,7 +350,7 @@ export default function PaymentPage() {
     ) {
       const updateOrderStatusParams = {
         collectWallet: paymentToken?.paymentAddress || "",
-        cryptoAmount: Number(coinCalculator?.payTokenAmount) || 0,
+        cryptoAmount: Number((Number(order.orderValue) / 100).toFixed(2)),
         cryptoSymbol: coinCalculator?.payTokenSymbol || "",
         cryptoTxHash: transactionSignature || "",
         payerWallet: publicKey || "",
@@ -416,10 +416,10 @@ export default function PaymentPage() {
 
   // Render payment form
   return (
-    <div className="flex h-full bg-base-300 w-full justify-center items-center">
+    <div className="flex min-h-full bg-base-300 w-full justify-center items-center">
       <div
         className={
-          "h-full max-w-md bg-base-300 w-full py-4 px-8 pb-34 overflow-hidden shadow-md relative md:rounded-xl md:h-auto "
+          "max-w-md w-full py-4 px-8 pb-8 shadow-md relative md:rounded-xl "
         }
       >
         {orderConfirmed && <div className="paid-bg-gradient"></div>}
@@ -450,9 +450,9 @@ export default function PaymentPage() {
 
         {isAuthenticated ? (
           !orderConfirmed ? (
-            <div className="py-4 px-8 right-0 bottom-2 left-0 absolute">
+            <div className="py-4">
               <div className="mx-auto max-w-md px-1">
-                {!isConnected ? (
+                {upToLimit ? null : !isConnected ? (
                   <button
                     className={MainButtonClass}
                     onClick={handleConnectWallet}
@@ -477,7 +477,7 @@ export default function PaymentPage() {
                       Confirming transaction...
                     </button>
                   </>
-                ) : upToLimit ? null : (
+                ) : (
                   <button
                     className={MainButtonClass}
                     onClick={handlePay}

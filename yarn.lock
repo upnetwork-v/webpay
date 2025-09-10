@@ -1287,10 +1287,10 @@
   resolved "https://registry.yarnpkg.com/@stablelib/wipe/-/wipe-1.0.1.tgz#d21401f1d59ade56a62e139462a97f104ed19a36"
   integrity sha512-WfqfX/eXGiAd3RJe4VU2snh/ZPwtSjLG4ynQ/vYzvghTh7dHFcI1wl+nrkWG6lGhukOxOsUHfv8dUXr58D0ayg==
 
-"@sumsub/websdk@^2.4.1":
+"@sumsub/websdk-react@^2.4.1":
   version "2.4.1"
-  resolved "https://registry.yarnpkg.com/@sumsub/websdk/-/websdk-2.4.1.tgz#e18b0b5183cdb0bceb15ca1d3a9980f2e79e1ea4"
-  integrity sha512-vDuY+B4UcvBtsFzn7FRVzNmJBYRY4/t6dR5QeHxWK9TDtN4jASSe4wvHYZXFqtBLvdgMsVBgOSV7kDGINKLKmg==
+  resolved "https://registry.yarnpkg.com/@sumsub/websdk-react/-/websdk-react-2.4.1.tgz#001e32df0b3d5a62fccd285cf2942ff1f40f2be4"
+  integrity sha512-8VX5t/dhYqAhY4dYN7jpWEw1Vgz2gh2HxszvLTVJW47B+bt/O99Cc9B+geB/vsx9wAn1miNUsNullr3zGfyHbQ==
 
 "@swc/helpers@^0.5.11":
   version "0.5.17"

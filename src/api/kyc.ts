@@ -19,8 +19,8 @@ export type getSumsubTokenData = {
 
 export async function getSumsubToken(): Promise<getSumsubTokenData | null> {
   try {
-    const response = await fetchInstance.get<getSumsubTokenResponse>(
-      `${import.meta.env.VITE_UP_SERVICE_API_HOST}/api/kyc/sumsub_token`
+    const response = await fetchInstance.post<getSumsubTokenResponse>(
+      `${import.meta.env.VITE_UP_SERVICE_API_HOST}/api/google/kyc/sumsub_token`
     );
     if (response.code === 200) {
       return response.data as getSumsubTokenData | null;
