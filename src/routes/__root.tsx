@@ -2,6 +2,7 @@ import { createRootRoute, Link, Outlet } from "@tanstack/react-router";
 import "@/index.css";
 import VConsole from "vconsole";
 import { useAuthInitialization } from "@/hooks";
+import KYCModal from "@/components/KYCModal";
 
 function NotFound() {
   return (
@@ -27,6 +28,7 @@ export const Route = createRootRoute({
     return (
       <>
         <Outlet />
+        <KYCModal />
       </>
     );
   },

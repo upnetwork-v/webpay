@@ -18,7 +18,7 @@
     "@solana/web3.js": "^1.98.4",
     "@stablelib/base64": "^2.0.1",
     "@stablelib/utf8": "^2.0.1",
-    "@sumsub/websdk": "^2.4.1",
+    "@sumsub/websdk-react": "^2.4.1",
     "@tanstack/react-router": "^1.131.34",
     "bs58": "^6.0.0",
     "clsx": "^2.1.1",

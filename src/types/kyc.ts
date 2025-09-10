@@ -15,8 +15,7 @@ export interface KYCOptions {
 
 export interface KYCSDKConfig {
   lang: string;
-  email?: string;
-  phone?: string;
+  theme?: string;
 }
 
 export interface KYCSDKOptions {
@@ -28,4 +27,12 @@ export interface UseKYCReturn {
   launchKYC: () => Promise<void>;
   isKYCLoading: boolean;
   kycError: string | null;
+  isKYCVisible: boolean;
+  accessToken: string | null;
+  config: KYCSDKConfig;
+  options: KYCSDKOptions;
+  handleTokenExpiration: () => Promise<string>;
+  handleKYCMessage: (type: string, payload: any) => void;
+  handleKYCError: (error: any) => void;
+  closeKYC: () => void;
 }

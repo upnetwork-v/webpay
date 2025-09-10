@@ -1,5 +1,5 @@
 import type { User } from "@/types/auth";
-import { useKYC } from "@/hooks";
+import { useKYCStore } from "@/stores";
 
 export default function KYCStatus({
   user,
@@ -8,7 +8,7 @@ export default function KYCStatus({
   user: User | null;
   upToLimit: boolean;
 }) {
-  const { launchKYC, isKYCLoading, kycError } = useKYC();
+  const { launchKYC, isKYCLoading, kycError } = useKYCStore();
 
   if (!user) {
     return null;
@@ -19,7 +19,7 @@ export default function KYCStatus({
       <div className="p-2">
         <button
           className="btn btn-primary btn-block rounded-full btn-lg"
-          onClick={launchKYC}
+          onClick={() => launchKYC()}
           disabled={isKYCLoading}
         >
           {isKYCLoading ? "Loading..." : "Complete KYC to pay"}
@@ -39,7 +39,7 @@ export default function KYCStatus({
           <div className="text-warning mt-2">
             <button
               className="link link-warning link-xs"
-              onClick={launchKYC}
+              onClick={() => launchKYC()}
               disabled={isKYCLoading}
             >
               {isKYCLoading ? "Loading..." : "Complete KYC"}
@@ -56,7 +56,7 @@ export default function KYCStatus({
           KYC failed
           <button
             className="link link-error link-xs ml-2"
-            onClick={launchKYC}
+            onClick={() => launchKYC()}
             disabled={isKYCLoading}
           >
             {isKYCLoading ? "Loading..." : "Retry KYC"}
