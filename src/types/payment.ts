@@ -24,6 +24,7 @@ export interface Order {
 }
 
 export interface Token {
+  chainName?: string;
   tokenAddress?: string;
   isNative: boolean;
   symbol: string;
