@@ -36,9 +36,7 @@ export interface WalletContextProps {
   selectWallet: (type: WalletType) => void;
   connect: () => Promise<void>;
   disconnect: () => Promise<void>;
-  signAndSendTransaction: (
-    transaction: Transaction
-  ) => Promise<{ signature: string }>;
+  signAndSendTransaction: (transaction: Transaction) => Promise<string>;
   handleConnectCallback: (
     params: WalletCallbackRequest
   ) => Promise<WalletCallbackResponse>;

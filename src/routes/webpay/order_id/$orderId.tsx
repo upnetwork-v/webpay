@@ -253,6 +253,7 @@ export default function PaymentPage() {
   }, [order, setError, paymentToken]);
 
   // Handle payment
+  // TODO phantom 支付报错
   const handlePay = useCallback(async () => {
     if (!isConnected || !publicKey) {
       console.log("handlePay not connected", isConnected, publicKey);
@@ -278,8 +279,8 @@ export default function PaymentPage() {
       console.log("signAndSendTransaction result", result);
       // 如果是 okx 钱包，而且 result 是否是合法的 Solana tx hash，则认为支付成功
       if (state.walletType === "okx") {
-        if (isValidSolanaTxHash(result.signature)) {
-          setTransactionSignature(result.signature);
+        if (isValidSolanaTxHash(result)) {
+          setTransactionSignature(result);
           setIsComplete(true);
         } else {
           console.error("Invalid tx hash", result);
