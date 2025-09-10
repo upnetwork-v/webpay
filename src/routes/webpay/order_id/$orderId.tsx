@@ -278,8 +278,8 @@ export default function PaymentPage() {
       console.log("signAndSendTransaction result", result);
       // 如果是 okx 钱包，而且 result 是否是合法的 Solana tx hash，则认为支付成功
       if (state.walletType === "okx") {
-        if (isValidSolanaTxHash(result)) {
-          setTransactionSignature(result);
+        if (isValidSolanaTxHash(result.signature)) {
+          setTransactionSignature(result.signature);
           setIsComplete(true);
         } else {
           console.error("Invalid tx hash", result);
