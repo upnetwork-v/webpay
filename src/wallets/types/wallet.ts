@@ -5,7 +5,9 @@ export type WalletType = "phantom" | "okx"; // 未来可扩展更多钱包
 export interface WalletAdapter {
   connect: () => Promise<void>;
   disconnect: () => Promise<void>;
-  signAndSendTransaction: (transaction: Transaction) => Promise<string>;
+  signAndSendTransaction: (
+    transaction: Transaction
+  ) => Promise<{ signature: string }>;
   isConnected: () => boolean;
   getPublicKey: () => string | null;
   handleCallback: (

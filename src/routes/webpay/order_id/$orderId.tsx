@@ -253,6 +253,7 @@ export default function PaymentPage() {
   }, [order, setError, paymentToken]);
 
   // Handle payment
+  // TODO phantom 支付报错
   const handlePay = useCallback(async () => {
     if (!isConnected || !publicKey) {
       console.log("handlePay not connected", isConnected, publicKey);
