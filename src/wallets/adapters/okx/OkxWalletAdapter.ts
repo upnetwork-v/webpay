@@ -103,7 +103,7 @@ export class OkxWalletAdapter implements WalletAdapter {
       transaction,
       OKX_CHAIN_ID
     );
-    return txHash;
+    return txHash.signature;
   }
 
   async handleCallback(_params: Record<string, string>) {
