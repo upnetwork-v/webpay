@@ -18,7 +18,7 @@ export default function KYCStatus({
     return (
       <div className="p-2">
         <button
-          className="btn btn-primary btn-block"
+          className="btn btn-primary btn-block rounded-full btn-lg"
           onClick={launchKYC}
           disabled={isKYCLoading}
         >

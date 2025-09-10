@@ -27,7 +27,6 @@ export const Route = createRootRoute({
     return (
       <>
         <Outlet />
-        <div id="sumsub-websdk-container"></div>
       </>
     );
   },

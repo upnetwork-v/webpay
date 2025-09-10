@@ -350,7 +350,7 @@ export default function PaymentPage() {
     ) {
       const updateOrderStatusParams = {
         collectWallet: paymentToken?.paymentAddress || "",
-        cryptoAmount: Number(coinCalculator?.payTokenAmount) || 0,
+        cryptoAmount: Number((Number(order.orderValue) / 100).toFixed(2)),
         cryptoSymbol: coinCalculator?.payTokenSymbol || "",
         cryptoTxHash: transactionSignature || "",
         payerWallet: publicKey || "",
@@ -452,7 +452,7 @@ export default function PaymentPage() {
           !orderConfirmed ? (
             <div className="py-4 px-8 right-0 bottom-2 left-0 absolute">
               <div className="mx-auto max-w-md px-1">
-                {!isConnected ? (
+                {upToLimit ? null : !isConnected ? (
                   <button
                     className={MainButtonClass}
                     onClick={handleConnectWallet}
@@ -477,7 +477,7 @@ export default function PaymentPage() {
                       Confirming transaction...
                     </button>
                   </>
-                ) : upToLimit ? null : (
+                ) : (
                   <button
                     className={MainButtonClass}
                     onClick={handlePay}
