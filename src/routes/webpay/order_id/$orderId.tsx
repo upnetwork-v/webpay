@@ -450,7 +450,7 @@ export default function PaymentPage() {
 
         {isAuthenticated ? (
           !orderConfirmed ? (
-            <div className="py-4 px-8">
+            <div className="py-4">
               <div className="mx-auto max-w-md px-1">
                 {upToLimit ? null : !isConnected ? (
                   <button

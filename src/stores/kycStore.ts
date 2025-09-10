@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { getSumsubToken } from "@/api/kyc";
 import type { KYCSDKConfig, KYCSDKOptions } from "@/types/kyc";
+import { useAuthStore } from "@/stores/authStore";
 
 interface KYCState {
   isKYCLoading: boolean;
@@ -104,9 +105,16 @@ export const useKYCStore = create<KYCStore>((set) => ({
   handleKYCMessage: (type: string, payload: any) => {
     console.log("KYC Message:", type, payload);
     // Handle completion event, refresh user status
-    if (type === "idCheck.onStepCompleted") {
+    if (
+      type === "idCheck.onApplicantStatusChanged" &&
+      payload.reviewStatus === "completed"
+    ) {
       // You can dispatch an event or call a callback here
       console.log("KYC Step completed, should refresh user status");
+      // refresh user status
+      useAuthStore.getState().initialize();
+      // close modal
+      set({ isKYCVisible: false });
     }
   },
 

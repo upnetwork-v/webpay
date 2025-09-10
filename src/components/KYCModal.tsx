@@ -17,20 +17,9 @@ export default function KYCModal() {
     closeKYC,
   } = useKYCStore();
 
-  console.log("🔍 KYCModal render:", {
-    isKYCVisible,
-    accessToken: !!accessToken,
-  });
-
   if (!isKYCVisible || !accessToken) {
-    console.log("❌ KYCModal not rendering:", {
-      isKYCVisible,
-      accessToken: !!accessToken,
-    });
     return null;
   }
-
-  console.log("✅ KYCModal rendering with fullscreen modal");
 
   return (
     <div className="fixed inset-0 z-[9999]">
