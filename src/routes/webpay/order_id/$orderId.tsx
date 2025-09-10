@@ -49,10 +49,13 @@ export default function PaymentPage() {
     return (
       order.supportTokenList.find(
         (token) =>
-          token.symbol ===
-          (order.paymentStatus === "success"
-            ? order.paymentResult?.symbol
-            : order.defaultPaymentToken)
+          token.chainName?.toLowerCase() === "solana" &&
+          token.symbol.toLowerCase() === "usdc"
+        // 临时锁定 Solana usdc 支付
+        // token.symbol ===
+        //   (order.paymentStatus === "success"
+        //     ? order.paymentResult?.symbol
+        //     : order.defaultPaymentToken)
       ) || null
     );
   }, [order]);
