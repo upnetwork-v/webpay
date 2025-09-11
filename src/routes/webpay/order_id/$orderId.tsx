@@ -45,7 +45,7 @@ export default function PaymentPage() {
   const nonce = urlParams.get("nonce");
   const data = urlParams.get("data");
   const errorCode = urlParams.get("errorCode");
-  
+
   // Determine payment flow state from URL
   const isPaymentCallback = !!(nonce && data && !phantomPk);
 
@@ -732,12 +732,24 @@ export default function PaymentPage() {
                             }
                             handlePay();
                           }}
-                          disabled={!tx || isLoading || isLoadingCalculator || isPaymentProcessing || isPaymentCallback}
+                          disabled={
+                            !tx ||
+                            isLoading ||
+                            isLoadingCalculator ||
+                            isPaymentProcessing ||
+                            isPaymentCallback
+                          }
                         >
-                          {(isLoading || isPaymentProcessing || isPaymentCallback) ? (
+                          {isLoading ||
+                          isPaymentProcessing ||
+                          isPaymentCallback ? (
                             <span className="loading loading-spinner loading-xs"></span>
                           ) : null}
-                          {isPaymentCallback ? "Processing Payment..." : isPaymentProcessing ? "Sending..." : "Pay Now"}
+                          {isPaymentCallback
+                            ? "Processing Payment..."
+                            : isPaymentProcessing
+                              ? "Sending..."
+                              : "Pay Now"}
                         </button>
                       )}
                     </div>
