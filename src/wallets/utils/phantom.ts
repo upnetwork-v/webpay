@@ -8,7 +8,7 @@ const useUniversalLinks = true;
 export const buildUrl = (path: string, params: URLSearchParams) =>
   `${useUniversalLinks ? "https://phantom.app/ul/" : "phantom://"}v1/${path}?${params.toString()}`;
 
-export function openPhantomSignAndSendTransactionDeeplink(
+export function openPhantomSignTransactionDeeplink(
   transaction: Transaction,
   redirectLink: string,
   phantomEncryptionPublicKey: string,
@@ -80,7 +80,7 @@ export function openPhantomSignAndSendTransactionDeeplink(
       payload: bs58.encode(encryptedPayload),
     });
 
-    const deeplinkUrl = buildUrl("signAndSendTransaction", params);
+    const deeplinkUrl = buildUrl("signTransaction", params);
     console.log("Opening Phantom deeplink", deeplinkUrl);
 
     // 使用替代方法打开deeplink
@@ -109,7 +109,7 @@ export function decryptTransactionResponse(
   nonce: string,
   data: string,
   dappKeyPair: nacl.BoxKeyPair
-): { signature: string } {
+): { transaction: string } {
   const sharedSecret = nacl.box.before(
     bs58.decode(phantomEncryptionPublicKey),
     dappKeyPair.secretKey
@@ -126,5 +126,5 @@ export function decryptTransactionResponse(
   }
 
   const response = JSON.parse(new TextDecoder().decode(decryptedData));
-  return { signature: response.signature };
+  return { transaction: response.transaction };
 }
