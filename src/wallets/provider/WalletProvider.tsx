@@ -136,12 +136,15 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
     [adapter]
   );
 
-  const handlePaymentCallback = async (params: Record<string, string>) => {
-    if (!adapter) {
-      throw new Error("Wallet adapter not initialized");
-    }
-    return adapter.handleCallback(params);
-  };
+  const handlePaymentCallback = useCallback(
+    async (params: Record<string, string>) => {
+      if (!adapter) {
+        throw new Error("Wallet adapter not initialized");
+      }
+      return adapter.handleCallback(params);
+    },
+    [adapter]
+  );
 
   // 2. adapter 初始化后，如果 URL 有 Phantom 回调参数，则执行 handleConnectCallback
   useEffect(() => {
