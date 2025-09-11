@@ -61,6 +61,7 @@ export default function PaymentPage() {
   }, [order]);
 
   // Initialize payment logic with proper error handling
+  // Always call usePayment hook to maintain hook consistency
   const paymentHook = usePayment({
     order: order,
     paymentToken: paymentToken,
@@ -482,20 +483,41 @@ export default function PaymentPage() {
     publicKey,
   ]);
 
-  // Render error state
-  if (error) {
-    const isBalanceError =
-      error.includes("Insufficient balance") ||
+  // Determine what to render
+  const shouldShowError = !!error;
+
+  // Calculate error types once
+  const isBalanceError = error
+    ? error.includes("Insufficient balance") ||
       error.includes("insufficient funds") ||
-      error.includes("shortfall");
+      error.includes("shortfall")
+    : false;
 
-    const isTokenNotFoundError = error.includes("Token not found in wallet");
-    const isUserCancelledError = error.includes("cancelled by user");
-    const isNetworkError = error.includes("Network connection error");
+  const isTokenNotFoundError = error
+    ? error.includes("Token not found in wallet")
+    : false;
+  const isUserCancelledError = error
+    ? error.includes("cancelled by user")
+    : false;
+  const isNetworkError = error
+    ? error.includes("Network connection error")
+    : false;
 
-    return (
-      <div className="min-h-screen bg-base-200 hero">
-        <div className="text-center hero-content">
+  const MainButtonClass =
+    "bg-gradient-to-b from-white rounded-full to-neutral-200 border-[0] text-neutral btn btn-primary btn-block btn-lg";
+
+  const upToLimit = useMemo(() => {
+    return user && user.transaction_limit
+      ? Number(user.transaction_total) >= Number(user.transaction_limit)
+      : false;
+  }, [user]);
+
+  // Render based on error state or normal payment flow
+  return (
+    <div className="min-h-screen bg-base-200 hero">
+      <div className="text-center hero-content">
+        {shouldShowError ? (
+          // Error state UI
           <div className="max-w-md">
             <h1 className="font-bold text-5xl">
               {isBalanceError
@@ -616,110 +638,98 @@ export default function PaymentPage() {
               </button>
             </div>
           </div>
-        </div>
-      </div>
-    );
-  }
-
-  const MainButtonClass =
-    "bg-gradient-to-b from-white rounded-full to-neutral-200 border-[0] text-neutral btn btn-primary btn-block btn-lg";
-
-  const upToLimit = useMemo(() => {
-    return user && user.transaction_limit
-      ? Number(user.transaction_total) >= Number(user.transaction_limit)
-      : false;
-  }, [user]);
-
-  // Render payment form
-  return (
-    <div className="flex min-h-full bg-base-300 w-full justify-center items-center">
-      <div
-        className={
-          "max-w-md w-full py-4 px-8 pb-8 shadow-md relative md:rounded-xl "
-        }
-      >
-        {orderConfirmed && <div className="paid-bg-gradient"></div>}
-        <div className="flex flex-col my-10 text-center gap-y-4">
-          <img src={Logo} alt="Onta pay" className="mx-auto h-6" />
-          {orderConfirmed ? (
-            <div className="flex gap-2 items-center justify-center">
-              <img src={CheckIcon} alt="Check" className="h-5" />
-              Order paid
-            </div>
-          ) : (
-            <div className="text-base-content">Pay order with crypto</div>
-          )}
-        </div>
-
-        {/* 订单详情 */}
-        <OrderDetailCard
-          order={order}
-          paymentToken={paymentToken}
-          coinCalculator={coinCalculator}
-          isEstimatingFee={isEstimatingFee}
-          estimatedFee={estimatedFee}
-          backgroundColor={orderConfirmed ? "bg-success" : undefined}
-          isLoading={isLoading || isLoadingCalculator}
-        />
-
-        {/* 按钮 */}
-
-        {isAuthenticated ? (
-          !orderConfirmed ? (
-            <div className="py-4">
-              <div className="mx-auto max-w-md px-1">
-                {upToLimit ? null : !isConnected ? (
-                  <button
-                    className={MainButtonClass}
-                    onClick={handleConnectWallet}
-                  >
-                    Connect Wallet
-                  </button>
-                ) : isComplete && transactionSignature ? (
-                  <>
-                    <div className="text-xs text-base-content text-center p-4">
-                      Pay Success!{" "}
-                      <a
-                        href={getSolanaExplorerUrl(transactionSignature)}
-                        target="_blank"
-                        className="link link-primary"
-                      >
-                        View on Solana Explorer
-                      </a>
-                      .
-                    </div>
-                    <button className={MainButtonClass} disabled>
-                      <span className="loading loading-spinner loading-xs"></span>
-                      Confirming transaction...
-                    </button>
-                  </>
+        ) : (
+          // Normal payment UI
+          <div className="flex min-h-full bg-base-300 w-full justify-center items-center">
+            <div
+              className={
+                "max-w-md w-full py-4 px-8 pb-8 shadow-md relative md:rounded-xl "
+              }
+            >
+              {orderConfirmed && <div className="paid-bg-gradient"></div>}
+              <div className="flex flex-col my-10 text-center gap-y-4">
+                <img src={Logo} alt="Onta pay" className="mx-auto h-6" />
+                {orderConfirmed ? (
+                  <div className="flex gap-2 items-center justify-center">
+                    <img src={CheckIcon} alt="Check" className="h-5" />
+                    Order paid
+                  </div>
                 ) : (
-                  <button
-                    className={MainButtonClass}
-                    onClick={async () => {
-                      // Double-check balance before payment
-                      const balanceCheck = await checkBalance();
-                      if (!balanceCheck.sufficient) {
-                        setError(balanceCheck.details);
-                        return;
-                      }
-                      handlePay();
-                    }}
-                    disabled={!tx || isLoading || isLoadingCalculator}
-                  >
-                    {isLoading ? (
-                      <span className="loading loading-spinner loading-xs"></span>
-                    ) : null}
-                    Pay Now
-                  </button>
+                  <div className="text-base-content">Pay order with crypto</div>
                 )}
               </div>
-              {/* kyc status */}
-              <KYCStatus user={user} upToLimit={upToLimit} />
+
+              {/* 订单详情 */}
+              <OrderDetailCard
+                order={order}
+                paymentToken={paymentToken}
+                coinCalculator={coinCalculator}
+                isEstimatingFee={isEstimatingFee}
+                estimatedFee={estimatedFee}
+                backgroundColor={orderConfirmed ? "bg-success" : undefined}
+                isLoading={isLoading || isLoadingCalculator}
+              />
+
+              {/* 按钮 */}
+              {isAuthenticated ? (
+                !orderConfirmed ? (
+                  <div className="py-4">
+                    <div className="mx-auto max-w-md px-1">
+                      {upToLimit ? null : !isConnected ? (
+                        <button
+                          className={MainButtonClass}
+                          onClick={handleConnectWallet}
+                        >
+                          Connect Wallet
+                        </button>
+                      ) : isComplete && transactionSignature ? (
+                        <>
+                          <div className="text-xs text-base-content text-center p-4">
+                            Pay Success!{" "}
+                            <a
+                              href={getSolanaExplorerUrl(transactionSignature)}
+                              target="_blank"
+                              className="link link-primary"
+                            >
+                              View on Solana Explorer
+                            </a>
+                            .
+                          </div>
+                          <button className={MainButtonClass} disabled>
+                            <span className="loading loading-spinner loading-xs"></span>
+                            Confirming transaction...
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          className={MainButtonClass}
+                          onClick={async () => {
+                            // Double-check balance before payment
+                            const balanceCheck = await checkBalance();
+                            if (!balanceCheck.sufficient) {
+                              setError(balanceCheck.details);
+                              return;
+                            }
+                            handlePay();
+                          }}
+                          disabled={!tx || isLoading || isLoadingCalculator}
+                        >
+                          {isLoading ? (
+                            <span className="loading loading-spinner loading-xs"></span>
+                          ) : null}
+                          Pay Now
+                        </button>
+                      )}
+                    </div>
+                    {/* kyc status */}
+                    <KYCStatus user={user} upToLimit={upToLimit} />
+                  </div>
+                ) : null
+              ) : (
+                <GoogleLoginButton />
+              )}
             </div>
-          ) : null
-        ) : (
-          <GoogleLoginButton />
+          </div>
         )}
       </div>
     </div>

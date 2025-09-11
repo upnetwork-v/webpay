@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import {
   createSolTransferTransaction,
   createSPLTransferTransaction,
@@ -23,7 +23,11 @@ export const usePayment = ({
   const [error, setError] = useState<string | null>(null);
   const [isPaying, setIsPaying] = useState(false);
 
-  const connection = new Connection(import.meta.env.VITE_SOLANA_RPC);
+  // Use useMemo to ensure connection is stable across renders
+  const connection = useMemo(
+    () => new Connection(import.meta.env.VITE_SOLANA_RPC),
+    []
+  );
 
   // Proactive balance check function
   const checkBalance = useCallback(async (): Promise<{
@@ -113,7 +117,7 @@ export const usePayment = ({
     }
   }, [phantomPublicKey, paymentToken, coinCalculator, connection]);
 
-  const createPaymentTransaction = async () => {
+  const createPaymentTransaction = useCallback(async () => {
     if (!order || !phantomPublicKey || !paymentToken) {
       console.warn(
         "Missing required payment information",
@@ -172,7 +176,7 @@ export const usePayment = ({
       console.error("Error creating payment transaction:", err);
       throw err;
     }
-  };
+  }, [order, phantomPublicKey, paymentToken, coinCalculator, checkBalance]);
 
   return {
     error,
