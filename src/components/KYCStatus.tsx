@@ -30,7 +30,7 @@ export default function KYCStatus({
   }
 
   return (
-    <div className="p-2 text-xs">
+    <div className="px-2 py-8 text-xs">
       {user?.verified === 0 && (
         <>
           {Number(user.transaction_total)}SGD / {Number(user.transaction_limit)}
