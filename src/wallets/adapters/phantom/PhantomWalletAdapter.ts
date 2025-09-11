@@ -1,10 +1,11 @@
 import type { WalletAdapter } from "../../types/wallet";
 import * as nacl from "tweetnacl";
-import type { Transaction } from "@solana/web3.js";
+import { Transaction } from "@solana/web3.js";
 import {
-  openPhantomSignAndSendTransactionDeeplink,
+  openPhantomSignTransactionDeeplink,
   buildUrl,
 } from "../../utils/phantom";
+import { sendRawTransaction } from "@/utils";
 import { processConnectCallback } from "../../utils/callbacks";
 import bs58 from "bs58";
 import type {
@@ -129,8 +130,8 @@ export class PhantomWalletAdapter implements WalletAdapter {
     clearPhantomWalletState();
   }
 
-  async signAndSendTransaction(transaction: Transaction): Promise<string> {
-    console.log("signAndSendTransaction", {
+  async signTransaction(transaction: Transaction): Promise<Transaction> {
+    console.log("signTransaction", {
       phantomEncryptionPublicKey: this.phantomEncryptionPublicKey,
       session: this.session,
       dappKeyPair: this.dappKeyPair,
@@ -143,13 +144,22 @@ export class PhantomWalletAdapter implements WalletAdapter {
       throw new Error("Wallet not connected");
     }
     const redirectUrl = `${window.location.origin}${window.location.pathname}`;
-    return openPhantomSignAndSendTransactionDeeplink(
+    openPhantomSignTransactionDeeplink(
       transaction,
       redirectUrl,
       this.phantomEncryptionPublicKey,
       this.dappKeyPair,
       this.session
     );
+
+    // 对于 Phantom 钱包，signTransaction 只是打开 deeplink
+    // 实际的签名结果会通过 URL 回调处理
+    // 这里抛出一个特殊错误，让业务层知道需要等待回调
+    throw new Error("PHANTOM_REDIRECT_PENDING");
+  }
+
+  async sendRawTransaction(signedTransaction: Transaction): Promise<string> {
+    return sendRawTransaction(signedTransaction);
   }
 
   // 处理连接回调
@@ -219,11 +229,11 @@ export class PhantomWalletAdapter implements WalletAdapter {
           };
         }
       }
-      // 支付回调
+      // 签名回调
       else if (params.nonce && params.data) {
         if (!this.phantomEncryptionPublicKey || !this.dappKeyPair) {
           return {
-            type: "signAndSendTransaction",
+            type: "signTransaction",
             success: false,
             error: "Wallet not connected",
           };
@@ -238,10 +248,11 @@ export class PhantomWalletAdapter implements WalletAdapter {
           params.data,
           this.dappKeyPair
         );
+
         return {
-          type: "signAndSendTransaction",
+          type: "signTransaction",
           success: true,
-          data: response as unknown,
+          data: { transaction: response.transaction } as unknown,
         };
       }
       // 其他情况

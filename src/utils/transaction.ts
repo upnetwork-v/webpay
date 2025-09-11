@@ -257,3 +257,46 @@ export async function createSolTransferTransaction({
     throw error;
   }
 }
+
+/**
+ * 广播签名后的交易到 Solana 网络
+ * @param signedTransaction 已签名的交易对象
+ * @returns 交易哈希字符串
+ */
+export async function sendRawTransaction(
+  signedTransaction: Transaction
+): Promise<string> {
+  try {
+    console.log("Broadcasting signed transaction...");
+
+    // 序列化交易
+    const serializedTransaction = signedTransaction.serialize();
+
+    // 发送交易到网络
+    const signature = await connection.sendRawTransaction(
+      serializedTransaction,
+      {
+        skipPreflight: false,
+        preflightCommitment: "confirmed",
+      }
+    );
+
+    console.log("Transaction broadcasted successfully:", signature);
+
+    // 等待交易确认
+    const confirmation = await connection.confirmTransaction(
+      signature,
+      "confirmed"
+    );
+
+    if (confirmation.value.err) {
+      throw new Error(`Transaction failed: ${confirmation.value.err}`);
+    }
+
+    console.log("Transaction confirmed:", signature);
+    return signature;
+  } catch (error) {
+    console.error("Error broadcasting transaction:", error);
+    throw error;
+  }
+}

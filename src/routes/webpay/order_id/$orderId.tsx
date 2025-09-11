@@ -1,13 +1,11 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { getOrderById, coinCalculatorQuery } from "@/api/order";
-import type { Order, CoinCalculator, Transaction } from "@/types";
+import type { Order, CoinCalculator } from "@/types";
+import { Transaction } from "@solana/web3.js";
 import { useWallet } from "@/wallets/provider/useWallet";
-import {
-  getSolanaExplorerUrl,
-  estimateTransactionFee,
-  isValidSolanaTxHash,
-} from "@/utils";
+import { getSolanaExplorerUrl, estimateTransactionFee } from "@/utils";
+import bs58 from "bs58";
 import Logo from "@/assets/img/logo.svg";
 import { usePayment } from "@/hooks";
 import OrderDetailCard from "@/components/orderDetailCard";
@@ -36,7 +34,8 @@ export default function PaymentPage() {
 
   const {
     state,
-    signAndSendTransaction,
+    signTransaction,
+    sendRawTransaction,
     handleConnectCallback,
     handlePaymentCallback,
     openWalletSelector,
@@ -141,20 +140,34 @@ export default function PaymentPage() {
             nonce: nonce,
             data: data,
           });
-          if (result.success && result.type === "signAndSendTransaction") {
+          if (result.success && result.type === "signTransaction") {
             if (
               typeof result.data === "object" &&
               result.data !== null &&
-              "signature" in result.data &&
-              typeof (result.data as { signature?: unknown }).signature ===
+              "transaction" in result.data &&
+              typeof (result.data as { transaction?: unknown }).transaction ===
                 "string"
             ) {
-              setTransactionSignature(
-                (result.data as { signature: string }).signature
-              );
-              setIsComplete(true);
+              // 签名成功，现在需要广播交易
+              try {
+                const signedTxData = (result.data as { transaction: string })
+                  .transaction;
+                // Phantom 返回的是 base58 编码的交易数据
+                const signedTransaction = Transaction.from(
+                  bs58.decode(signedTxData)
+                );
+                const txHash = await sendRawTransaction(signedTransaction);
+                setTransactionSignature(txHash);
+                setIsComplete(true);
+              } catch (broadcastError) {
+                console.error(
+                  "Error broadcasting transaction:",
+                  broadcastError
+                );
+                setError(`Failed to broadcast transaction: ${broadcastError}`);
+              }
             } else {
-              setError("Payment response missing signature");
+              setError("Payment response missing transaction data");
             }
           } else if (!result.success) {
             setError(result.error || "Payment failed");
@@ -253,7 +266,6 @@ export default function PaymentPage() {
   }, [order, setError, paymentToken]);
 
   // Handle payment
-  // TODO phantom 支付报错
   const handlePay = useCallback(async () => {
     if (!isConnected || !publicKey) {
       console.log("handlePay not connected", isConnected, publicKey);
@@ -273,19 +285,32 @@ export default function PaymentPage() {
         throw new Error("Failed to create transaction");
       }
 
-      // signAndSendTransaction 方法在 PhantomWalletAdapter 中返回deeplink url
-      const result = await signAndSendTransaction(tx);
-      // okx wallet return tx hash
-      console.log("signAndSendTransaction result", result);
-      // 如果是 okx 钱包，而且 result 是否是合法的 Solana tx hash，则认为支付成功
-      if (state.walletType === "okx") {
-        if (isValidSolanaTxHash(result)) {
-          setTransactionSignature(result);
-          setIsComplete(true);
-        } else {
-          console.error("Invalid tx hash", result);
-          setError("Payment failed");
+      // 新的两步流程：签名 + 广播
+      console.log("Starting payment process...");
+
+      try {
+        // 1. 签名交易
+        const signedTransaction = await signTransaction(tx);
+        console.log("Transaction signed successfully");
+
+        // 2. 广播交易
+        const txHash = await sendRawTransaction(signedTransaction);
+        console.log("Transaction broadcasted successfully:", txHash);
+
+        // 3. 设置结果
+        setTransactionSignature(txHash);
+        setIsComplete(true);
+      } catch (signError: any) {
+        // 如果是 Phantom 钱包的重定向错误，说明需要等待回调处理
+        if (signError.message === "PHANTOM_REDIRECT_PENDING") {
+          console.log(
+            "Phantom wallet redirect pending, waiting for callback..."
+          );
+          // 不设置错误，让回调处理完成支付流程
+          return;
         }
+        // 其他错误正常抛出
+        throw signError;
       }
     } catch (err: unknown) {
       const errorMessage =
@@ -299,7 +324,8 @@ export default function PaymentPage() {
     order,
     tx,
     handleConnectWallet,
-    signAndSendTransaction,
+    signTransaction,
+    sendRawTransaction,
     setError,
   ]);
 

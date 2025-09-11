@@ -3,6 +3,7 @@ import type { Transaction } from "@solana/web3.js";
 import { OKXUniversalProvider } from "@okxconnect/universal-provider";
 import { OKXSolanaProvider } from "@okxconnect/solana-provider";
 import { DAPP_NAME, DAPP_ICON } from "@/wallets/utils/dapp";
+import { sendRawTransaction } from "@/utils";
 
 const OKX_SESSION_KEY = "okx_wallet_session";
 const OKX_CHAIN_ID = "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp"; // mainnet，可根据需要调整
@@ -95,15 +96,19 @@ export class OkxWalletAdapter implements WalletAdapter {
     return this.publicKey;
   }
 
-  async signAndSendTransaction(transaction: Transaction): Promise<string> {
+  async signTransaction(transaction: Transaction): Promise<Transaction> {
     if (!this.solanaProvider) {
       throw new Error("Wallet not connected");
     }
-    const txHash = await this.solanaProvider.signAndSendTransaction(
+    const signedTransaction = await this.solanaProvider.signTransaction(
       transaction,
       OKX_CHAIN_ID
     );
-    return txHash.signature;
+    return signedTransaction;
+  }
+
+  async sendRawTransaction(signedTransaction: Transaction): Promise<string> {
+    return sendRawTransaction(signedTransaction);
   }
 
   async handleCallback(_params: Record<string, string>) {

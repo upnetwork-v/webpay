@@ -98,13 +98,22 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
     }
   };
 
-  const signAndSendTransaction = async (
+  const signTransaction = async (
     transaction: Transaction
+  ): Promise<Transaction> => {
+    if (!adapter) {
+      throw new Error("Wallet adapter not initialized");
+    }
+    return adapter.signTransaction(transaction);
+  };
+
+  const sendRawTransaction = async (
+    signedTransaction: Transaction
   ): Promise<string> => {
     if (!adapter) {
       throw new Error("Wallet adapter not initialized");
     }
-    return adapter.signAndSendTransaction(transaction);
+    return adapter.sendRawTransaction(signedTransaction);
   };
 
   // 处理回调更新状态
@@ -218,7 +227,8 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
         selectWallet,
         connect,
         disconnect,
-        signAndSendTransaction,
+        signTransaction,
+        sendRawTransaction,
         handleConnectCallback,
         handlePaymentCallback,
         adapter,
