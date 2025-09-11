@@ -45,7 +45,7 @@ export default function PaymentPage() {
   const nonce = urlParams.get("nonce");
   const data = urlParams.get("data");
   const errorCode = urlParams.get("errorCode");
-  
+
   // Determine payment flow state from URL
   const isPaymentCallback = !!(nonce && data && !phantomPk);
 
@@ -534,224 +534,234 @@ export default function PaymentPage() {
 
   // Render based on error state or normal payment flow
   return (
-    <div className="min-h-screen bg-base-200 hero">
-      <div className="text-center hero-content">
-        {shouldShowError ? (
-          // Error state UI
-          <div className="max-w-md">
-            <h1 className="font-bold text-5xl">
-              {isBalanceError
-                ? "Insufficient Balance"
-                : isTokenNotFoundError
-                  ? "Token Not Found"
-                  : isUserCancelledError
-                    ? "Payment Cancelled"
-                    : isNetworkError
-                      ? "Connection Error"
-                      : "Payment Error"}
-            </h1>
-
-            <div className="py-6">
-              <div className="space-y-4">
-                <p className="text-lg">{error}</p>
-
-                {isBalanceError && (
-                  <div className="alert alert-warning">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="stroke-current shrink-0 h-6 w-6"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="2"
-                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
-                      />
-                    </svg>
-                    <div>
-                      <h3 className="font-bold">Check your wallet balance</h3>
-                      <div className="text-xs">
-                        Make sure you have sufficient{" "}
-                        {paymentToken?.symbol || "tokens"} and SOL for
-                        transaction fees
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {isTokenNotFoundError && (
-                  <div className="alert alert-info">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="stroke-current shrink-0 h-6 w-6"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="2"
-                        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                      />
-                    </svg>
-                    <div>
-                      <h3 className="font-bold">Add token to your wallet</h3>
-                      <div className="text-xs">
-                        Add {paymentToken?.symbol || "the required token"} to
-                        your wallet and try again
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {isNetworkError && (
-                  <div className="alert alert-error">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="stroke-current shrink-0 h-6 w-6"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="2"
-                        d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                      />
-                    </svg>
-                    <div>
-                      <h3 className="font-bold">Connection problem</h3>
-                      <div className="text-xs">
-                        Check your internet connection and try again
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <button
-                className="btn btn-primary btn-block"
-                onClick={() => {
-                  setError(null);
-                  setTx(null); // Reset transaction to trigger recreation
-                }}
-              >
-                {isBalanceError
-                  ? "Check Balance Again"
+    <div className="min-h-screen bg-base-200">
+      {shouldShowError ? (
+        // Error state UI
+        <div className="max-w-md">
+          <h1 className="font-bold text-5xl">
+            {isBalanceError
+              ? "Insufficient Balance"
+              : isTokenNotFoundError
+                ? "Token Not Found"
+                : isUserCancelledError
+                  ? "Payment Cancelled"
                   : isNetworkError
-                    ? "Retry Connection"
-                    : "Try Again"}
-              </button>
+                    ? "Connection Error"
+                    : "Payment Error"}
+          </h1>
 
-              <button
-                className="btn btn-outline btn-block"
-                onClick={() => {
-                  setError(null);
-                  setTx(null);
-                }}
-              >
-                Back to Payment
-              </button>
-            </div>
-          </div>
-        ) : (
-          // Normal payment UI
-          <div className="flex min-h-full bg-base-300 w-full justify-center items-center">
-            <div
-              className={
-                "max-w-md w-full py-4 px-8 pb-8 shadow-md relative md:rounded-xl "
-              }
-            >
-              {orderConfirmed && <div className="paid-bg-gradient"></div>}
-              <div className="flex flex-col my-10 text-center gap-y-4">
-                <img src={Logo} alt="Onta pay" className="mx-auto h-6" />
-                {orderConfirmed ? (
-                  <div className="flex gap-2 items-center justify-center">
-                    <img src={CheckIcon} alt="Check" className="h-5" />
-                    Order paid
-                  </div>
-                ) : (
-                  <div className="text-base-content">Pay order with crypto</div>
-                )}
-              </div>
+          <div className="py-6">
+            <div className="space-y-4">
+              <p className="text-lg">{error}</p>
 
-              {/* 订单详情 */}
-              <OrderDetailCard
-                order={order}
-                paymentToken={paymentToken}
-                coinCalculator={coinCalculator}
-                isEstimatingFee={isEstimatingFee}
-                estimatedFee={estimatedFee}
-                backgroundColor={orderConfirmed ? "bg-success" : undefined}
-                isLoading={isLoading || isLoadingCalculator}
-              />
-
-              {/* 按钮 */}
-              {isAuthenticated ? (
-                !orderConfirmed ? (
-                  <div className="py-4">
-                    <div className="mx-auto max-w-md px-1">
-                      {upToLimit ? null : !isConnected ? (
-                        <button
-                          className={MainButtonClass}
-                          onClick={handleConnectWallet}
-                        >
-                          Connect Wallet
-                        </button>
-                      ) : isComplete && transactionSignature ? (
-                        <>
-                          <div className="text-xs text-base-content text-center p-4">
-                            Pay Success!{" "}
-                            <a
-                              href={getSolanaExplorerUrl(transactionSignature)}
-                              target="_blank"
-                              className="link link-primary"
-                            >
-                              View on Solana Explorer
-                            </a>
-                            .
-                          </div>
-                          <button className={MainButtonClass} disabled>
-                            <span className="loading loading-spinner loading-xs"></span>
-                            Confirming transaction...
-                          </button>
-                        </>
-                      ) : (
-                        <button
-                          className={MainButtonClass}
-                          onClick={async () => {
-                            // Double-check balance before payment
-                            const balanceCheck = await checkBalance();
-                            if (!balanceCheck.sufficient) {
-                              setError(balanceCheck.details);
-                              return;
-                            }
-                            handlePay();
-                          }}
-                          disabled={!tx || isLoading || isLoadingCalculator || isPaymentProcessing || isPaymentCallback}
-                        >
-                          {(isLoading || isPaymentProcessing || isPaymentCallback) ? (
-                            <span className="loading loading-spinner loading-xs"></span>
-                          ) : null}
-                          {isPaymentCallback ? "Processing Payment..." : isPaymentProcessing ? "Sending..." : "Pay Now"}
-                        </button>
-                      )}
+              {isBalanceError && (
+                <div className="alert alert-warning">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="stroke-current shrink-0 h-6 w-6"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
+                    />
+                  </svg>
+                  <div>
+                    <h3 className="font-bold">Check your wallet balance</h3>
+                    <div className="text-xs">
+                      Make sure you have sufficient{" "}
+                      {paymentToken?.symbol || "tokens"} and SOL for transaction
+                      fees
                     </div>
-                    {/* kyc status */}
-                    <KYCStatus user={user} upToLimit={upToLimit} />
                   </div>
-                ) : null
-              ) : (
-                <GoogleLoginButton />
+                </div>
+              )}
+
+              {isTokenNotFoundError && (
+                <div className="alert alert-info">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="stroke-current shrink-0 h-6 w-6"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                  <div>
+                    <h3 className="font-bold">Add token to your wallet</h3>
+                    <div className="text-xs">
+                      Add {paymentToken?.symbol || "the required token"} to your
+                      wallet and try again
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {isNetworkError && (
+                <div className="alert alert-error">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="stroke-current shrink-0 h-6 w-6"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                  <div>
+                    <h3 className="font-bold">Connection problem</h3>
+                    <div className="text-xs">
+                      Check your internet connection and try again
+                    </div>
+                  </div>
+                </div>
               )}
             </div>
           </div>
-        )}
-      </div>
+
+          <div className="space-y-2">
+            <button
+              className="btn btn-primary btn-block"
+              onClick={() => {
+                setError(null);
+                setTx(null); // Reset transaction to trigger recreation
+              }}
+            >
+              {isBalanceError
+                ? "Check Balance Again"
+                : isNetworkError
+                  ? "Retry Connection"
+                  : "Try Again"}
+            </button>
+
+            <button
+              className="btn btn-outline btn-block"
+              onClick={() => {
+                setError(null);
+                setTx(null);
+              }}
+            >
+              Back to Payment
+            </button>
+          </div>
+        </div>
+      ) : (
+        // Normal payment UI
+        <div className="flex min-h-full bg-base-300 w-full justify-center items-center">
+          <div
+            className={
+              "max-w-md w-full py-4 px-8 pb-8 shadow-md relative md:rounded-xl "
+            }
+          >
+            {orderConfirmed && <div className="paid-bg-gradient"></div>}
+            <div className="flex flex-col my-10 text-center gap-y-4">
+              <img src={Logo} alt="Onta pay" className="mx-auto h-6" />
+              {orderConfirmed ? (
+                <div className="flex gap-2 items-center justify-center">
+                  <img src={CheckIcon} alt="Check" className="h-5" />
+                  Order paid
+                </div>
+              ) : (
+                <div className="text-base-content">Pay order with crypto</div>
+              )}
+            </div>
+
+            {/* 订单详情 */}
+            <OrderDetailCard
+              order={order}
+              paymentToken={paymentToken}
+              coinCalculator={coinCalculator}
+              isEstimatingFee={isEstimatingFee}
+              estimatedFee={estimatedFee}
+              backgroundColor={orderConfirmed ? "bg-success" : undefined}
+              isLoading={isLoading || isLoadingCalculator}
+            />
+
+            {/* 按钮 */}
+            {isAuthenticated ? (
+              !orderConfirmed ? (
+                <div className="py-4">
+                  <div className="mx-auto max-w-md px-1">
+                    {upToLimit ? null : !isConnected ? (
+                      <button
+                        className={MainButtonClass}
+                        onClick={handleConnectWallet}
+                      >
+                        Connect Wallet
+                      </button>
+                    ) : isComplete && transactionSignature ? (
+                      <>
+                        <div className="text-xs text-base-content text-center p-4">
+                          Pay Success!{" "}
+                          <a
+                            href={getSolanaExplorerUrl(transactionSignature)}
+                            target="_blank"
+                            className="link link-primary"
+                          >
+                            View on Solana Explorer
+                          </a>
+                          .
+                        </div>
+                        <button className={MainButtonClass} disabled>
+                          <span className="loading loading-spinner loading-xs"></span>
+                          Confirming transaction...
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        className={MainButtonClass}
+                        onClick={async () => {
+                          // Double-check balance before payment
+                          const balanceCheck = await checkBalance();
+                          if (!balanceCheck.sufficient) {
+                            setError(balanceCheck.details);
+                            return;
+                          }
+                          handlePay();
+                        }}
+                        disabled={
+                          !tx ||
+                          isLoading ||
+                          isLoadingCalculator ||
+                          isPaymentProcessing ||
+                          isPaymentCallback
+                        }
+                      >
+                        {isLoading ||
+                        isPaymentProcessing ||
+                        isPaymentCallback ? (
+                          <span className="loading loading-spinner loading-xs"></span>
+                        ) : null}
+                        {isPaymentCallback
+                          ? "Processing Payment..."
+                          : isPaymentProcessing
+                            ? "Sending..."
+                            : "Pay Now"}
+                      </button>
+                    )}
+                  </div>
+                  {/* kyc status */}
+                  <KYCStatus user={user} upToLimit={upToLimit} />
+                </div>
+              ) : null
+            ) : (
+              <GoogleLoginButton />
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
