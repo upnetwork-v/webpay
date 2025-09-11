@@ -81,7 +81,14 @@ export default function PaymentPage() {
           })
           .catch((err) => {
             console.error("Error creating payment transaction:", err);
-            setError(`Failed to create payment transaction: ${err}`);
+            // Check if it's an insufficient balance error
+            const errorMessage =
+              err instanceof Error ? err.message : String(err);
+            if (errorMessage.includes("Insufficient balance")) {
+              setError(errorMessage);
+            } else {
+              setError(`Failed to create payment transaction: ${errorMessage}`);
+            }
           });
       } else {
         console.log(
@@ -306,6 +313,8 @@ export default function PaymentPage() {
           console.log(
             "Phantom wallet redirect pending, waiting for callback..."
           );
+          // 重置 loading 状态，因为会打开新标签页处理回调
+          setIsLoading(false);
           // 不设置错误，让回调处理完成支付流程
           return;
         }
@@ -315,7 +324,13 @@ export default function PaymentPage() {
     } catch (err: unknown) {
       const errorMessage =
         err instanceof Error ? err.message : "Payment failed";
-      setError(errorMessage);
+
+      // Check if it's an insufficient balance error
+      if (errorMessage.includes("Insufficient balance")) {
+        setError(errorMessage);
+      } else {
+        setError(`Payment failed: ${errorMessage}`);
+      }
       setIsLoading(false);
     }
   }, [
@@ -415,20 +430,66 @@ export default function PaymentPage() {
 
   // Render error state
   if (error) {
+    const isBalanceError = error.includes("Insufficient balance");
+
     return (
       <div className="min-h-screen bg-base-200 hero">
         <div className="text-center hero-content">
           <div className="max-w-md">
-            <h1 className="font-bold text-5xl">Error</h1>
+            <h1 className="font-bold text-5xl">
+              {isBalanceError ? "Insufficient Balance" : "Error"}
+            </h1>
 
-            <p className="py-6">{error}</p>
+            <div className="py-6">
+              {isBalanceError ? (
+                <div className="space-y-4">
+                  <p className="text-lg">{error}</p>
+                  <div className="alert alert-warning">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="stroke-current shrink-0 h-6 w-6"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
+                      />
+                    </svg>
+                    <div>
+                      <h3 className="font-bold">
+                        Please check your wallet balance
+                      </h3>
+                      <div className="text-xs">
+                        Make sure you have sufficient token balance in your
+                        wallet to complete the payment
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <p>{error}</p>
+              )}
+            </div>
 
-            <button
-              className="btn btn-primary"
-              onClick={() => window.location.reload()}
-            >
-              Try Again
-            </button>
+            <div className="space-y-2">
+              <button
+                className="btn btn-primary btn-block"
+                onClick={() => window.location.reload()}
+              >
+                {isBalanceError ? "Check Balance Again" : "Try Again"}
+              </button>
+              {isBalanceError && (
+                <button
+                  className="btn btn-outline btn-block"
+                  onClick={() => setError(null)}
+                >
+                  Back to Payment
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -513,6 +574,9 @@ export default function PaymentPage() {
                     onClick={handlePay}
                     disabled={!tx || isLoading}
                   >
+                    {isLoading ? (
+                      <span className="loading loading-spinner loading-xs"></span>
+                    ) : null}
                     Pay Now
                   </button>
                 )}

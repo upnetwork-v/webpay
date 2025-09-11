@@ -95,8 +95,10 @@ export async function createSPLTransferTransaction({
       fromBalance === undefined ||
       BigInt(fromBalance) < BigInt(tokenAmount)
     ) {
+      // 计算余额不足的具体数量
+      const shortfall = BigInt(tokenAmount) - BigInt(fromBalance ?? 0);
       throw new Error(
-        `Sender Token balance not enough, current balance: ${fromBalance ?? 0}, need: ${tokenAmount}`
+        `Insufficient balance. Current balance: ${fromBalance ?? 0}, required: ${tokenAmount}, shortfall: ${shortfall}`
       );
     }
 
@@ -188,8 +190,10 @@ export async function createSolTransferTransaction({
     const totalNeeded = lamports + BigInt(estimatedFee);
 
     if (fromBalance < totalNeeded) {
+      const shortfall =
+        Number(totalNeeded - BigInt(fromBalance)) / LAMPORTS_PER_SOL;
       throw new Error(
-        `Sender SOL balance not enough, current balance: ${fromBalance / LAMPORTS_PER_SOL}, need: ${tokenAmount} + fee`
+        `Insufficient SOL balance. Current balance: ${(fromBalance / LAMPORTS_PER_SOL).toFixed(6)} SOL, required: ${(Number(tokenAmount) / LAMPORTS_PER_SOL).toFixed(6)} SOL + fees, shortfall: ${shortfall.toFixed(6)} SOL`
       );
     }
 
@@ -298,21 +302,28 @@ export async function sendRawTransaction(
       console.log("Transaction confirmed:", signature);
       return signature;
     } catch (confirmError: any) {
-      // 如果 confirmTransaction 失败（比如 signatureSubscribe 不支持），使用轮询方式
+      // 如果 confirmTransaction 失败，使用轮询方式
       if (
         confirmError.message?.includes("signatureSubscribe") ||
-        confirmError.message?.includes("Method not found")
+        confirmError.message?.includes("Method not found") ||
+        confirmError.message?.includes("Transaction was not confirmed") ||
+        confirmError.message?.includes("timeout")
       ) {
         console.log(
-          "signatureSubscribe not supported, using polling method..."
+          "confirmTransaction failed, using polling method...",
+          confirmError.message
         );
 
         // 方法2：使用轮询方式确认交易
-        const maxAttempts = 30; // 最多轮询30次
-        const pollInterval = 2000; // 每2秒轮询一次
+        const maxAttempts = 60; // 增加轮询次数到60次
+        const pollInterval = 3000; // 每3秒轮询一次，总时间约3分钟
 
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
           try {
+            console.log(
+              `Polling attempt ${attempt}/${maxAttempts} for signature: ${signature}`
+            );
+
             const status = await connection.getSignatureStatus(signature, {
               searchTransactionHistory: true,
             });
@@ -328,6 +339,11 @@ export async function sendRawTransaction(
                 console.log("Transaction confirmed via polling:", signature);
                 return signature;
               }
+              console.log(
+                `Transaction status: ${status.value.confirmationStatus}`
+              );
+            } else {
+              console.log("Transaction status: pending");
             }
 
             // 等待下次轮询
@@ -336,7 +352,7 @@ export async function sendRawTransaction(
             console.warn(`Polling attempt ${attempt} failed:`, pollError);
             if (attempt === maxAttempts) {
               throw new Error(
-                `Transaction confirmation timeout after ${maxAttempts} attempts`
+                `Transaction confirmation timeout after ${maxAttempts} attempts (${(maxAttempts * pollInterval) / 1000} seconds)`
               );
             }
           }
