@@ -25,7 +25,7 @@ export default function KYCModal() {
     <div className="fixed inset-0 z-[9999]">
       {/* KYC SDK Container */}
       <div
-        className="relative w-full h-full bg-black flex flex-col justify-center"
+        className="relative w-full h-full bg-black flex flex-col justify-center overflow-y-auto"
         onClick={closeKYC}
       >
         {/* loading */}
