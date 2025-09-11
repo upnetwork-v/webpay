@@ -18,7 +18,6 @@ import { updateOrderStatus } from "@/api/order";
 export default function PaymentPage() {
   const { orderId } = Route.useParams();
   const [order, setOrder] = useState<Order | null>(null);
-  const [componentError, setComponentError] = useState<string | null>(null);
   const [coinCalculator, setCoinCalculator] = useState<CoinCalculator | null>(
     null
   );
@@ -61,31 +60,25 @@ export default function PaymentPage() {
     );
   }, [order]);
 
-  // Initialize payment logic
-  let paymentHook;
-  try {
-    paymentHook = usePayment({
-      order: order,
-      paymentToken: paymentToken,
-      coinCalculator: coinCalculator,
-      phantomPublicKey: publicKey,
-    });
-  } catch (err) {
-    console.error("Error initializing payment hook:", err);
-    setComponentError("Failed to initialize payment system");
-  }
+  // Initialize payment logic with proper error handling
+  const paymentHook = usePayment({
+    order: order,
+    paymentToken: paymentToken,
+    coinCalculator: coinCalculator,
+    phantomPublicKey: publicKey,
+  });
 
-  const { error, createPaymentTransaction, setError } = paymentHook || {
-    error: null,
-    createPaymentTransaction: null,
-    setError: () => {},
-  };
+  const { error, createPaymentTransaction, checkBalance, setError } =
+    paymentHook;
 
   const [tx, setTx] = useState<Transaction | null>(null);
 
   useEffect(() => {
-    if (!tx && !isLoadingCalculator) {
+    if (!tx && !isLoadingCalculator && !error) {
       if (createPaymentTransaction && publicKey && coinCalculator) {
+        // Clear any previous errors before attempting to create transaction
+        setError(null);
+
         createPaymentTransaction()
           .then((tx) => {
             console.log("create payment transaction success", tx);
@@ -95,23 +88,38 @@ export default function PaymentPage() {
           })
           .catch((err) => {
             console.error("Error creating payment transaction:", err);
-            // Check if it's an insufficient balance error
+            // Ensure error is properly handled and displayed
             const errorMessage =
               err instanceof Error ? err.message : String(err);
-            if (errorMessage.includes("Insufficient balance")) {
+
+            // Check for different types of balance-related errors
+            if (
+              errorMessage.includes("Insufficient balance") ||
+              errorMessage.includes("insufficient funds") ||
+              errorMessage.includes("shortfall")
+            ) {
               setError(errorMessage);
+            } else if (errorMessage.includes("Token Account not found")) {
+              setError(
+                "Token not found in wallet. Please add the required token to your wallet first."
+              );
+            } else if (
+              errorMessage.includes("Receiver Token Account not found")
+            ) {
+              setError("Payment processing error. Please try again later.");
             } else {
-              setError(`Failed to create payment transaction: ${errorMessage}`);
+              setError(`Transaction creation failed: ${errorMessage}`);
             }
           });
       } else {
         console.log(
-          "missing init params",
-          typeof createPaymentTransaction,
-          publicKey,
-          coinCalculator,
-          "isLoadingCalculator:",
-          isLoadingCalculator
+          "Transaction creation skipped - missing required parameters:",
+          {
+            hasCreatePaymentTransaction: !!createPaymentTransaction,
+            hasPublicKey: !!publicKey,
+            hasCoinCalculator: !!coinCalculator,
+            isLoadingCalculator,
+          }
         );
       }
     }
@@ -121,6 +129,7 @@ export default function PaymentPage() {
     publicKey,
     coinCalculator,
     isLoadingCalculator,
+    error,
     setError,
   ]);
 
@@ -353,10 +362,26 @@ export default function PaymentPage() {
     } catch (err: unknown) {
       const errorMessage =
         err instanceof Error ? err.message : "Payment failed";
+      console.error("Payment process failed:", err);
 
-      // Check if it's an insufficient balance error
-      if (errorMessage.includes("Insufficient balance")) {
+      // Categorize and handle different types of errors
+      if (
+        errorMessage.includes("Insufficient balance") ||
+        errorMessage.includes("insufficient funds") ||
+        errorMessage.includes("shortfall")
+      ) {
         setError(errorMessage);
+      } else if (errorMessage.includes("User rejected")) {
+        setError("Payment was cancelled by user");
+      } else if (
+        errorMessage.includes("Network error") ||
+        errorMessage.includes("fetch")
+      ) {
+        setError(
+          "Network connection error. Please check your internet connection and try again."
+        );
+      } else if (errorMessage.includes("Transaction failed")) {
+        setError("Transaction failed. Please try again.");
       } else {
         setError(`Payment failed: ${errorMessage}`);
       }
@@ -458,23 +483,37 @@ export default function PaymentPage() {
   ]);
 
   // Render error state
-  if (componentError || error) {
-    const displayError = componentError || error;
+  if (error) {
     const isBalanceError =
-      displayError?.includes("Insufficient balance") || false;
+      error.includes("Insufficient balance") ||
+      error.includes("insufficient funds") ||
+      error.includes("shortfall");
+
+    const isTokenNotFoundError = error.includes("Token not found in wallet");
+    const isUserCancelledError = error.includes("cancelled by user");
+    const isNetworkError = error.includes("Network connection error");
 
     return (
       <div className="min-h-screen bg-base-200 hero">
         <div className="text-center hero-content">
           <div className="max-w-md">
             <h1 className="font-bold text-5xl">
-              {isBalanceError ? "Insufficient Balance" : "Error"}
+              {isBalanceError
+                ? "Insufficient Balance"
+                : isTokenNotFoundError
+                  ? "Token Not Found"
+                  : isUserCancelledError
+                    ? "Payment Cancelled"
+                    : isNetworkError
+                      ? "Connection Error"
+                      : "Payment Error"}
             </h1>
 
             <div className="py-6">
-              {isBalanceError ? (
-                <div className="space-y-4">
-                  <p className="text-lg">{displayError || "Unknown error"}</p>
+              <div className="space-y-4">
+                <p className="text-lg">{error}</p>
+
+                {isBalanceError && (
                   <div className="alert alert-warning">
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
@@ -490,36 +529,91 @@ export default function PaymentPage() {
                       />
                     </svg>
                     <div>
-                      <h3 className="font-bold">
-                        Please check your wallet balance
-                      </h3>
+                      <h3 className="font-bold">Check your wallet balance</h3>
                       <div className="text-xs">
-                        Make sure you have sufficient token balance in your
-                        wallet to complete the payment
+                        Make sure you have sufficient{" "}
+                        {paymentToken?.symbol || "tokens"} and SOL for
+                        transaction fees
                       </div>
                     </div>
                   </div>
-                </div>
-              ) : (
-                <p>{displayError || "Unknown error"}</p>
-              )}
+                )}
+
+                {isTokenNotFoundError && (
+                  <div className="alert alert-info">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="stroke-current shrink-0 h-6 w-6"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                    <div>
+                      <h3 className="font-bold">Add token to your wallet</h3>
+                      <div className="text-xs">
+                        Add {paymentToken?.symbol || "the required token"} to
+                        your wallet and try again
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {isNetworkError && (
+                  <div className="alert alert-error">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="stroke-current shrink-0 h-6 w-6"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                    <div>
+                      <h3 className="font-bold">Connection problem</h3>
+                      <div className="text-xs">
+                        Check your internet connection and try again
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="space-y-2">
               <button
                 className="btn btn-primary btn-block"
-                onClick={() => window.location.reload()}
+                onClick={() => {
+                  setError(null);
+                  setTx(null); // Reset transaction to trigger recreation
+                }}
               >
-                {isBalanceError ? "Check Balance Again" : "Try Again"}
+                {isBalanceError
+                  ? "Check Balance Again"
+                  : isNetworkError
+                    ? "Retry Connection"
+                    : "Try Again"}
               </button>
-              {isBalanceError && (
-                <button
-                  className="btn btn-outline btn-block"
-                  onClick={() => setError(null)}
-                >
-                  Back to Payment
-                </button>
-              )}
+
+              <button
+                className="btn btn-outline btn-block"
+                onClick={() => {
+                  setError(null);
+                  setTx(null);
+                }}
+              >
+                Back to Payment
+              </button>
             </div>
           </div>
         </div>
@@ -602,7 +696,15 @@ export default function PaymentPage() {
                 ) : (
                   <button
                     className={MainButtonClass}
-                    onClick={handlePay}
+                    onClick={async () => {
+                      // Double-check balance before payment
+                      const balanceCheck = await checkBalance();
+                      if (!balanceCheck.sufficient) {
+                        setError(balanceCheck.details);
+                        return;
+                      }
+                      handlePay();
+                    }}
                     disabled={!tx || isLoading || isLoadingCalculator}
                   >
                     {isLoading ? (
