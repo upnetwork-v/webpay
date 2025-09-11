@@ -153,7 +153,7 @@ const OrderDetailCard: React.FC<OrderDetailCardProps> = ({
 
         <CardSplitter backgroundColor={backgroundColor} />
 
-        <div className="flex flex-col opacity-40 gap-2 relative">
+        <div className="flex flex-col opacity-40 gap-2 relative text-left">
           {/* logo */}
           <img
             src={Logo}

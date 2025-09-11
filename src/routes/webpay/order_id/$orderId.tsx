@@ -29,6 +29,25 @@ export default function PaymentPage() {
   >(null);
   const [estimatedFee, setEstimatedFee] = useState<string>("0");
   const [isEstimatingFee, setIsEstimatingFee] = useState<boolean>(false);
+  const [isPaymentProcessing, setIsPaymentProcessing] = useState(() => {
+    // Initialize payment processing state based on URL parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const nonce = urlParams.get("nonce");
+    const data = urlParams.get("data");
+    const phantomPk = urlParams.get("phantom_encryption_public_key");
+    // If we have payment callback parameters, we're processing a payment
+    return !!(nonce && data && !phantomPk);
+  });
+
+  // Check URL parameters to determine if we're in a payment callback state
+  const urlParams = new URLSearchParams(window.location.search);
+  const phantomPk = urlParams.get("phantom_encryption_public_key");
+  const nonce = urlParams.get("nonce");
+  const data = urlParams.get("data");
+  const errorCode = urlParams.get("errorCode");
+  
+  // Determine payment flow state from URL
+  const isPaymentCallback = !!(nonce && data && !phantomPk);
 
   // Authentication state
   const { isAuthenticated, user } = useAuthStore();
@@ -146,11 +165,7 @@ export default function PaymentPage() {
 
   // Check for Phantom connection callback or payment response when component mounts
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const phantomPk = urlParams.get("phantom_encryption_public_key");
-    const nonce = urlParams.get("nonce");
-    const data = urlParams.get("data");
-    const errorCode = urlParams.get("errorCode");
+    // Use the URL parameters already parsed above
 
     // Handle connection callback
     if (phantomPk && nonce && data) {
@@ -200,18 +215,22 @@ export default function PaymentPage() {
                 const txHash = await sendRawTransaction(signedTransaction);
                 setTransactionSignature(txHash);
                 setIsComplete(true);
+                setIsPaymentProcessing(false);
               } catch (broadcastError) {
                 console.error(
                   "Error broadcasting transaction:",
                   broadcastError
                 );
                 setError(`Failed to broadcast transaction: ${broadcastError}`);
+                setIsPaymentProcessing(false);
               }
             } else {
               setError("Payment response missing transaction data");
+              setIsPaymentProcessing(false);
             }
           } else if (!result.success) {
             setError(result.error || "Payment failed");
+            setIsPaymentProcessing(false);
           }
 
           // Clean up the URL
@@ -220,6 +239,7 @@ export default function PaymentPage() {
         } catch (err) {
           console.error("Error processing payment response:", err);
           setError(`Failed to process payment response: ${err}`);
+          setIsPaymentProcessing(false);
         }
       };
 
@@ -325,7 +345,7 @@ export default function PaymentPage() {
     }
 
     try {
-      setIsLoading(true);
+      setIsPaymentProcessing(true);
 
       if (!tx) {
         throw new Error("Failed to create transaction");
@@ -346,14 +366,14 @@ export default function PaymentPage() {
         // 3. 设置结果
         setTransactionSignature(txHash);
         setIsComplete(true);
+        setIsPaymentProcessing(false);
       } catch (signError: any) {
         // 如果是 Phantom 钱包的重定向错误，说明需要等待回调处理
         if (signError.message === "PHANTOM_REDIRECT_PENDING") {
           console.log(
             "Phantom wallet redirect pending, waiting for callback..."
           );
-          // 重置 loading 状态，因为会打开新标签页处理回调
-          setIsLoading(false);
+          // 保持 payment processing 状态，不重置
           // 不设置错误，让回调处理完成支付流程
           return;
         }
@@ -386,7 +406,7 @@ export default function PaymentPage() {
       } else {
         setError(`Payment failed: ${errorMessage}`);
       }
-      setIsLoading(false);
+      setIsPaymentProcessing(false);
     }
   }, [
     isConnected,
@@ -712,12 +732,12 @@ export default function PaymentPage() {
                             }
                             handlePay();
                           }}
-                          disabled={!tx || isLoading || isLoadingCalculator}
+                          disabled={!tx || isLoading || isLoadingCalculator || isPaymentProcessing || isPaymentCallback}
                         >
-                          {isLoading ? (
+                          {(isLoading || isPaymentProcessing || isPaymentCallback) ? (
                             <span className="loading loading-spinner loading-xs"></span>
                           ) : null}
-                          Pay Now
+                          {isPaymentCallback ? "Processing Payment..." : isPaymentProcessing ? "Sending..." : "Pay Now"}
                         </button>
                       )}
                     </div>
