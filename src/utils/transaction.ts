@@ -90,7 +90,7 @@ export async function createSPLTransferTransaction({
       fromBalance =
         fromTokenAccountParsed.value.data.parsed.info.tokenAmount.amount;
     }
-    console.log("付款人 Token 余额:", fromBalance);
+    console.log("Payer Token balance:", fromBalance);
     if (
       fromBalance === undefined ||
       BigInt(fromBalance) < BigInt(tokenAmount)

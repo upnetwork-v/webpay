@@ -44,8 +44,7 @@ export const usePayment = ({
           throw new Error("Payment address is required for SPL token payment");
         }
         if (!coinCalculator) {
-          console.warn("Coin calculator is required for SPL token payment");
-          return tx;
+          throw new Error("Coin calculator is required for SPL token payment");
         }
 
         tx = await createSPLTransferTransaction({
@@ -61,8 +60,7 @@ export const usePayment = ({
           throw new Error("Payment address is required for SOL payment");
         }
         if (!coinCalculator) {
-          console.warn("Coin calculator is required for SOL payment");
-          return tx;
+          throw new Error("Coin calculator is required for SOL payment");
         }
         tx = await createSolTransferTransaction({
           from: phantomPublicKey,
