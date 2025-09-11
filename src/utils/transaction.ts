@@ -283,18 +283,71 @@ export async function sendRawTransaction(
 
     console.log("Transaction broadcasted successfully:", signature);
 
-    // 等待交易确认
-    const confirmation = await connection.confirmTransaction(
-      signature,
-      "confirmed"
-    );
+    // 等待交易确认 - 使用更兼容的方式
+    try {
+      // 方法1：使用 confirmTransaction（可能在某些RPC节点失败）
+      const confirmation = await connection.confirmTransaction(
+        signature,
+        "confirmed"
+      );
 
-    if (confirmation.value.err) {
-      throw new Error(`Transaction failed: ${confirmation.value.err}`);
+      if (confirmation.value.err) {
+        throw new Error(`Transaction failed: ${confirmation.value.err}`);
+      }
+
+      console.log("Transaction confirmed:", signature);
+      return signature;
+    } catch (confirmError: any) {
+      // 如果 confirmTransaction 失败（比如 signatureSubscribe 不支持），使用轮询方式
+      if (
+        confirmError.message?.includes("signatureSubscribe") ||
+        confirmError.message?.includes("Method not found")
+      ) {
+        console.log(
+          "signatureSubscribe not supported, using polling method..."
+        );
+
+        // 方法2：使用轮询方式确认交易
+        const maxAttempts = 30; // 最多轮询30次
+        const pollInterval = 2000; // 每2秒轮询一次
+
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+          try {
+            const status = await connection.getSignatureStatus(signature, {
+              searchTransactionHistory: true,
+            });
+
+            if (status.value) {
+              if (status.value.err) {
+                throw new Error(`Transaction failed: ${status.value.err}`);
+              }
+              if (
+                status.value.confirmationStatus === "confirmed" ||
+                status.value.confirmationStatus === "finalized"
+              ) {
+                console.log("Transaction confirmed via polling:", signature);
+                return signature;
+              }
+            }
+
+            // 等待下次轮询
+            await new Promise((resolve) => setTimeout(resolve, pollInterval));
+          } catch (pollError) {
+            console.warn(`Polling attempt ${attempt} failed:`, pollError);
+            if (attempt === maxAttempts) {
+              throw new Error(
+                `Transaction confirmation timeout after ${maxAttempts} attempts`
+              );
+            }
+          }
+        }
+
+        throw new Error("Transaction confirmation timeout");
+      } else {
+        // 其他类型的错误直接抛出
+        throw confirmError;
+      }
     }
-
-    console.log("Transaction confirmed:", signature);
-    return signature;
   } catch (error) {
     console.error("Error broadcasting transaction:", error);
     throw error;
