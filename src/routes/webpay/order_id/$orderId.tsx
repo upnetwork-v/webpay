@@ -420,12 +420,8 @@ export default function PaymentPage() {
 
   // Render payment form
   return (
-    <div className="flex min-h-full bg-base-300 w-full justify-center items-center">
-      <div
-        className={
-          "max-w-md w-full py-4 px-8 pb-8 shadow-md relative md:rounded-xl "
-        }
-      >
+    <div className="flex min-h-full bg-base-300 justify-center items-center max-w-md w-full py-4 px-8 pb-8 shadow-md relative">
+      <div>
         {orderConfirmed && <div className="paid-bg-gradient"></div>}
         <div className="flex flex-col my-10 text-center gap-y-4">
           <img src={Logo} alt="Onta pay" className="mx-auto h-6" />
