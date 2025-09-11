@@ -22,6 +22,7 @@ export default function PaymentPage() {
   const [coinCalculator, setCoinCalculator] = useState<CoinCalculator | null>(
     null
   );
+  const [isLoadingCalculator, setIsLoadingCalculator] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isComplete, setIsComplete] = useState(false);
   const [transactionSignature, setTransactionSignature] = useState<
@@ -83,8 +84,8 @@ export default function PaymentPage() {
   const [tx, setTx] = useState<Transaction | null>(null);
 
   useEffect(() => {
-    if (!tx) {
-      if (createPaymentTransaction && publicKey) {
+    if (!tx && !isLoadingCalculator) {
+      if (createPaymentTransaction && publicKey && coinCalculator) {
         createPaymentTransaction()
           .then((tx) => {
             console.log("create payment transaction success", tx);
@@ -107,11 +108,21 @@ export default function PaymentPage() {
         console.log(
           "missing init params",
           typeof createPaymentTransaction,
-          publicKey
+          publicKey,
+          coinCalculator,
+          "isLoadingCalculator:",
+          isLoadingCalculator
         );
       }
     }
-  }, [tx, createPaymentTransaction, publicKey, setError]);
+  }, [
+    tx,
+    createPaymentTransaction,
+    publicKey,
+    coinCalculator,
+    isLoadingCalculator,
+    setError,
+  ]);
 
   useEffect(() => {
     if (tx) {
@@ -272,15 +283,20 @@ export default function PaymentPage() {
         return;
       }
 
+      setIsLoadingCalculator(true);
       coinCalculatorQuery({
         id: order.orderId,
         symbol: paymentToken?.symbol || "",
         tokenAddress: paymentToken?.tokenAddress,
       })
-        .then(setCoinCalculator)
+        .then((calculator) => {
+          setCoinCalculator(calculator);
+          setIsLoadingCalculator(false);
+        })
         .catch((err) => {
           console.error("Error fetching Calculator:", err);
           setError(`Failed to Calculator: ${err}`);
+          setIsLoadingCalculator(false);
         });
     }
   }, [order, setError, paymentToken]);
@@ -549,7 +565,7 @@ export default function PaymentPage() {
           isEstimatingFee={isEstimatingFee}
           estimatedFee={estimatedFee}
           backgroundColor={orderConfirmed ? "bg-success" : undefined}
-          isLoading={isLoading}
+          isLoading={isLoading || isLoadingCalculator}
         />
 
         {/* 按钮 */}
@@ -587,7 +603,7 @@ export default function PaymentPage() {
                   <button
                     className={MainButtonClass}
                     onClick={handlePay}
-                    disabled={!tx || isLoading}
+                    disabled={!tx || isLoading || isLoadingCalculator}
                   >
                     {isLoading ? (
                       <span className="loading loading-spinner loading-xs"></span>
