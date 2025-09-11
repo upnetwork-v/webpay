@@ -18,6 +18,7 @@ import { updateOrderStatus } from "@/api/order";
 export default function PaymentPage() {
   const { orderId } = Route.useParams();
   const [order, setOrder] = useState<Order | null>(null);
+  const [componentError, setComponentError] = useState<string | null>(null);
   const [coinCalculator, setCoinCalculator] = useState<CoinCalculator | null>(
     null
   );
@@ -60,12 +61,24 @@ export default function PaymentPage() {
   }, [order]);
 
   // Initialize payment logic
-  const { error, createPaymentTransaction, setError } = usePayment({
-    order: order,
-    paymentToken: paymentToken,
-    coinCalculator: coinCalculator,
-    phantomPublicKey: publicKey,
-  });
+  let paymentHook;
+  try {
+    paymentHook = usePayment({
+      order: order,
+      paymentToken: paymentToken,
+      coinCalculator: coinCalculator,
+      phantomPublicKey: publicKey,
+    });
+  } catch (err) {
+    console.error("Error initializing payment hook:", err);
+    setComponentError("Failed to initialize payment system");
+  }
+
+  const { error, createPaymentTransaction, setError } = paymentHook || {
+    error: null,
+    createPaymentTransaction: null,
+    setError: () => {},
+  };
 
   const [tx, setTx] = useState<Transaction | null>(null);
 
@@ -429,8 +442,10 @@ export default function PaymentPage() {
   ]);
 
   // Render error state
-  if (error) {
-    const isBalanceError = error.includes("Insufficient balance");
+  if (componentError || error) {
+    const displayError = componentError || error;
+    const isBalanceError =
+      displayError?.includes("Insufficient balance") || false;
 
     return (
       <div className="min-h-screen bg-base-200 hero">
@@ -443,7 +458,7 @@ export default function PaymentPage() {
             <div className="py-6">
               {isBalanceError ? (
                 <div className="space-y-4">
-                  <p className="text-lg">{error}</p>
+                  <p className="text-lg">{displayError || "Unknown error"}</p>
                   <div className="alert alert-warning">
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
@@ -470,7 +485,7 @@ export default function PaymentPage() {
                   </div>
                 </div>
               ) : (
-                <p>{error}</p>
+                <p>{displayError || "Unknown error"}</p>
               )}
             </div>
 
