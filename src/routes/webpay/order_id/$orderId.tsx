@@ -528,13 +528,14 @@ export default function PaymentPage() {
 
   const upToLimit = useMemo(() => {
     return user && user.transaction_limit
-      ? Number(user.transaction_total) >= Number(user.transaction_limit)
+      ? Number(user.transaction_total) >= Number(user.transaction_limit) &&
+          user.verified !== 2
       : false;
   }, [user]);
 
   // Render based on error state or normal payment flow
   return (
-    <div className="min-h-screen bg-base-200">
+    <div className="min-h-screen bg-base-200 relative">
       {shouldShowError ? (
         // Error state UI
         <div className="max-w-md">
@@ -659,12 +660,8 @@ export default function PaymentPage() {
         </div>
       ) : (
         // Normal payment UI
-        <div className="flex min-h-full bg-base-300 w-full justify-center items-center">
-          <div
-            className={
-              "max-w-md w-full py-4 px-8 pb-8 shadow-md relative md:rounded-xl "
-            }
-          >
+        <div className="flex h-full bg-base-300 w-full justify-center items-center py-4 px-8 pb-8 ">
+          <div>
             {orderConfirmed && <div className="paid-bg-gradient"></div>}
             <div className="flex flex-col my-10 text-center gap-y-4">
               <img src={Logo} alt="Onta pay" className="mx-auto h-6" />

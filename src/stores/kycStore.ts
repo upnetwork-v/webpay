@@ -1,7 +1,6 @@
 import { create } from "zustand";
 import { getSumsubToken } from "@/api/kyc";
 import type { KYCSDKConfig, KYCSDKOptions } from "@/types/kyc";
-import { useAuthStore } from "@/stores/authStore";
 
 interface KYCState {
   isKYCLoading: boolean;
@@ -10,6 +9,7 @@ interface KYCState {
   accessToken: string | null;
   config: KYCSDKConfig | null;
   options: KYCSDKOptions | null;
+  sdkLoading: boolean; // SDK 初始化加载状态
 }
 
 interface KYCActions {
@@ -17,8 +17,8 @@ interface KYCActions {
   closeKYC: () => void;
   setKYCError: (error: string | null) => void;
   handleTokenExpiration: () => Promise<string>;
-  handleKYCMessage: (type: string, payload: any) => void;
   handleKYCError: (error: any) => void;
+  setSdkLoading: (loading: boolean) => void;
 }
 
 type KYCStore = KYCState & KYCActions;
@@ -31,6 +31,7 @@ export const useKYCStore = create<KYCStore>((set) => ({
   accessToken: null,
   config: null,
   options: null,
+  sdkLoading: true, // 默认为 true，等待 SDK 初始化
 
   // Actions
   launchKYC: async () => {
@@ -65,6 +66,7 @@ export const useKYCStore = create<KYCStore>((set) => ({
         isKYCVisible: true,
         config,
         options,
+        sdkLoading: true, // 重置 SDK 加载状态
       });
       console.log("✅ KYC should be visible now");
     } catch (error) {
@@ -85,6 +87,7 @@ export const useKYCStore = create<KYCStore>((set) => ({
       kycError: null,
       config: null,
       options: null,
+      sdkLoading: true, // 关闭时重置加载状态，为下次打开做准备
     });
   },
 
@@ -102,26 +105,12 @@ export const useKYCStore = create<KYCStore>((set) => ({
     }
   },
 
-  handleKYCMessage: (type: string, payload: any) => {
-    console.log("KYC Message:", type, payload);
-    // Handle completion event, refresh user status
-    if (
-      type === "idCheck.onApplicantStatusChanged" &&
-      payload.reviewStatus === "completed"
-    ) {
-      // You can dispatch an event or call a callback here
-      console.log("KYC Step completed, should refresh user status");
-      // refresh user status
-      setTimeout(() => {
-        useAuthStore.getState().initialize();
-      }, 2000);
-      // close modal
-      set({ isKYCVisible: false });
-    }
-  },
-
   handleKYCError: (error: any) => {
     console.error("KYC Error:", error);
     set({ kycError: "KYC verification failed" });
+  },
+
+  setSdkLoading: (loading: boolean) => {
+    set({ sdkLoading: loading });
   },
 }));
