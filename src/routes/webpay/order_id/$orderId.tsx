@@ -535,7 +535,7 @@ export default function PaymentPage() {
 
   // Render based on error state or normal payment flow
   return (
-    <div className="min-h-screen bg-base-200 relative">
+    <div className="h-full bg-base-200 relative overflow-auto">
       {shouldShowError ? (
         // Error state UI
         <div className="max-w-md">
