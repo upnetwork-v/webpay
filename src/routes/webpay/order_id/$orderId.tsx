@@ -528,7 +528,8 @@ export default function PaymentPage() {
 
   const upToLimit = useMemo(() => {
     return user && user.transaction_limit
-      ? Number(user.transaction_total) >= Number(user.transaction_limit)
+      ? Number(user.transaction_total) >= Number(user.transaction_limit) &&
+          user.verified !== 2
       : false;
   }, [user]);
 
