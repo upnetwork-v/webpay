@@ -15,7 +15,18 @@ export default function KYCStatus({
   }
 
   if (upToLimit) {
-    return (
+    return user?.verified === 3 ? (
+      <div className="text-error">
+        KYC failed
+        <button
+          className="link link-error link-xs ml-2"
+          onClick={() => launchKYC()}
+          disabled={isKYCLoading}
+        >
+          {isKYCLoading ? "Loading..." : "Retry KYC"}
+        </button>
+      </div>
+    ) : (
       <div className="p-2">
         <button
           className="btn btn-primary btn-block rounded-full btn-lg"
@@ -51,18 +62,6 @@ export default function KYCStatus({
       {/* kyc 正在审核中 */}
       {user?.verified === 1 && <div> KYC is being reviewed</div>}
 
-      {user?.verified === 3 && (
-        <div className="text-error">
-          KYC failed
-          <button
-            className="link link-error link-xs ml-2"
-            onClick={() => launchKYC()}
-            disabled={isKYCLoading}
-          >
-            {isKYCLoading ? "Loading..." : "Retry KYC"}
-          </button>
-        </div>
-      )}
       {kycError && <div className="text-error text-xs mt-2">{kycError}</div>}
     </div>
   );
