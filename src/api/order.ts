@@ -38,12 +38,12 @@ export async function coinCalculatorQuery(params: {
 // 更新订单状态
 export type updateOrderStatusRequest = {
   collectWallet: string;
-  cryptoAmount: number;
+  cryptoAmount: string;
   cryptoSymbol: string;
   cryptoTxHash: string;
   payerWallet: string;
   paymentStatus: string;
-  transactionId: number;
+  transactionId: string;
 };
 export type updateOrderStatusResponse = {
   code: number;
