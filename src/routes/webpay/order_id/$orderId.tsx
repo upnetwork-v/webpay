@@ -470,12 +470,12 @@ export default function PaymentPage() {
     ) {
       const updateOrderStatusParams = {
         collectWallet: paymentToken?.paymentAddress || "",
-        cryptoAmount: Number((Number(order.orderValue) / 100).toFixed(2)),
+        cryptoAmount: (Number(order.orderValue) / 100).toFixed(2),
         cryptoSymbol: coinCalculator?.payTokenSymbol || "",
         cryptoTxHash: transactionSignature || "",
         payerWallet: publicKey || "",
         paymentStatus: "success",
-        transactionId: Number(order.orderId),
+        transactionId: order.orderId,
       };
 
       updateOrderStatus(updateOrderStatusParams)
