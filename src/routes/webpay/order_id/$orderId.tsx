@@ -368,10 +368,12 @@ export default function PaymentPage() {
         setIsComplete(true);
         setIsPaymentProcessing(false);
       } catch (signError: unknown) {
-        // 如果是 Phantom 钱包的重定向错误，说明需要等待回调处理
-        if (signError instanceof Error && signError.message === "PHANTOM_REDIRECT_PENDING") {
+        // 如果是钱包的重定向错误，说明需要等待回调处理
+        if (signError instanceof Error && 
+            (signError.message === "PHANTOM_REDIRECT_PENDING" || 
+             signError.message === "TRUST_REDIRECT_PENDING")) {
           console.log(
-            "Phantom wallet redirect pending, waiting for callback..."
+            "Wallet redirect pending, waiting for callback..."
           );
           // 保持 payment processing 状态，不重置
           // 不设置错误，让回调处理完成支付流程
