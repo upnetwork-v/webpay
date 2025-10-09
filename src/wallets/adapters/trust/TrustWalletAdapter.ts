@@ -299,7 +299,7 @@ export class TrustWalletAdapter implements WalletAdapter {
       // 使用与连接时相同的 URI 格式
       const signatureUri = `wc:${this.session.topic}@2?relay-protocol=irn`;
       const trustSignatureDeeplink = `${TRUST_DEEPLINK_BASE}/wc?uri=${encodeURIComponent(signatureUri)}`;
-      
+
       WalletLogger.log(LogLevel.INFO, "trust", "openSignatureDeeplink", {
         uri: trustSignatureDeeplink.substring(0, 100) + "...",
       });
@@ -345,7 +345,6 @@ export class TrustWalletAdapter implements WalletAdapter {
   getPublicKey(): string | null {
     return this.publicKey;
   }
-
 
   /**
    * 保存 Session 到 localStorage
@@ -427,7 +426,7 @@ export class TrustWalletAdapter implements WalletAdapter {
     // Trust Wallet 使用 WalletConnect 协议
     // 连接和签名结果都通过 WalletConnect 事件自动处理
     // 这里主要用于兼容性，实际上不会接收到特殊的回调参数
-    
+
     try {
       // 检查是否是连接回调（通过 WalletConnect 自动处理）
       if (this.connected && this.publicKey) {
@@ -444,7 +443,9 @@ export class TrustWalletAdapter implements WalletAdapter {
       return {
         type: "signTransaction",
         success: true,
-        data: { message: "Trust Wallet callback handled via WalletConnect" } as unknown,
+        data: {
+          message: "Trust Wallet callback handled via WalletConnect",
+        } as unknown,
       };
     } catch (err: unknown) {
       return {
