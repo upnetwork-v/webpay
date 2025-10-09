@@ -40,13 +40,17 @@ export class TrustWalletAdapter implements WalletAdapter {
       return;
     }
 
-    if (!this.session) {
-      return;
+    // 验证环境变量
+    const projectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID;
+    if (!projectId) {
+      throw new Error(
+        "VITE_WALLETCONNECT_PROJECT_ID environment variable is not set"
+      );
     }
 
     try {
       this.signClient = await SignClient.init({
-        projectId: import.meta.env.VITE_WALLETCONNECT_PROJECT_ID,
+        projectId: projectId,
         metadata: {
           name: DAPP_NAME,
           description: "Web3 Payment Platform",
@@ -57,8 +61,10 @@ export class TrustWalletAdapter implements WalletAdapter {
 
       this.setupEventListeners();
 
-      // 初始化后验证会话是否仍然有效
-      await this.validateSessionOnInit();
+      // 如果有现有会话，验证其有效性
+      if (this.session) {
+        await this.validateSessionOnInit();
+      }
     } catch (err) {
       this.signClient = null;
       this.clearSession();
@@ -103,8 +109,13 @@ export class TrustWalletAdapter implements WalletAdapter {
     if (uri) {
       const trustDeeplink = `${TRUST_DEEPLINK_BASE}/wc?uri=${encodeURIComponent(uri)}`;
       window.location.href = trustDeeplink;
+
+      // 重定向后不等待 approval，让用户通过回调返回
+      // 连接状态将通过会话恢复机制处理
+      return;
     }
 
+    // 如果没有 URI，直接等待 approval（这种情况很少见）
     const session = await approval();
 
     if (!session) {

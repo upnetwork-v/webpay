@@ -74,17 +74,21 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
     setState((prev) => ({ ...prev, isLoading: true, error: null }));
     try {
       await adapter.connect();
-      localStorage.setItem("wallet_is_connected", "true");
-      // 如果 walletType 是 okx 或 trust，则设置为已连接状态
-      if (state.walletType === "okx" || state.walletType === "trust") {
+
+      // 检查连接是否立即成功（对于不需要重定向的钱包）
+      if (adapter.isConnected()) {
+        localStorage.setItem("wallet_is_connected", "true");
         setState((prev) => ({
           ...prev,
           isConnected: true,
           publicKey: adapter.getPublicKey(),
           isLoading: false,
         }));
-
         setWalletSelectorOpen(false);
+      } else {
+        // 对于需要重定向的钱包（如 Trust Wallet），保持加载状态
+        // 连接状态将在用户返回后通过会话恢复机制更新
+        console.log("[WalletProvider] Wallet connection initiated, waiting for user to return from wallet app");
       }
     } catch (error: unknown) {
       const errorMessage =
