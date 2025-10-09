@@ -35,8 +35,72 @@ export class TrustWalletAdapter implements WalletAdapter {
   private connected: boolean = false;
 
   constructor() {
-    // 尝试恢复 session
+    // 只恢复基础状态，不做异步初始化
     this.restoreSession();
+  }
+
+  /**
+   * 初始化 Trust Wallet（异步）
+   * 参考 OKX 的实现模式
+   */
+  async init(): Promise<void> {
+    try {
+      // 如果已有 signClient，无需重复初始化
+      if (this.signClient) {
+        WalletLogger.log(LogLevel.INFO, "trust", "init", {
+          message: "SignClient already initialized",
+        });
+        return;
+      }
+
+      // 如果没有 session，无需初始化
+      if (!this.session) {
+        WalletLogger.log(LogLevel.INFO, "trust", "init", {
+          message: "No session to restore",
+        });
+        return;
+      }
+
+      WalletLogger.log(LogLevel.INFO, "trust", "init", {
+        message: "Initializing SignClient for restored session",
+      });
+
+      // 初始化 SignClient
+      this.signClient = await SignClient.init({
+        projectId: import.meta.env.VITE_WALLETCONNECT_PROJECT_ID,
+        metadata: {
+          name: DAPP_NAME,
+          description: "Web3 Payment Platform",
+          url: window.location.origin,
+          icons: [DAPP_ICON],
+        },
+      });
+
+      // 设置事件监听器
+      this.setupEventListeners();
+
+      WalletLogger.log(LogLevel.INFO, "trust", "init", {
+        success: true,
+        publicKey: this.publicKey,
+        sessionTopic: this.session.topic,
+      });
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      WalletLogger.log(LogLevel.ERROR, "trust", "init", {
+        error: error.message,
+      });
+
+      // 初始化失败，清理状态
+      this.signClient = null;
+      this.clearSession();
+
+      throw new WalletError(
+        WalletErrorCode.CONNECTION_FAILED,
+        `Failed to initialize Trust Wallet: ${error.message}`,
+        true,
+        error
+      );
+    }
   }
 
   /**
@@ -96,28 +160,15 @@ export class TrustWalletAdapter implements WalletAdapter {
         );
       }
 
-      // 2. 初始化 SignClient
+      // 2. 确保 SignClient 已初始化
       if (!this.signClient) {
-        WalletLogger.log(LogLevel.INFO, "trust", "initSignClient");
-
-        this.signClient = await SignClient.init({
-          projectId: import.meta.env.VITE_WALLETCONNECT_PROJECT_ID,
-          metadata: {
-            name: DAPP_NAME,
-            description: "Web3 Payment Platform",
-            url: window.location.origin,
-            icons: [DAPP_ICON],
-          },
-        });
-
-        // 设置事件监听器
-        this.setupEventListeners();
+        await this.init();
       }
 
       // 3. 创建连接请求
       WalletLogger.log(LogLevel.INFO, "trust", "createConnectRequest");
 
-      const { uri, approval } = await this.signClient.connect({
+      const { uri, approval } = await this.signClient!.connect({
         requiredNamespaces: {
           [WALLETCONNECT_NAMESPACE]: {
             methods: [
@@ -269,7 +320,7 @@ export class TrustWalletAdapter implements WalletAdapter {
 
     try {
       // 1. 检查连接状态
-      if (!this.connected || !this.session || !this.signClient) {
+      if (!this.connected || !this.session) {
         throw new WalletError(
           WalletErrorCode.NOT_CONNECTED,
           "Wallet not connected. Please connect first.",
@@ -277,7 +328,15 @@ export class TrustWalletAdapter implements WalletAdapter {
         );
       }
 
-      // 2. 验证交易
+      // 2. 确保 SignClient 已初始化
+      if (!this.signClient) {
+        WalletLogger.log(LogLevel.INFO, "trust", "signTransaction", {
+          message: "SignClient not initialized, initializing...",
+        });
+        await this.init();
+      }
+
+      // 3. 验证交易
       if (!transaction.recentBlockhash) {
         throw new WalletError(
           WalletErrorCode.INVALID_TRANSACTION,
@@ -294,7 +353,7 @@ export class TrustWalletAdapter implements WalletAdapter {
         );
       }
 
-      // 3. 构建 Trust Wallet 签名 deeplink 并跳转
+      // 4. 构建 Trust Wallet 签名 deeplink 并跳转
       // 构建 Trust Wallet 签名 deeplink
       // 使用与连接时相同的 URI 格式
       const signatureUri = `wc:${this.session.topic}@2?relay-protocol=irn`;
