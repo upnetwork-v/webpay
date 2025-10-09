@@ -3,7 +3,7 @@ import type {
   WalletCallbackRequest,
   WalletCallbackResponse,
 } from "@/wallets/types/wallet";
-import { Transaction } from "@solana/web3.js";
+import { Transaction, PublicKey } from "@solana/web3.js";
 import SignClient from "@walletconnect/sign-client";
 import type { SessionTypes } from "@walletconnect/types";
 import { DAPP_NAME, DAPP_ICON } from "@/wallets/utils/dapp";
@@ -313,14 +313,14 @@ export class TrustWalletAdapter implements WalletAdapter {
   }
 
   /**
-   * 签名交易（带超时和安全检查）
+   * 签名交易（使用 WalletConnect 标准流程）
    */
   async signTransaction(transaction: Transaction): Promise<Transaction> {
     const startTime = Date.now();
 
     try {
       // 1. 检查连接状态
-      if (!this.connected || !this.session) {
+      if (!this.connected || !this.session || !this.signClient) {
         throw new WalletError(
           WalletErrorCode.NOT_CONNECTED,
           "Wallet not connected. Please connect first.",
@@ -328,15 +328,7 @@ export class TrustWalletAdapter implements WalletAdapter {
         );
       }
 
-      // 2. 确保 SignClient 已初始化
-      if (!this.signClient) {
-        WalletLogger.log(LogLevel.INFO, "trust", "signTransaction", {
-          message: "SignClient not initialized, initializing...",
-        });
-        await this.init();
-      }
-
-      // 3. 验证交易
+      // 2. 验证交易
       if (!transaction.recentBlockhash) {
         throw new WalletError(
           WalletErrorCode.INVALID_TRANSACTION,
@@ -353,27 +345,83 @@ export class TrustWalletAdapter implements WalletAdapter {
         );
       }
 
-      // 4. 构建 Trust Wallet 签名 deeplink 并跳转
-      // 构建 Trust Wallet 签名 deeplink
-      // 使用与连接时相同的 URI 格式
-      const signatureUri = `wc:${this.session.topic}@2?relay-protocol=irn`;
-      const trustSignatureDeeplink = `${TRUST_DEEPLINK_BASE}/wc?uri=${encodeURIComponent(signatureUri)}`;
+      // 3. 序列化交易
+      const serializedTransaction = transaction
+        .serialize({
+          requireAllSignatures: false,
+          verifySignatures: false,
+        })
+        .toString("base64");
 
-      WalletLogger.log(LogLevel.INFO, "trust", "openSignatureDeeplink", {
-        uri: trustSignatureDeeplink.substring(0, 100) + "...",
+      WalletLogger.log(LogLevel.INFO, "trust", "signTransaction", {
+        transactionSize: serializedTransaction.length,
+        sessionTopic: this.session.topic,
       });
 
-      // 跳转到 Trust Wallet 进行签名
-      window.location.href = trustSignatureDeeplink;
+      // 4. 发送签名请求到 Trust Wallet
+      // WalletConnect SDK 会自动处理移动端 deeplink 跳转
+      const result = await this.signClient.request({
+        topic: this.session.topic,
+        chainId: SOLANA_MAINNET_CHAIN_ID,
+        request: {
+          method: SOLANA_METHODS.SIGN_TRANSACTION,
+          params: {
+            transaction: serializedTransaction,
+          },
+        },
+      });
 
-      // 对于 Trust Wallet，signTransaction 只是打开 deeplink
-      // 实际的签名结果会通过 WalletConnect 回调处理
-      // 这里抛出一个特殊错误，让业务层知道需要等待回调
-      throw new WalletError(
-        WalletErrorCode.UNSUPPORTED_OPERATION,
-        "TRUST_REDIRECT_PENDING",
-        true
-      );
+      WalletLogger.log(LogLevel.INFO, "trust", "signTransaction", {
+        success: true,
+        resultType: typeof result,
+      });
+
+      // 5. 处理签名结果
+      let signature: Buffer;
+
+      if (typeof result === "string") {
+        // 如果返回的是签名字符串
+        signature = Buffer.from(result, "base64");
+      } else if (
+        result &&
+        typeof result === "object" &&
+        "signature" in result
+      ) {
+        // 如果返回的是包含签名的对象
+        const signatureResult = result as { signature: string };
+        signature = Buffer.from(signatureResult.signature, "base64");
+      } else {
+        throw new WalletError(
+          WalletErrorCode.SIGNATURE_VERIFICATION_FAILED,
+          "Invalid signature result from Trust Wallet",
+          false
+        );
+      }
+
+      // 找到对应的签名位置并添加签名
+      const signerPublicKey = new PublicKey(this.publicKey!);
+
+      // 查找签名位置
+      for (let i = 0; i < transaction.signatures.length; i++) {
+        if (transaction.signatures[i].publicKey.equals(signerPublicKey)) {
+          transaction.signatures[i].signature = signature;
+          break;
+        }
+      }
+
+      // 6. 验证签名
+      if (!transaction.verifySignatures()) {
+        throw new WalletError(
+          WalletErrorCode.SIGNATURE_VERIFICATION_FAILED,
+          "Transaction signature verification failed",
+          false
+        );
+      }
+
+      const duration = Date.now() - startTime;
+      WalletLogger.logSignature("trust", true, duration);
+
+      return transaction;
     } catch (error) {
       const duration = Date.now() - startTime;
       const walletError = createWalletError(error);

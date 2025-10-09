@@ -370,8 +370,7 @@ export default function PaymentPage() {
       } catch (signError: unknown) {
         // 如果是钱包的重定向错误，说明需要等待回调处理
         if (signError instanceof Error &&
-          (signError.message === "PHANTOM_REDIRECT_PENDING" ||
-            signError.message === "TRUST_REDIRECT_PENDING")) {
+          signError.message === "PHANTOM_REDIRECT_PENDING") {
           console.log(
             "Wallet redirect pending, waiting for callback..."
           );
