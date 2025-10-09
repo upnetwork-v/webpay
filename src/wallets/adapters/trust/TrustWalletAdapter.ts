@@ -56,6 +56,9 @@ export class TrustWalletAdapter implements WalletAdapter {
       });
 
       this.setupEventListeners();
+
+      // 初始化后验证会话是否仍然有效
+      await this.validateSessionOnInit();
     } catch (err) {
       this.signClient = null;
       this.clearSession();
@@ -130,13 +133,90 @@ export class TrustWalletAdapter implements WalletAdapter {
   private setupEventListeners(): void {
     if (!this.signClient) return;
 
-    this.signClient.on("session_delete", () => {
+    this.signClient.on("session_delete", (event) => {
+      console.log("[TrustWallet] Session deleted:", event);
       this.clearSession();
     });
 
-    this.signClient.on("session_expire", () => {
+    this.signClient.on("session_expire", (event) => {
+      console.log("[TrustWallet] Session expired:", event);
       this.clearSession();
     });
+
+    this.signClient.on("session_update", (event) => {
+      console.log("[TrustWallet] Session updated:", event);
+      // 可以在这里处理会话更新
+    });
+
+    this.signClient.on("session_ping", (event) => {
+      console.log("[TrustWallet] Session ping:", event);
+      // 会话心跳，表示连接正常
+    });
+  }
+
+  /**
+   * 验证当前会话是否仍然有效
+   */
+  async validateSession(): Promise<boolean> {
+    if (!this.signClient || !this.session) {
+      console.log("[TrustWallet] No signClient or session to validate");
+      return false;
+    }
+
+    try {
+      // 1. 检查会话是否在 WalletConnect 客户端中存在
+      const sessions = this.signClient.session.getAll();
+      const currentSession = sessions.find(
+        (s) => s.topic === this.session!.topic
+      );
+
+      if (!currentSession) {
+        console.log("[TrustWallet] Session not found in WalletConnect client");
+        return false;
+      }
+
+      // 2. 检查会话是否过期
+      const now = Date.now();
+      if (currentSession.expiry && now > currentSession.expiry * 1000) {
+        console.log("[TrustWallet] Session expired");
+        return false;
+      }
+
+      // 3. 验证会话状态
+      if (currentSession.acknowledged !== true) {
+        console.log("[TrustWallet] Session not acknowledged");
+        return false;
+      }
+
+      console.log("[TrustWallet] Session validation successful");
+      return true;
+    } catch (error) {
+      console.error("[TrustWallet] Session validation failed:", error);
+      return false;
+    }
+  }
+
+  /**
+   * 清除无效会话并重置状态
+   */
+  clearInvalidSession(): void {
+    console.log("[TrustWallet] Clearing invalid session");
+    this.clearSession();
+  }
+
+  /**
+   * 初始化时验证会话（在 init 方法中调用）
+   */
+  private async validateSessionOnInit(): Promise<void> {
+    if (!this.session) {
+      return; // 没有会话需要验证
+    }
+
+    const isValid = await this.validateSession();
+    if (!isValid) {
+      console.log("[TrustWallet] Session invalid on init, clearing state");
+      this.clearInvalidSession();
+    }
   }
 
   /**
@@ -167,6 +247,15 @@ export class TrustWalletAdapter implements WalletAdapter {
   async signTransaction(transaction: Transaction): Promise<Transaction> {
     if (!this.connected || !this.session || !this.signClient) {
       throw new Error("Wallet not connected. Please connect first.");
+    }
+
+    // 在签名前验证会话是否仍然有效
+    const isValid = await this.validateSession();
+    if (!isValid) {
+      this.clearInvalidSession();
+      throw new Error(
+        "Wallet session expired. Please reconnect your Trust Wallet."
+      );
     }
 
     if (!transaction.recentBlockhash || !transaction.feePayer) {

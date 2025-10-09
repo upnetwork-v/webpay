@@ -32,6 +32,26 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
       if (typeof (newAdapter as any).init === "function") {
         await (newAdapter as any).init();
       }
+
+      // 对于 Trust Wallet，验证会话状态
+      if (type === "trust" && typeof (newAdapter as any).validateSession === "function") {
+        const isValid = await (newAdapter as any).validateSession();
+        if (!isValid) {
+          console.log("[WalletProvider] Trust Wallet session invalid, clearing state");
+          (newAdapter as any).clearInvalidSession();
+          // 重置为未连接状态
+          setState((prev) => ({
+            ...prev,
+            walletType: type,
+            isConnected: false,
+            publicKey: null,
+            error: null,
+          }));
+          setAdapter(newAdapter);
+          return;
+        }
+      }
+
       setAdapter(newAdapter);
       setState((prev) => ({
         ...prev,
