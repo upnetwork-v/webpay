@@ -55,8 +55,8 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
     try {
       await adapter.connect();
       localStorage.setItem("wallet_is_connected", "true");
-      // 如果 walletType 是 okx，则设置为已连接状态
-      if (state.walletType === "okx") {
+      // 如果 walletType 是 okx 或 trust，则设置为已连接状态
+      if (state.walletType === "okx" || state.walletType === "trust") {
         setState((prev) => ({
           ...prev,
           isConnected: true,
@@ -217,6 +217,17 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
         <img
           src={new URL("../adapters/okx/logo.png", import.meta.url).href}
           alt="OKX"
+          className="rounded-full object-cover h-10 w-10"
+        />
+      ),
+    },
+    {
+      type: "trust",
+      name: "Trust Wallet",
+      icon: (
+        <img
+          src={new URL("../adapters/trust/logo.png", import.meta.url).href}
+          alt="Trust Wallet"
           className="rounded-full object-cover h-10 w-10"
         />
       ),
