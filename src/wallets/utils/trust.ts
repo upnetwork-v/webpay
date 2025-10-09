@@ -3,10 +3,12 @@
  */
 
 import { PublicKey } from "@solana/web3.js";
-import {
-  SOLANA_SLIP44,
-  SOLANA_TOKEN_ADDRESSES,
-} from "@/wallets/adapters/trust/constants";
+// 内联常量定义
+const SOLANA_SLIP44 = 501;
+const SOLANA_TOKEN_ADDRESSES = {
+  USDC: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+  USDT: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+} as const;
 
 export interface TokenInfo {
   symbol: string;
