@@ -159,6 +159,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
         });
         localStorage.removeItem("wallet_type");
         localStorage.removeItem("wallet_is_connected");
+        localStorage.removeItem("wallet_provider_initialized"); // 清理初始化标志
       } catch (error: unknown) {
         const errorMessage =
           error instanceof Error ? error.message : "Disconnection failed";
@@ -250,33 +251,45 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
     const savedType = localStorage.getItem("wallet_type") as WalletType | null;
     const savedIsConnected =
       localStorage.getItem("wallet_is_connected") === "true";
-    if (savedType) {
+
+    // 防止重复初始化
+    const hasInitialized = localStorage.getItem("wallet_provider_initialized") === "true";
+
+    if (savedType && !hasInitialized) {
+      localStorage.setItem("wallet_provider_initialized", "true");
+
       (async () => {
-        await selectWallet(savedType);
+        try {
+          await selectWallet(savedType);
 
-        // Phantom 钱包自动恢复连接
-        if (savedType === "phantom" && savedIsConnected) {
-          // adapter 会在构造时自动恢复 session
-          // 这里等待 adapter 初始化后自动同步 isConnected
-        }
-
-        // Trust Wallet 自动恢复连接
-        if (savedType === "trust") {
-          const isConnecting = localStorage.getItem("trust_wallet_connecting") === "true";
-          if (isConnecting || savedIsConnected) {
-            console.log("[WalletProvider] Trust Wallet auto-recovery initiated");
-            // 等待一段时间让 TrustWalletAdapter 完成初始化
-            setTimeout(() => {
-              if (adapter && adapter.isConnected()) {
-                setState((prev) => ({
-                  ...prev,
-                  isConnected: true,
-                  publicKey: adapter.getPublicKey(),
-                  isLoading: false,
-                }));
-              }
-            }, 2000);
+          // Phantom 钱包自动恢复连接
+          if (savedType === "phantom" && savedIsConnected) {
+            // adapter 会在构造时自动恢复 session
+            // 这里等待 adapter 初始化后自动同步 isConnected
           }
+
+          // Trust Wallet 自动恢复连接
+          if (savedType === "trust") {
+            const isConnecting = localStorage.getItem("trust_wallet_connecting") === "true";
+            if (isConnecting || savedIsConnected) {
+              console.log("[WalletProvider] Trust Wallet auto-recovery initiated");
+              // 等待一段时间让 TrustWalletAdapter 完成初始化
+              setTimeout(() => {
+                if (adapter && adapter.isConnected()) {
+                  setState((prev) => ({
+                    ...prev,
+                    isConnected: true,
+                    publicKey: adapter.getPublicKey(),
+                    isLoading: false,
+                  }));
+                }
+              }, 2000);
+            }
+          }
+        } catch (error) {
+          console.error("[WalletProvider] Auto-recovery failed:", error);
+          // 重置初始化标志，允许重试
+          localStorage.removeItem("wallet_provider_initialized");
         }
       })();
     }

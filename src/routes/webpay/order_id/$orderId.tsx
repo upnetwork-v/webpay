@@ -378,8 +378,33 @@ export default function PaymentPage() {
           // 不设置错误，让回调处理完成支付流程
           return;
         }
-        // 其他错误正常抛出
-        throw signError;
+        // 直接处理签名错误，不重新抛出
+        const errorMessage = signError instanceof Error ? signError.message : "Payment failed";
+        console.error("Payment process failed:", signError);
+
+        // Categorize and handle different types of errors
+        if (
+          errorMessage.includes("Insufficient balance") ||
+          errorMessage.includes("insufficient funds") ||
+          errorMessage.includes("shortfall")
+        ) {
+          setError(errorMessage);
+        } else if (errorMessage.includes("User rejected") || errorMessage.includes("rejected by user")) {
+          setError("Payment was cancelled by user");
+        } else if (
+          errorMessage.includes("Network error") ||
+          errorMessage.includes("fetch")
+        ) {
+          setError(
+            "Network connection error. Please check your internet connection and try again."
+          );
+        } else if (errorMessage.includes("Transaction failed")) {
+          setError("Transaction failed. Please try again.");
+        } else {
+          setError(`Payment failed: ${errorMessage}`);
+        }
+        setIsPaymentProcessing(false);
+        return;
       }
     } catch (err: unknown) {
       const errorMessage =
@@ -393,7 +418,7 @@ export default function PaymentPage() {
         errorMessage.includes("shortfall")
       ) {
         setError(errorMessage);
-      } else if (errorMessage.includes("User rejected")) {
+      } else if (errorMessage.includes("User rejected") || errorMessage.includes("rejected by user")) {
         setError("Payment was cancelled by user");
       } else if (
         errorMessage.includes("Network error") ||

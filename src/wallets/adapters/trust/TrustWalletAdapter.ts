@@ -34,6 +34,10 @@ const CONFIG = {
   CALLBACK_WAIT_TIME: 1000, // 回调等待时间
 } as const;
 
+// 全局 WalletConnect 实例管理，防止重复初始化
+let globalSignClient: SignClient | null = null;
+let globalInitPromise: Promise<SignClient> | null = null;
+
 // 错误类型定义
 enum TrustWalletErrorType {
   CONNECTION_TIMEOUT = "CONNECTION_TIMEOUT",
@@ -64,6 +68,7 @@ export class TrustWalletAdapter implements TrustWalletAdapterExtended {
   private publicKey: string | null = null;
   private connected: boolean = false;
   private isInitialized: boolean = false;
+  private isValidationInProgress: boolean = false; // 防止重复验证
 
   constructor() {
     // 只恢复基础状态，不做异步初始化
@@ -92,16 +97,31 @@ export class TrustWalletAdapter implements TrustWalletAdapterExtended {
     }
 
     try {
-      console.log("[TrustWallet] Initializing WalletConnect client...");
-      this.signClient = await SignClient.init({
-        projectId: projectId,
-        metadata: {
-          name: DAPP_NAME,
-          description: "Web3 Payment Platform",
-          url: window.location.origin,
-          icons: [DAPP_ICON],
-        },
-      });
+      // 使用全局实例，避免重复初始化 WalletConnect
+      if (globalSignClient) {
+        console.log("[TrustWallet] Using existing WalletConnect client");
+        this.signClient = globalSignClient;
+      } else if (globalInitPromise) {
+        console.log(
+          "[TrustWallet] Waiting for existing WalletConnect initialization..."
+        );
+        this.signClient = await globalInitPromise;
+      } else {
+        console.log("[TrustWallet] Initializing new WalletConnect client...");
+        globalInitPromise = SignClient.init({
+          projectId: projectId,
+          metadata: {
+            name: DAPP_NAME,
+            description: "Web3 Payment Platform",
+            url: window.location.origin,
+            icons: [DAPP_ICON],
+          },
+        });
+
+        this.signClient = await globalInitPromise;
+        globalSignClient = this.signClient;
+        globalInitPromise = null; // 重置，允许后续重新初始化
+      }
 
       this.setupEventListeners();
       this.isInitialized = true;
@@ -466,6 +486,14 @@ export class TrustWalletAdapter implements TrustWalletAdapterExtended {
       return false;
     }
 
+    // 防止重复验证
+    if (this.isValidationInProgress) {
+      console.log("[TrustWallet] Validation already in progress, skipping");
+      return false;
+    }
+
+    this.isValidationInProgress = true;
+
     try {
       // 1. 检查会话是否在 WalletConnect 客户端中存在
       const sessions = this.signClient.session.getAll();
@@ -496,6 +524,8 @@ export class TrustWalletAdapter implements TrustWalletAdapterExtended {
     } catch (error) {
       console.error("[TrustWallet] Session validation failed:", error);
       return false;
+    } finally {
+      this.isValidationInProgress = false;
     }
   }
 
