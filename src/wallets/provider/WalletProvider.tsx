@@ -29,16 +29,32 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
     localStorage.setItem("wallet_type", type);
     try {
       const newAdapter = createAdapter(type);
-      if (typeof (newAdapter as any).init === "function") {
-        await (newAdapter as any).init();
+      // 类型守卫函数
+      const hasInitMethod = (adapter: WalletAdapter): adapter is WalletAdapter & { init: () => Promise<void> } => {
+        return 'init' in adapter && typeof (adapter as any).init === 'function';
+      };
+
+      const isTrustWalletAdapter = (adapter: WalletAdapter): adapter is WalletAdapter & {
+        validateSession: () => Promise<boolean>;
+        clearInvalidSession: () => void;
+      } => {
+        return type === "trust" &&
+          'validateSession' in adapter &&
+          'clearInvalidSession' in adapter &&
+          typeof (adapter as any).validateSession === 'function' &&
+          typeof (adapter as any).clearInvalidSession === 'function';
+      };
+
+      if (hasInitMethod(newAdapter)) {
+        await newAdapter.init();
       }
 
       // 对于 Trust Wallet，验证会话状态
-      if (type === "trust" && typeof (newAdapter as any).validateSession === "function") {
-        const isValid = await (newAdapter as any).validateSession();
+      if (isTrustWalletAdapter(newAdapter)) {
+        const isValid = await newAdapter.validateSession();
         if (!isValid) {
           console.log("[WalletProvider] Trust Wallet session invalid, clearing state");
-          (newAdapter as any).clearInvalidSession();
+          newAdapter.clearInvalidSession();
           // 重置为未连接状态
           setState((prev) => ({
             ...prev,
@@ -89,6 +105,35 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
         // 对于需要重定向的钱包（如 Trust Wallet），保持加载状态
         // 连接状态将在用户返回后通过会话恢复机制更新
         console.log("[WalletProvider] Wallet connection initiated, waiting for user to return from wallet app");
+
+        // 对于 Trust Wallet，设置一个定时器来检查连接状态
+        if (state.walletType === "trust") {
+          const checkInterval = setInterval(() => {
+            if (adapter && adapter.isConnected()) {
+              localStorage.setItem("wallet_is_connected", "true");
+              setState((prev) => ({
+                ...prev,
+                isConnected: true,
+                publicKey: adapter.getPublicKey(),
+                isLoading: false,
+              }));
+              setWalletSelectorOpen(false);
+              clearInterval(checkInterval);
+            }
+          }, 2000); // 每2秒检查一次
+
+          // 设置超时，避免无限等待
+          setTimeout(() => {
+            clearInterval(checkInterval);
+            if (!adapter?.isConnected()) {
+              setState((prev) => ({
+                ...prev,
+                error: "Connection timeout. Please try again.",
+                isLoading: false,
+              }));
+            }
+          }, 120000); // 2分钟超时
+        }
       }
     } catch (error: unknown) {
       const errorMessage =
@@ -208,15 +253,34 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
     if (savedType) {
       (async () => {
         await selectWallet(savedType);
+
         // Phantom 钱包自动恢复连接
         if (savedType === "phantom" && savedIsConnected) {
           // adapter 会在构造时自动恢复 session
           // 这里等待 adapter 初始化后自动同步 isConnected
         }
-        // TODO: 其他钱包类型 autoConnect 入口
+
+        // Trust Wallet 自动恢复连接
+        if (savedType === "trust") {
+          const isConnecting = localStorage.getItem("trust_wallet_connecting") === "true";
+          if (isConnecting || savedIsConnected) {
+            console.log("[WalletProvider] Trust Wallet auto-recovery initiated");
+            // 等待一段时间让 TrustWalletAdapter 完成初始化
+            setTimeout(() => {
+              if (adapter && adapter.isConnected()) {
+                setState((prev) => ({
+                  ...prev,
+                  isConnected: true,
+                  publicKey: adapter.getPublicKey(),
+                  isLoading: false,
+                }));
+              }
+            }, 2000);
+          }
+        }
       })();
     }
-  }, []);
+  }, [adapter]);
 
   const openWalletSelector = () => setWalletSelectorOpen(true);
   const closeWalletSelector = () => setWalletSelectorOpen(false);
