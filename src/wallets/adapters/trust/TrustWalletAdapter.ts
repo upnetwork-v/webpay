@@ -624,6 +624,17 @@ export class TrustWalletAdapter implements TrustWalletAdapterExtended {
         },
       });
 
+      console.log("[TrustWallet] Received signature result:", {
+        type: typeof result,
+        isString: typeof result === "string",
+        isObject: typeof result === "object" && result !== null,
+        hasSignature:
+          typeof result === "object" &&
+          result !== null &&
+          "signature" in result,
+        result: result,
+      });
+
       let signature: Buffer;
 
       if (typeof result === "string") {
@@ -639,6 +650,47 @@ export class TrustWalletAdapter implements TrustWalletAdapterExtended {
         throw new TrustWalletError(
           TrustWalletErrorType.SIGNATURE_FAILED,
           "Invalid signature result from Trust Wallet"
+        );
+      }
+
+      // 验证和修复签名长度
+      console.log(
+        `[TrustWallet] Received signature length: ${signature.length} bytes`
+      );
+
+      if (signature.length === 66) {
+        // Trust Wallet 可能返回了带前缀的签名，去掉前 2 字节
+        console.log(
+          "[TrustWallet] Detected 66-byte signature, removing 2-byte prefix"
+        );
+        signature = signature.slice(2);
+      } else if (signature.length !== 64) {
+        // 如果签名长度不是 64 或 66，尝试其他修复方法
+        console.log(
+          `[TrustWallet] Unexpected signature length: ${signature.length}, attempting to extract 64-byte signature`
+        );
+
+        if (signature.length > 64) {
+          // 尝试从末尾取 64 字节
+          signature = signature.slice(-64);
+        } else {
+          throw new TrustWalletError(
+            TrustWalletErrorType.SIGNATURE_FAILED,
+            `Invalid signature length: expected 64 bytes, got ${signature.length} bytes`
+          );
+        }
+      }
+
+      console.log(
+        `[TrustWallet] Final signature length: ${signature.length} bytes`
+      );
+      console.log(`[TrustWallet] Signature hex: ${signature.toString("hex")}`);
+
+      // 验证签名是否为有效的 Ed25519 签名格式
+      if (signature.length !== 64) {
+        throw new TrustWalletError(
+          TrustWalletErrorType.SIGNATURE_FAILED,
+          `Invalid signature length after processing: expected 64 bytes, got ${signature.length} bytes`
         );
       }
 
