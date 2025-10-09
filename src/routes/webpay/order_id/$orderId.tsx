@@ -202,7 +202,7 @@ export default function PaymentPage() {
               result.data !== null &&
               "transaction" in result.data &&
               typeof (result.data as { transaction?: unknown }).transaction ===
-                "string"
+              "string"
             ) {
               // 签名成功，现在需要广播交易
               try {
@@ -367,9 +367,9 @@ export default function PaymentPage() {
         setTransactionSignature(txHash);
         setIsComplete(true);
         setIsPaymentProcessing(false);
-      } catch (signError: any) {
+      } catch (signError: unknown) {
         // 如果是 Phantom 钱包的重定向错误，说明需要等待回调处理
-        if (signError.message === "PHANTOM_REDIRECT_PENDING") {
+        if (signError instanceof Error && signError.message === "PHANTOM_REDIRECT_PENDING") {
           console.log(
             "Phantom wallet redirect pending, waiting for callback..."
           );
@@ -509,8 +509,8 @@ export default function PaymentPage() {
   // Calculate error types once
   const isBalanceError = error
     ? error.includes("Insufficient balance") ||
-      error.includes("insufficient funds") ||
-      error.includes("shortfall")
+    error.includes("insufficient funds") ||
+    error.includes("shortfall")
     : false;
 
   const isTokenNotFoundError = error
@@ -529,7 +529,7 @@ export default function PaymentPage() {
   const upToLimit = useMemo(() => {
     return user && user.transaction_limit
       ? Number(user.transaction_total) >= Number(user.transaction_limit) &&
-          user.verified !== 2
+      user.verified !== 2
       : false;
   }, [user]);
 
@@ -737,8 +737,8 @@ export default function PaymentPage() {
                         }
                       >
                         {isLoading ||
-                        isPaymentProcessing ||
-                        isPaymentCallback ? (
+                          isPaymentProcessing ||
+                          isPaymentCallback ? (
                           <span className="loading loading-spinner loading-xs"></span>
                         ) : null}
                         {isPaymentCallback
