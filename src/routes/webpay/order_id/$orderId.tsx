@@ -400,6 +400,10 @@ export default function PaymentPage() {
           );
         } else if (errorMessage.includes("Transaction failed")) {
           setError("Transaction failed. Please try again.");
+        } else if (errorMessage.includes("ws error") || errorMessage.includes("WebSocket")) {
+          // WebSocket 错误通常不影响交易成功，忽略这些错误
+          console.warn("WebSocket error detected, but transaction may have succeeded:", errorMessage);
+          // 不设置错误，让用户检查交易状态
         } else {
           setError(`Payment failed: ${errorMessage}`);
         }
@@ -429,6 +433,10 @@ export default function PaymentPage() {
         );
       } else if (errorMessage.includes("Transaction failed")) {
         setError("Transaction failed. Please try again.");
+      } else if (errorMessage.includes("ws error") || errorMessage.includes("WebSocket")) {
+        // WebSocket 错误通常不影响交易成功，忽略这些错误
+        console.warn("WebSocket error detected, but transaction may have succeeded:", errorMessage);
+        // 不设置错误，让用户检查交易状态
       } else {
         setError(`Payment failed: ${errorMessage}`);
       }

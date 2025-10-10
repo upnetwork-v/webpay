@@ -644,8 +644,19 @@ export class TrustWalletAdapter implements TrustWalletAdapterExtended {
    * 广播已签名交易
    */
   async sendRawTransaction(signedTransaction: Transaction): Promise<string> {
-    // 使用静态导入的函数
-    return sendRawTransaction(signedTransaction);
+    try {
+      console.log("[TrustWallet] Broadcasting signed transaction...");
+      // 使用静态导入的函数
+      const txHash = await sendRawTransaction(signedTransaction);
+      console.log(
+        "[TrustWallet] Transaction broadcasted successfully:",
+        txHash
+      );
+      return txHash;
+    } catch (error) {
+      console.error("[TrustWallet] Error broadcasting transaction:", error);
+      throw error;
+    }
   }
 
   /**
