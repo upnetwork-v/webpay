@@ -674,90 +674,122 @@ export class TrustWalletAdapter implements TrustWalletAdapterExtended {
       );
       console.log("[TrustWallet] Signature hex:", signature.toString("hex"));
 
-      if (signature.length === 66) {
+      let sig64: Buffer;
+
+      // 根据 ed25519 签名格式标准处理不同长度的签名
+      if (signature.length === 64) {
+        // 标准 ed25519 签名：64 字节，直接使用
+        sig64 = signature;
         console.log(
-          "[TrustWallet] Detected 66-byte signature, removing 2-byte prefix"
+          "[TrustWallet] Standard 64-byte ed25519 signature detected"
+        );
+      } else if (signature.length === 65) {
+        // 65 字节签名：可能包含 1 字节的恢复 ID 或前缀
+        console.log(
+          "[TrustWallet] Detected 65-byte signature with 1-byte prefix"
         );
         console.log(
-          "[TrustWallet] First 2 bytes (hex):",
-          signature.slice(0, 2).toString("hex")
-        );
-        console.log(
-          "[TrustWallet] Last 2 bytes (hex):",
-          signature.slice(-2).toString("hex")
+          "[TrustWallet] First byte (prefix):",
+          signature.slice(0, 1).toString("hex")
         );
 
-        // Trust Wallet 返回 66 字节签名，前 2 字节是前缀，后 64 字节是实际签名
-        // 移除前 2 字节前缀，使用后 64 字节
-        const sig64 = signature.slice(-64);
+        // 移除第 1 字节前缀，使用后 64 字节作为实际签名
+        sig64 = signature.slice(-64);
         console.log(
-          "[TrustWallet] Final signature length:",
+          "[TrustWallet] Extracted signature length:",
           sig64.length,
           "bytes"
         );
-        console.log("[TrustWallet] Signature hex:", sig64.toString("hex"));
-
-        const signerPublicKey = new PublicKey(this.publicKey!);
-
-        // 找到对应的签名槽位并设置签名
-        let signatureSet = false;
-        for (let i = 0; i < transaction.signatures.length; i++) {
-          if (transaction.signatures[i].publicKey.equals(signerPublicKey)) {
-            transaction.signatures[i].signature = sig64;
-            signatureSet = true;
-            break;
-          }
-        }
-
-        if (!signatureSet) {
-          throw new TrustWalletError(
-            TrustWalletErrorType.SIGNATURE_FAILED,
-            "Could not find signature slot for the connected wallet"
-          );
-        }
-
-        // 跳过本地签名验证，因为 Trust Wallet 的签名格式可能与 Solana 标准略有不同
-        // 但签名本身是正确的，将在链上验证
         console.log(
-          "[TrustWallet] Skipping local signature verification, will verify on-chain"
+          "[TrustWallet] Extracted signature hex:",
+          sig64.toString("hex")
         );
-      } else if (signature.length === 64) {
-        console.log("[TrustWallet] Standard 64-byte signature detected");
-        const signerPublicKey = new PublicKey(this.publicKey!);
+      } else if (signature.length === 66) {
+        // 66 字节签名：可能包含 2 字节的前缀或额外的元数据
+        console.log(
+          "[TrustWallet] Detected 66-byte signature with 2-byte prefix"
+        );
+        console.log(
+          "[TrustWallet] First 2 bytes (prefix):",
+          signature.slice(0, 2).toString("hex")
+        );
+        console.log(
+          "[TrustWallet] Last 2 bytes:",
+          signature.slice(-2).toString("hex")
+        );
 
-        // 找到对应的签名槽位并设置签名
-        let signatureSet = false;
-        for (let i = 0; i < transaction.signatures.length; i++) {
-          if (transaction.signatures[i].publicKey.equals(signerPublicKey)) {
-            transaction.signatures[i].signature = signature;
-            signatureSet = true;
-            break;
-          }
-        }
+        // 移除前 2 字节前缀，使用后 64 字节作为实际签名
+        sig64 = signature.slice(-64);
+        console.log(
+          "[TrustWallet] Extracted signature length:",
+          sig64.length,
+          "bytes"
+        );
+        console.log(
+          "[TrustWallet] Extracted signature hex:",
+          sig64.toString("hex")
+        );
+      } else {
+        // 其他长度：不支持
+        throw new TrustWalletError(
+          TrustWalletErrorType.SIGNATURE_FAILED,
+          `Unsupported signature length: expected 64, 65, or 66 bytes, got ${signature.length} bytes. ` +
+            `This may indicate a change in Trust Wallet's signature format or an encoding issue.`
+        );
+      }
 
-        if (!signatureSet) {
-          throw new TrustWalletError(
-            TrustWalletErrorType.SIGNATURE_FAILED,
-            "Could not find signature slot for the connected wallet"
+      // 验证提取的签名长度
+      if (sig64.length !== 64) {
+        throw new TrustWalletError(
+          TrustWalletErrorType.SIGNATURE_FAILED,
+          `Invalid extracted signature length: expected 64 bytes, got ${sig64.length} bytes`
+        );
+      }
+
+      // 设置签名到交易中
+      const signerPublicKey = new PublicKey(this.publicKey!);
+      let signatureSet = false;
+
+      for (let i = 0; i < transaction.signatures.length; i++) {
+        if (transaction.signatures[i].publicKey.equals(signerPublicKey)) {
+          transaction.signatures[i].signature = sig64;
+          signatureSet = true;
+          console.log(
+            `[TrustWallet] Signature set for public key: ${signerPublicKey.toString()}`
           );
+          break;
         }
+      }
 
-        // 尝试验证签名
+      if (!signatureSet) {
+        throw new TrustWalletError(
+          TrustWalletErrorType.SIGNATURE_FAILED,
+          `Could not find signature slot for the connected wallet (${signerPublicKey.toString()}). ` +
+            `Transaction may have been modified or the public key does not match.`
+        );
+      }
+
+      // 对于非标准长度的签名，跳过本地验证
+      // 标准 64 字节签名可以尝试验证，但其他格式依赖链上验证
+      if (signature.length === 64) {
         try {
           if (!transaction.verifySignatures()) {
             console.warn(
-              "[TrustWallet] Local signature verification failed, but proceeding anyway"
+              "[TrustWallet] Local signature verification failed, but proceeding with on-chain verification"
             );
           } else {
-            console.log("[TrustWallet] Signature verification passed");
+            console.log("[TrustWallet] Local signature verification passed");
           }
         } catch (err) {
-          console.warn("[TrustWallet] Signature verification error:", err);
+          console.warn(
+            "[TrustWallet] Local signature verification error:",
+            err
+          );
+          console.log("[TrustWallet] Proceeding with on-chain verification");
         }
       } else {
-        throw new TrustWalletError(
-          TrustWalletErrorType.SIGNATURE_FAILED,
-          `Unexpected signature length: expected 64 or 66 bytes, got ${signature.length} bytes`
+        console.log(
+          `[TrustWallet] Skipping local verification for ${signature.length}-byte signature, will verify on-chain`
         );
       }
 
