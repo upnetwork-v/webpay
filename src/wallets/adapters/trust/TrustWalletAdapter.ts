@@ -17,10 +17,10 @@ import type { SessionTypes } from "@walletconnect/types";
 import { sendRawTransaction } from "@/utils/transaction";
 
 // 内联常量定义
-const SOLANA_NETWORK = 501; // Solana SLIP-44
+const SOLANA_SLIP44 = 501; // Solana SLIP-44 for address derivation
 const TRUST_METHODS = {
-  SIGN_TRANSACTION: "trust_signTransaction",
-  GET_ACCOUNTS: "get_accounts",
+  SIGN_TRANSACTION: "solana_signTransaction", // 使用标准 Solana 方法
+  GET_ACCOUNTS: "solana_getAccounts", // 使用标准 Solana 方法
 } as const;
 const TRUST_SESSION_KEY = "trust_wallet_session";
 const SESSION_EXPIRY = 24 * 60 * 60 * 1000; // 24 hours
@@ -178,7 +178,7 @@ export class TrustWalletAdapter implements TrustWalletAdapterExtended {
     try {
       console.log("[TrustWallet] Starting connection...");
 
-      // 创建连接请求
+      // 创建连接请求 - 尝试使用更通用的配置
       const { uri, approval } = await this.signClient.connect({
         requiredNamespaces: {
           solana: {
@@ -186,7 +186,7 @@ export class TrustWalletAdapter implements TrustWalletAdapterExtended {
               TRUST_METHODS.SIGN_TRANSACTION,
               TRUST_METHODS.GET_ACCOUNTS,
             ],
-            chains: [`solana:${SOLANA_NETWORK}`],
+            chains: [], // 不指定特定链，让钱包决定
             events: [],
           },
         },
@@ -276,10 +276,10 @@ export class TrustWalletAdapter implements TrustWalletAdapterExtended {
     }
 
     try {
-      // 使用 Trust Wallet 扩展的 get_accounts 方法
+      // 使用标准的 Solana 账户获取方法
       const result = await this.signClient.request({
         topic: this.session.topic,
-        chainId: `solana:${SOLANA_NETWORK}`,
+        chainId: "solana", // 使用通用 Solana 链 ID
         request: {
           method: TRUST_METHODS.GET_ACCOUNTS,
           params: [],
@@ -291,7 +291,7 @@ export class TrustWalletAdapter implements TrustWalletAdapterExtended {
       if (Array.isArray(result)) {
         // 只保留 Solana 账户 (network: 501)
         this.accounts = result.filter(
-          (account) => account.network === SOLANA_NETWORK
+          (account) => account.network === SOLANA_SLIP44
         );
 
         // 找到第一个 Solana 账户
@@ -341,18 +341,13 @@ export class TrustWalletAdapter implements TrustWalletAdapterExtended {
 
       console.log("[TrustWallet] Requesting transaction signature...");
 
-      // 使用 Trust Wallet 的 trust_signTransaction 方法
+      // 使用标准的 Solana 签名方法
       const result = await this.signClient.request({
         topic: this.session.topic,
-        chainId: `solana:${SOLANA_NETWORK}`,
+        chainId: "solana", // 使用通用 Solana 链 ID
         request: {
           method: TRUST_METHODS.SIGN_TRANSACTION,
-          params: [
-            {
-              network: SOLANA_NETWORK,
-              transaction: serializedTransaction,
-            },
-          ],
+          params: [serializedTransaction], // 标准 Solana 格式
         },
       });
 
