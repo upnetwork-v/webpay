@@ -23,6 +23,13 @@ const TRUST_METHODS = {
   SIGN_TRANSACTION: "solana_signTransaction", // 使用标准 Solana 方法
   GET_ACCOUNTS: "solana_getAccounts", // 使用标准 Solana 方法
 } as const;
+
+// 账户类型定义
+interface TrustWalletAccount {
+  address: string;
+  network?: number;
+  chainId?: string;
+}
 const TRUST_SESSION_KEY = "trust_wallet_session";
 const SESSION_EXPIRY = 24 * 60 * 60 * 1000; // 24 hours
 
@@ -57,7 +64,7 @@ class TrustWalletError extends Error {
 export class TrustWalletAdapter implements TrustWalletAdapterExtended {
   private signClient: InstanceType<typeof SignClient> | null = null;
   private session: SessionTypes.Struct | null = null;
-  private accounts: Array<{ network: number; address: string }> = [];
+  private accounts: TrustWalletAccount[] = [];
   private publicKey: string | null = null;
   private connected: boolean = false;
   private isInitialized: boolean = false;
@@ -150,6 +157,27 @@ export class TrustWalletAdapter implements TrustWalletAdapterExtended {
 
     signClient.on("session_update", (event) => {
       console.log("[TrustWallet] Session update:", event);
+
+      // 如果当前会话被更新，重新获取账户信息
+      if (this.session && event.topic === this.session.topic) {
+        console.log("[TrustWallet] Updating session with new data");
+
+        // 更新会话数据
+        if (this.signClient) {
+          const updatedSession = this.signClient.session.get(event.topic);
+          if (updatedSession) {
+            this.session = updatedSession;
+          }
+        }
+
+        // 重新获取账户信息
+        this.getAccounts().catch((error) => {
+          console.error(
+            "[TrustWallet] Error updating accounts after session update:",
+            error
+          );
+        });
+      }
     });
 
     signClient.on("session_delete", (event) => {
@@ -250,8 +278,30 @@ export class TrustWalletAdapter implements TrustWalletAdapterExtended {
     }
 
     try {
+      console.log("[TrustWallet] Handling connection success...");
+      console.log("[TrustWallet] Session data:", {
+        topic: this.session.topic,
+        namespaces: this.session.namespaces,
+        expiry: this.session.expiry,
+      });
+
       // 获取账户信息
       await this.getAccounts();
+
+      // 验证是否成功获取到公钥
+      if (!this.publicKey) {
+        console.error(
+          "[TrustWallet] Failed to extract public key from session"
+        );
+        console.log(
+          "[TrustWallet] Session namespaces:",
+          this.session.namespaces
+        );
+        console.log("[TrustWallet] Available accounts:", this.accounts);
+        throw new Error(
+          "Failed to extract public key from Trust Wallet session"
+        );
+      }
 
       // 保存会话
       this.saveSession();
@@ -276,40 +326,84 @@ export class TrustWalletAdapter implements TrustWalletAdapterExtended {
       throw new Error("SignClient or session not available");
     }
 
-    try {
-      // 使用标准的 Solana 账户获取方法
-      const result = await this.signClient.request({
-        topic: this.session.topic,
-        chainId: SOLANA_MAINNET_CHAIN_ID, // 使用正确的 Solana 主网链 ID
-        request: {
-          method: TRUST_METHODS.GET_ACCOUNTS,
-          params: [],
-        },
-      });
+    // 从会话命名空间获取账户信息 - 基于截图数据格式
+    if (
+      this.session.namespaces &&
+      this.session.namespaces.solana &&
+      this.session.namespaces.solana.accounts
+    ) {
+      console.log(
+        "[TrustWallet] Found accounts in session namespace:",
+        this.session.namespaces.solana.accounts
+      );
 
-      console.log("[TrustWallet] Accounts received:", result);
+      for (const account of this.session.namespaces.solana.accounts) {
+        console.log("[TrustWallet] Processing session account:", account);
 
-      if (Array.isArray(result)) {
-        // 只保留 Solana 账户 (network: 501)
-        this.accounts = result.filter(
-          (account) => account.network === SOLANA_SLIP44
-        );
+        // 解析账户字符串，格式是 "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp:address"
+        const parts = account.split(":");
 
-        // 找到第一个 Solana 账户
-        const solanaAccount = this.accounts[0];
-
-        if (solanaAccount) {
-          this.publicKey = solanaAccount.address;
-          console.log("[TrustWallet] Found Solana account:", this.publicKey);
-        } else {
-          console.log("[TrustWallet] No Solana account found");
+        if (parts.length < 3) {
+          throw new Error(`Invalid account format: ${account}`);
         }
-      } else {
-        throw new Error("Invalid accounts response format");
+
+        const namespace = parts[0]; // "solana"
+        const chainId = parts[1]; // "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp"
+        const address = parts.slice(2).join(":"); // 处理地址中可能包含冒号的情况
+
+        console.log("[TrustWallet] Parsed account:", {
+          namespace,
+          chainId,
+          address,
+          expectedChainId: SOLANA_MAINNET_CHAIN_ID.split(":")[1],
+        });
+
+        // 验证命名空间
+        if (namespace !== "solana") {
+          throw new Error(
+            `Invalid namespace: expected 'solana', got '${namespace}'`
+          );
+        }
+
+        // 验证链 ID 是否匹配
+        if (chainId !== SOLANA_MAINNET_CHAIN_ID.split(":")[1]) {
+          throw new Error(
+            `Chain ID mismatch: expected '${SOLANA_MAINNET_CHAIN_ID.split(":")[1]}', got '${chainId}'`
+          );
+        }
+
+        // 验证是否为有效的 Solana 地址
+        try {
+          new PublicKey(address);
+        } catch {
+          throw new Error(`Invalid Solana address: ${address}`);
+        }
+
+        // 添加到账户列表
+        this.accounts.push({
+          address: address,
+          chainId: SOLANA_MAINNET_CHAIN_ID,
+          network: SOLANA_SLIP44,
+        });
+
+        console.log(
+          "[TrustWallet] Found valid Solana account from session:",
+          address
+        );
       }
-    } catch (error) {
-      console.error("[TrustWallet] Error getting accounts:", error);
-      // 不抛出错误，因为可能不是所有提供商都支持这个方法
+
+      // 设置第一个账户为当前公钥
+      if (this.accounts.length > 0) {
+        this.publicKey = this.accounts[0].address;
+        console.log(
+          "[TrustWallet] Using account from session:",
+          this.publicKey
+        );
+      } else {
+        throw new Error("No valid Solana accounts found in session namespace");
+      }
+    } else {
+      throw new Error("No solana namespace found in session");
     }
   }
 
