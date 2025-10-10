@@ -12,8 +12,9 @@ interface TrustWalletAdapterExtended extends WalletAdapter {
 }
 
 import { Transaction, PublicKey } from "@solana/web3.js";
-import WalletConnect from "@walletconnect/client";
-import QRCodeModal from "@walletconnect/qrcode-modal";
+import Web3 from "web3";
+import WalletConnectProvider from "@walletconnect/web3-provider";
+import Web3Modal from "web3modal";
 
 // 内联常量定义
 const SOLANA_NETWORK = 501; // Solana SLIP-44
@@ -23,20 +24,12 @@ const TRUST_METHODS = {
 } as const;
 const TRUST_SESSION_KEY = "trust_wallet_session";
 const SESSION_EXPIRY = 24 * 60 * 60 * 1000; // 24 hours
-const WALLETCONNECT_BRIDGE = "https://bridge.walletconnect.org";
 
-// 配置常量
-const CONFIG = {
-  CONNECTION_TIMEOUT: 120000, // 2分钟连接超时
-  RETRY_DELAY: 2000, // 重试延迟
-  POLL_INTERVAL: 5000, // 轮询间隔
-  REDIRECT_DELAY: 100, // 重定向延迟
-  CALLBACK_WAIT_TIME: 1000, // 回调等待时间
-} as const;
+// 移除未使用的配置常量
 
-// 全局 WalletConnect 实例管理，防止重复初始化
-let globalConnector: WalletConnect | null = null;
-let globalInitPromise: Promise<WalletConnect> | null = null;
+// 全局 Web3Modal 实例管理
+let globalWeb3Modal: Web3Modal | null = null;
+let globalInitPromise: Promise<Web3Modal> | null = null;
 
 // 错误类型定义
 enum TrustWalletErrorType {
@@ -60,15 +53,17 @@ class TrustWalletError extends Error {
 }
 
 /**
- * Trust Wallet 适配器 - WalletConnect V1 实现
+ * Trust Wallet 适配器 - Web3Modal 实现
  */
 export class TrustWalletAdapter implements TrustWalletAdapterExtended {
-  private connector: WalletConnect | null = null;
+  private web3Modal: Web3Modal | null = null;
+  private provider: WalletConnectProvider | null = null;
+  private web3: Web3 | null = null;
   private accounts: Array<{ network: number; address: string }> = [];
   private publicKey: string | null = null;
   private connected: boolean = false;
   private isInitialized: boolean = false;
-  private isValidationInProgress: boolean = false; // 防止重复验证
+  private isValidationInProgress: boolean = false;
 
   constructor() {
     // 只恢复基础状态，不做异步初始化
@@ -83,52 +78,38 @@ export class TrustWalletAdapter implements TrustWalletAdapterExtended {
    * 初始化 Trust Wallet
    */
   async init(): Promise<void> {
-    if (this.isInitialized && this.connector) {
+    if (this.isInitialized && this.web3Modal) {
       return;
     }
 
     try {
-      // 使用全局实例，避免重复初始化 WalletConnect
-      if (globalConnector) {
-        console.log("[TrustWallet] Using existing WalletConnect connector");
-        this.connector = globalConnector;
+      // 使用全局实例，避免重复初始化 Web3Modal
+      if (globalWeb3Modal) {
+        console.log("[TrustWallet] Using existing Web3Modal instance");
+        this.web3Modal = globalWeb3Modal;
       } else if (globalInitPromise) {
         console.log(
-          "[TrustWallet] Waiting for existing WalletConnect initialization..."
+          "[TrustWallet] Waiting for existing Web3Modal initialization..."
         );
-        this.connector = await globalInitPromise;
+        this.web3Modal = await globalInitPromise;
       } else {
-        console.log(
-          "[TrustWallet] Initializing new WalletConnect connector..."
-        );
-        globalInitPromise = new Promise((resolve, reject) => {
-          try {
-            const connector = new WalletConnect({
-              bridge: WALLETCONNECT_BRIDGE,
-              qrcodeModal: QRCodeModal,
-            });
-            resolve(connector);
-          } catch (error) {
-            reject(error);
-          }
-        });
-
-        this.connector = await globalInitPromise;
-        globalConnector = this.connector;
-        globalInitPromise = null; // 重置，允许后续重新初始化
+        console.log("[TrustWallet] Initializing new Web3Modal...");
+        globalInitPromise = this.initializeWeb3Modal();
+        this.web3Modal = await globalInitPromise;
+        globalWeb3Modal = this.web3Modal;
+        globalInitPromise = null;
       }
 
-      this.setupEventListeners();
       this.isInitialized = true;
 
       // 检查是否有现有连接
-      if (this.connector.connected) {
+      if (this.web3Modal.cachedProvider) {
         await this.restoreConnection();
       }
 
       console.log("[TrustWallet] Initialization completed successfully");
     } catch (err) {
-      this.connector = null;
+      this.web3Modal = null;
       this.isInitialized = false;
       this.clearSession();
       const error = err instanceof Error ? err : new Error(String(err));
@@ -141,33 +122,61 @@ export class TrustWalletAdapter implements TrustWalletAdapterExtended {
   }
 
   /**
+   * 初始化 Web3Modal
+   */
+  private async initializeWeb3Modal(): Promise<Web3Modal> {
+    // 获取 Solana RPC 端点
+    const solanaRpc = import.meta.env.VITE_SOLANA_RPC;
+    if (!solanaRpc) {
+      throw new TrustWalletError(
+        TrustWalletErrorType.INITIALIZATION_FAILED,
+        "VITE_SOLANA_RPC environment variable is not set"
+      );
+    }
+
+    // 配置 Trust Wallet 提供商 - 只支持 Solana 主网
+    const providerOptions = {
+      walletconnect: {
+        package: WalletConnectProvider,
+        options: {
+          rpc: {
+            501: solanaRpc, // Solana mainnet - 使用环境变量
+          },
+          chainId: 501, // Solana 主网作为默认链
+          bridge: "https://bridge.walletconnect.org",
+        },
+      },
+    };
+
+    const web3Modal = new Web3Modal({
+      network: "mainnet",
+      cacheProvider: true,
+      providerOptions,
+    });
+
+    return web3Modal;
+  }
+
+  /**
    * 恢复现有连接
    */
   private async restoreConnection(): Promise<void> {
     try {
       console.log("[TrustWallet] Restoring existing connection...");
 
-      // 获取账户列表
-      await this.getAccounts();
-
-      // 找到 Solana 账户
-      const solanaAccount = this.accounts.find(
-        (account) => account.network === SOLANA_NETWORK
-      );
-
-      if (solanaAccount) {
-        this.publicKey = solanaAccount.address;
-        this.connected = true;
-        this.saveSession();
-        console.log(
-          "[TrustWallet] Connection restored successfully:",
-          this.publicKey
-        );
-      } else {
-        console.log(
-          "[TrustWallet] No Solana account found in restored connection"
-        );
+      if (!this.web3Modal?.cachedProvider) {
+        console.log("[TrustWallet] No cached provider found");
+        return;
       }
+
+      // 连接到缓存的提供商
+      const provider = await this.web3Modal.connectTo("walletconnect");
+      await this.setupProvider(provider);
+
+      console.log(
+        "[TrustWallet] Connection restored successfully:",
+        this.publicKey
+      );
     } catch (error) {
       console.error("[TrustWallet] Error restoring connection:", error);
       this.clearSession();
@@ -182,96 +191,86 @@ export class TrustWalletAdapter implements TrustWalletAdapterExtended {
       throw new Error("Wallet already connected");
     }
 
-    if (!this.connector) {
+    if (!this.web3Modal) {
       await this.init();
     }
 
     try {
-      // 如果还没有连接，创建新会话
-      if (!this.connector!.connected) {
-        console.log("[TrustWallet] Creating new WalletConnect session...");
-        this.connector!.createSession();
-      }
+      console.log("[TrustWallet] Connecting via Web3Modal...");
 
-      // 等待连接事件
-      return new Promise((resolve, reject) => {
-        let isResolved = false;
+      // 连接到 Trust Wallet (通过 WalletConnect)
+      const provider = await this.web3Modal!.connectTo("walletconnect");
+      await this.setupProvider(provider);
 
-        const timeout = setTimeout(() => {
-          if (!isResolved) {
-            isResolved = true;
-            reject(
-              new TrustWalletError(
-                TrustWalletErrorType.CONNECTION_TIMEOUT,
-                "Connection timeout. Please make sure you approved the connection in Trust Wallet and try again."
-              )
-            );
-          }
-        }, CONFIG.CONNECTION_TIMEOUT);
-
-        // 监听连接成功事件
-        const handleConnect = async () => {
-          if (!isResolved) {
-            isResolved = true;
-            clearTimeout(timeout);
-
-            try {
-              // 获取账户列表
-              await this.getAccounts();
-
-              // 找到 Solana 账户
-              const solanaAccount = this.accounts.find(
-                (account) => account.network === SOLANA_NETWORK
-              );
-
-              if (solanaAccount) {
-                this.publicKey = solanaAccount.address;
-                this.connected = true;
-                this.saveSession();
-                console.log(
-                  "[TrustWallet] Connection successful:",
-                  this.publicKey
-                );
-                resolve();
-              } else {
-                reject(new Error("No Solana account found"));
-              }
-            } catch (error) {
-              reject(error);
-            }
-          }
-        };
-
-        // 监听连接失败事件
-        const handleConnectError = (error: Error | null) => {
-          if (!isResolved) {
-            isResolved = true;
-            clearTimeout(timeout);
-            reject(error || new Error("Connection failed"));
-          }
-        };
-
-        // 绑定事件监听器
-        this.connector!.on("connect", handleConnect);
-        this.connector!.on("disconnect", handleConnectError);
-      });
+      console.log("[TrustWallet] Connection successful:", this.publicKey);
     } catch (error) {
       console.error("[TrustWallet] Connection failed:", error);
+
+      // 检查是否是用户拒绝
+      if (error instanceof Error && error.message.includes("User rejected")) {
+        throw new TrustWalletError(
+          TrustWalletErrorType.USER_REJECTED,
+          "Connection was rejected by user",
+          error
+        );
+      }
+
       throw error;
     }
   }
 
   /**
-   * 获取账户列表
+   * 设置提供商
+   */
+  private async setupProvider(provider: WalletConnectProvider): Promise<void> {
+    this.provider = provider as WalletConnectProvider;
+    this.web3 = new Web3(this.provider);
+
+    // 监听账户变化
+    this.provider.on("accountsChanged", (accounts: string[]) => {
+      console.log("[TrustWallet] Accounts changed:", accounts);
+      if (accounts.length > 0) {
+        this.publicKey = accounts[0];
+        this.saveSession();
+      } else {
+        this.clearSession();
+      }
+    });
+
+    // 监听网络变化
+    this.provider.on("chainChanged", (chainId: number) => {
+      console.log("[TrustWallet] Chain changed:", chainId);
+    });
+
+    // 监听断开连接
+    this.provider.on("disconnect", (code: number, reason: string) => {
+      console.log("[TrustWallet] Disconnected:", code, reason);
+      this.clearSession();
+    });
+
+    // 获取账户
+    const accounts = await this.web3.eth.getAccounts();
+    if (accounts.length > 0) {
+      this.publicKey = accounts[0];
+      this.connected = true;
+      this.saveSession();
+    }
+
+    // 获取 Solana 账户（通过 Trust Wallet 扩展方法）
+    await this.getAccounts();
+  }
+
+  /**
+   * 获取 Solana 账户列表
    */
   private async getAccounts(): Promise<void> {
-    if (!this.connector) {
-      throw new Error("WalletConnect not initialized");
+    if (!this.provider) {
+      throw new Error("Provider not initialized");
     }
 
     try {
-      // 使用公开的方法
-      const result = await this.connector.sendCustomRequest({
+      // 使用 Trust Wallet 扩展的 get_accounts 方法
+      const result = await this.provider.send({
         method: TRUST_METHODS.GET_ACCOUNTS,
         params: [],
       });
@@ -279,38 +278,34 @@ export class TrustWalletAdapter implements TrustWalletAdapterExtended {
       console.log("[TrustWallet] Accounts received:", result);
 
       if (Array.isArray(result)) {
-        this.accounts = result;
+        // 只保留 Solana 账户 (network: 501)
+        this.accounts = result.filter(
+          (account) => account.network === SOLANA_NETWORK
+        );
+
+        // 找到第一个 Solana 账户
+        const solanaAccount = this.accounts[0];
+
+        if (solanaAccount) {
+          this.publicKey = solanaAccount.address;
+          console.log("[TrustWallet] Found Solana account:", this.publicKey);
+        } else {
+          console.log("[TrustWallet] No Solana account found");
+        }
       } else {
         throw new Error("Invalid accounts response format");
       }
     } catch (error) {
       console.error("[TrustWallet] Error getting accounts:", error);
-      throw error;
+      // 不抛出错误，因为可能不是所有提供商都支持这个方法
     }
-  }
-
-  /**
-   * 设置事件监听器
-   */
-  private setupEventListeners(): void {
-    if (!this.connector) return;
-
-    this.connector.on("disconnect", (_error, payload) => {
-      console.log("[TrustWallet] Disconnected:", payload);
-      this.clearSession();
-    });
-
-    this.connector.on("session_update", (_error, payload) => {
-      console.log("[TrustWallet] Session updated:", payload);
-      // 可以在这里处理会话更新
-    });
   }
 
   /**
    * 签名交易
    */
   async signTransaction(transaction: Transaction): Promise<Transaction> {
-    if (!this.connected || !this.connector) {
+    if (!this.connected || !this.provider) {
       throw new TrustWalletError(
         TrustWalletErrorType.SESSION_NOT_FOUND,
         "Wallet not connected. Please connect first."
@@ -318,7 +313,7 @@ export class TrustWalletAdapter implements TrustWalletAdapterExtended {
     }
 
     // 在签名前验证连接是否仍然有效
-    if (!this.connector.connected) {
+    if (!this.provider.connected) {
       this.clearInvalidSession();
       throw new TrustWalletError(
         TrustWalletErrorType.SESSION_NOT_FOUND,
@@ -345,7 +340,7 @@ export class TrustWalletAdapter implements TrustWalletAdapterExtended {
       console.log("[TrustWallet] Requesting transaction signature...");
 
       // 使用 Trust Wallet 的 trust_signTransaction 方法
-      const result = await this.connector.sendCustomRequest({
+      const result = await this.provider.send({
         method: TRUST_METHODS.SIGN_TRANSACTION,
         params: [
           {
@@ -574,8 +569,8 @@ export class TrustWalletAdapter implements TrustWalletAdapterExtended {
    * 验证当前会话是否仍然有效
    */
   async validateSession(): Promise<boolean> {
-    if (!this.connector || !this.connected) {
-      console.log("[TrustWallet] No connector or not connected to validate");
+    if (!this.provider || !this.connected) {
+      console.log("[TrustWallet] No provider or not connected to validate");
       return false;
     }
 
@@ -589,8 +584,8 @@ export class TrustWalletAdapter implements TrustWalletAdapterExtended {
 
     try {
       // 检查连接是否仍然有效
-      if (!this.connector.connected) {
-        console.log("[TrustWallet] Connector not connected");
+      if (!this.provider.connected) {
+        console.log("[TrustWallet] Provider not connected");
         return false;
       }
 
@@ -617,14 +612,18 @@ export class TrustWalletAdapter implements TrustWalletAdapterExtended {
    */
   async disconnect(): Promise<void> {
     try {
-      if (this.connector) {
-        await this.connector.killSession();
+      if (this.provider) {
+        await this.provider.disconnect();
+      }
+      if (this.web3Modal) {
+        await this.web3Modal.clearCachedProvider();
       }
     } catch (error) {
       console.warn("Error disconnecting Trust Wallet:", error);
     } finally {
       this.clearSession();
-      this.connector = null;
+      this.provider = null;
+      this.web3 = null;
     }
   }
 
@@ -698,7 +697,7 @@ export class TrustWalletAdapter implements TrustWalletAdapterExtended {
       type: "signTransaction",
       success: true,
       data: {
-        message: "Trust Wallet callback handled via WalletConnect v1",
+        message: "Trust Wallet callback handled via Web3Modal",
         params: params,
       } as unknown,
     };
