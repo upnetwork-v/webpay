@@ -522,7 +522,25 @@ export class TrustWalletAdapter implements TrustWalletAdapterExtended {
 
       // 将签名添加到原始交易中
       const signatureBuffer = Buffer.from(signatureString, "base64");
+      console.log(
+        "[TrustWallet] Signature buffer length:",
+        signatureBuffer.length,
+        "bytes"
+      );
+      console.log(
+        "[TrustWallet] Signature buffer hex:",
+        signatureBuffer.toString("hex")
+      );
+
       const userPublicKey = new PublicKey(this.publicKey!);
+      console.log("[TrustWallet] User public key:", userPublicKey.toString());
+
+      // 检查交易状态
+      console.log("[TrustWallet] Transaction before adding signature:");
+      console.log("  - Signatures count:", transaction.signatures.length);
+      console.log("  - Fee payer:", transaction.feePayer?.toString());
+      console.log("  - Recent blockhash:", transaction.recentBlockhash);
+
       transaction.addSignature(userPublicKey, signatureBuffer);
 
       console.log("[TrustWallet] Successfully added signature to transaction");
@@ -531,11 +549,43 @@ export class TrustWalletAdapter implements TrustWalletAdapterExtended {
         transaction.signatures.length
       );
 
+      // 检查添加签名后的状态
+      const addedSignature = transaction.signatures.find((sig) =>
+        sig.publicKey.equals(userPublicKey)
+      );
+      if (addedSignature && addedSignature.signature) {
+        console.log("[TrustWallet] Added signature details:");
+        console.log("  - Public key:", addedSignature.publicKey.toString());
+        console.log(
+          "  - Signature length:",
+          addedSignature.signature.length,
+          "bytes"
+        );
+        console.log(
+          "  - Signature hex:",
+          addedSignature.signature.toString("hex")
+        );
+      } else {
+        console.error("[TrustWallet] Could not find added signature!");
+      }
+
       // 验证签名
+      console.log("[TrustWallet] Starting signature verification...");
       const isValid = transaction.verifySignatures();
       console.log("[TrustWallet] Signature verification result:", isValid);
 
       if (!isValid) {
+        console.error("[TrustWallet] Signature verification failed!");
+        console.error("[TrustWallet] Transaction details:", {
+          signatures: transaction.signatures.map((sig) => ({
+            publicKey: sig.publicKey.toString(),
+            signatureLength: sig.signature?.length || 0,
+            signatureHex: sig.signature?.toString("hex") || "null",
+          })),
+          feePayer: transaction.feePayer?.toString(),
+          recentBlockhash: transaction.recentBlockhash,
+        });
+
         throw new TrustWalletError(
           TrustWalletErrorType.SIGNATURE_FAILED,
           "Signature verification failed"
