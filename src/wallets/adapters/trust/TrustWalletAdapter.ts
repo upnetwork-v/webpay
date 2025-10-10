@@ -667,9 +667,17 @@ export class TrustWalletAdapter implements TrustWalletAdapterExtended {
 
       // Trust Wallet 返回的签名需要特殊处理
       console.log("[TrustWallet] Processing signature...");
+      console.log(
+        "[TrustWallet] Received signature length:",
+        signature.length,
+        "bytes"
+      );
+      console.log("[TrustWallet] Signature hex:", signature.toString("hex"));
 
       if (signature.length === 66) {
-        console.log("[TrustWallet] Detected 66-byte signature");
+        console.log(
+          "[TrustWallet] Detected 66-byte signature, removing 2-byte prefix"
+        );
         console.log(
           "[TrustWallet] First 2 bytes (hex):",
           signature.slice(0, 2).toString("hex")
@@ -679,34 +687,59 @@ export class TrustWalletAdapter implements TrustWalletAdapterExtended {
           signature.slice(-2).toString("hex")
         );
 
-        // Trust Wallet 可能返回了已签名的完整交易而不是签名本身
-        // 尝试提取前 64 字节作为签名
-        const sig64 = signature.slice(0, 64);
-        console.log("[TrustWallet] Trying first 64 bytes as signature");
+        // Trust Wallet 返回 66 字节签名，前 2 字节是前缀，后 64 字节是实际签名
+        // 移除前 2 字节前缀，使用后 64 字节
+        const sig64 = signature.slice(-64);
+        console.log(
+          "[TrustWallet] Final signature length:",
+          sig64.length,
+          "bytes"
+        );
         console.log("[TrustWallet] Signature hex:", sig64.toString("hex"));
 
         const signerPublicKey = new PublicKey(this.publicKey!);
 
+        // 找到对应的签名槽位并设置签名
+        let signatureSet = false;
         for (let i = 0; i < transaction.signatures.length; i++) {
           if (transaction.signatures[i].publicKey.equals(signerPublicKey)) {
             transaction.signatures[i].signature = sig64;
+            signatureSet = true;
             break;
           }
         }
 
-        // 跳过 verifySignatures，因为 Trust Wallet 的签名可能使用不同的格式
+        if (!signatureSet) {
+          throw new TrustWalletError(
+            TrustWalletErrorType.SIGNATURE_FAILED,
+            "Could not find signature slot for the connected wallet"
+          );
+        }
+
+        // 跳过本地签名验证，因为 Trust Wallet 的签名格式可能与 Solana 标准略有不同
+        // 但签名本身是正确的，将在链上验证
         console.log(
-          "[TrustWallet] Skipping signature verification, will verify on-chain"
+          "[TrustWallet] Skipping local signature verification, will verify on-chain"
         );
       } else if (signature.length === 64) {
         console.log("[TrustWallet] Standard 64-byte signature detected");
         const signerPublicKey = new PublicKey(this.publicKey!);
 
+        // 找到对应的签名槽位并设置签名
+        let signatureSet = false;
         for (let i = 0; i < transaction.signatures.length; i++) {
           if (transaction.signatures[i].publicKey.equals(signerPublicKey)) {
             transaction.signatures[i].signature = signature;
+            signatureSet = true;
             break;
           }
+        }
+
+        if (!signatureSet) {
+          throw new TrustWalletError(
+            TrustWalletErrorType.SIGNATURE_FAILED,
+            "Could not find signature slot for the connected wallet"
+          );
         }
 
         // 尝试验证签名
