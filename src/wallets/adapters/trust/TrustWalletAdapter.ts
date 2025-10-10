@@ -15,6 +15,7 @@ import { Transaction, PublicKey } from "@solana/web3.js";
 import Web3 from "web3";
 import WalletConnectProvider from "@walletconnect/web3-provider";
 import Web3Modal from "web3modal";
+import { sendRawTransaction } from "@/utils/transaction";
 
 // 内联常量定义
 const SOLANA_NETWORK = 501; // Solana SLIP-44
@@ -546,8 +547,7 @@ export class TrustWalletAdapter implements TrustWalletAdapterExtended {
    * 广播已签名交易
    */
   async sendRawTransaction(signedTransaction: Transaction): Promise<string> {
-    // 复用现有实现
-    const { sendRawTransaction } = await import("@/utils/transaction");
+    // 使用静态导入的函数
     return sendRawTransaction(signedTransaction);
   }
 
