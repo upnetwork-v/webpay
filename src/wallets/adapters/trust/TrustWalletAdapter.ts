@@ -24,9 +24,6 @@ const TRUST_METHODS = {
   SIGN_MESSAGE: "solana_signMessage", // 添加消息签名方法
   REQUEST_ACCOUNTS: "solana_requestAccounts", // 使用 WalletConnect 官方推荐的方法
   GET_ACCOUNTS: "solana_getAccounts", // 备用方法
-  // 尝试 Trust Wallet 可能支持的其他方法名
-  TRUST_SIGN_TRANSACTION: "trust_signTransaction",
-  TRUST_SIGN_MESSAGE: "trust_signMessage",
 } as const;
 
 // 账户类型定义
@@ -221,9 +218,6 @@ export class TrustWalletAdapter implements TrustWalletAdapterExtended {
               TRUST_METHODS.SIGN_MESSAGE,
               TRUST_METHODS.REQUEST_ACCOUNTS,
               TRUST_METHODS.GET_ACCOUNTS,
-              // 尝试 Trust Wallet 特有的方法
-              TRUST_METHODS.TRUST_SIGN_TRANSACTION,
-              TRUST_METHODS.TRUST_SIGN_MESSAGE,
             ],
             chains: [SOLANA_MAINNET_CHAIN_ID], // Solana 主网链 ID
             events: [],
@@ -460,7 +454,15 @@ export class TrustWalletAdapter implements TrustWalletAdapterExtended {
     }
 
     try {
-      // 序列化交易为 base64
+      console.log("[TrustWallet] Requesting transaction signature...");
+      console.log("[TrustWallet] Transaction details:", {
+        recentBlockhash: transaction.recentBlockhash,
+        feePayer: transaction.feePayer?.toString(),
+        signatures: transaction.signatures.length,
+        instructions: transaction.instructions.length,
+      });
+
+      // 根据 WalletConnect Solana 官方规范，使用正确的参数格式
       const serializedTransaction = transaction
         .serialize({
           requireAllSignatures: false,
@@ -468,65 +470,31 @@ export class TrustWalletAdapter implements TrustWalletAdapterExtended {
         })
         .toString("base64");
 
-      console.log("[TrustWallet] Requesting transaction signature...");
+      console.log(
+        "[TrustWallet] Using official WalletConnect Solana format..."
+      );
+      console.log(
+        "[TrustWallet] Transaction serialized length:",
+        serializedTransaction.length
+      );
+      console.log("[TrustWallet] User public key:", this.publicKey);
 
-      // 尝试多种签名方法，按优先级排序
-      let result;
-      let methodUsed;
-
-      try {
-        // 首先尝试标准 Solana 方法
-        result = await this.signClient.request({
-          topic: this.session.topic,
-          chainId: SOLANA_MAINNET_CHAIN_ID,
-          request: {
-            method: TRUST_METHODS.SIGN_TRANSACTION,
-            params: [serializedTransaction],
+      const result = await this.signClient.request({
+        topic: this.session.topic,
+        chainId: SOLANA_MAINNET_CHAIN_ID,
+        request: {
+          method: "solana_signTransaction",
+          params: {
+            transaction: serializedTransaction,
+            pubkey: this.publicKey,
           },
-        });
-        methodUsed = TRUST_METHODS.SIGN_TRANSACTION;
-        console.log("[TrustWallet] Used standard Solana method:", methodUsed);
-      } catch (firstError) {
-        console.warn(
-          "[TrustWallet] Standard method failed, trying Trust Wallet specific method:",
-          firstError
-        );
-
-        try {
-          // 尝试 Trust Wallet 特有的方法
-          result = await this.signClient.request({
-            topic: this.session.topic,
-            chainId: SOLANA_MAINNET_CHAIN_ID,
-            request: {
-              method: TRUST_METHODS.TRUST_SIGN_TRANSACTION,
-              params: [serializedTransaction],
-            },
-          });
-          methodUsed = TRUST_METHODS.TRUST_SIGN_TRANSACTION;
-          console.log(
-            "[TrustWallet] Used Trust Wallet specific method:",
-            methodUsed
-          );
-        } catch (secondError) {
-          console.error("[TrustWallet] Both methods failed:", {
-            firstError,
-            secondError,
-          });
-          throw new TrustWalletError(
-            TrustWalletErrorType.SIGNATURE_FAILED,
-            `Failed to sign transaction with both standard and Trust Wallet methods: ${secondError}`,
-            secondError instanceof Error
-              ? secondError
-              : new Error(String(secondError))
-          );
-        }
-      }
+        },
+      });
 
       console.log("[TrustWallet] Received signature result:", {
         type: typeof result,
         isString: typeof result === "string",
         isObject: typeof result === "object" && result !== null,
-        methodUsed: methodUsed,
         result: result,
       });
 
