@@ -532,28 +532,26 @@ export class TrustWalletAdapter implements TrustWalletAdapterExtended {
         signatureBuffer.toString("hex")
       );
 
-      // Trust Wallet 返回的是 DER 编码的签名（65 字节），需要转换为 Solana 期望的 64 字节格式
+      // 处理签名格式：Trust Wallet 返回 65 字节，去掉第一个字节转换为 64 字节
       let solanaSignature: Buffer;
-      if (signatureBuffer.length === 65 && signatureBuffer[0] === 0x02) {
-        // 这是 DER 编码的签名，提取 r 和 s 值（各 32 字节）
-        const r = signatureBuffer.slice(1, 33);
-        const s = signatureBuffer.slice(33, 65);
-        solanaSignature = Buffer.concat([r, s]);
-        console.log("[TrustWallet] Converted DER signature to Solana format");
-        console.log(
-          "[TrustWallet] Solana signature length:",
-          solanaSignature.length,
-          "bytes"
-        );
-        console.log(
-          "[TrustWallet] Solana signature hex:",
-          solanaSignature.toString("hex")
-        );
-      } else if (signatureBuffer.length === 64) {
-        // 已经是正确的 64 字节格式
+
+      if (signatureBuffer.length === 64) {
+        // 标准的 64 字节 ed25519 签名
         solanaSignature = signatureBuffer;
+        console.log("[TrustWallet] Using 64-byte signature");
+      } else if (signatureBuffer.length === 65) {
+        // Trust Wallet 返回 65 字节签名，去掉第一个字节
+        solanaSignature = signatureBuffer.slice(1);
         console.log(
-          "[TrustWallet] Signature is already in correct 64-byte format"
+          "[TrustWallet] Converted 65-byte signature to 64-byte format"
+        );
+        console.log(
+          "[TrustWallet] First byte (removed):",
+          signatureBuffer[0].toString(16)
+        );
+        console.log(
+          "[TrustWallet] Final signature hex:",
+          solanaSignature.toString("hex")
         );
       } else {
         throw new TrustWalletError(
@@ -561,6 +559,12 @@ export class TrustWalletAdapter implements TrustWalletAdapterExtended {
           `Invalid signature length: expected 64 or 65 bytes, got ${signatureBuffer.length} bytes`
         );
       }
+
+      console.log(
+        "[TrustWallet] Final signature length:",
+        solanaSignature.length,
+        "bytes"
+      );
 
       const userPublicKey = new PublicKey(this.publicKey!);
       console.log("[TrustWallet] User public key:", userPublicKey.toString());
