@@ -15,6 +15,7 @@ import { Transaction, PublicKey } from "@solana/web3.js";
 import { SignClient } from "@walletconnect/sign-client";
 import type { SessionTypes } from "@walletconnect/types";
 import { sendRawTransaction } from "@/utils/transaction";
+import bs58 from "bs58";
 
 // 内联常量定义
 const SOLANA_MAINNET_CHAIN_ID = "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp"; // Solana 主网链 ID
@@ -520,8 +521,9 @@ export class TrustWalletAdapter implements TrustWalletAdapterExtended {
 
       console.log("[TrustWallet] Signature length:", signatureString.length);
 
-      // 将签名添加到原始交易中
-      const signatureBuffer = Buffer.from(signatureString, "base64");
+      // 将签名添加到原始交易中 - Trust Wallet 返回的是 base58 编码的签名
+      // 使用 bs58 库进行 base58 解码
+      const signatureBuffer = Buffer.from(bs58.decode(signatureString));
       console.log(
         "[TrustWallet] Signature buffer length:",
         signatureBuffer.length,
@@ -532,31 +534,17 @@ export class TrustWalletAdapter implements TrustWalletAdapterExtended {
         signatureBuffer.toString("hex")
       );
 
-      // 处理签名格式：Trust Wallet 返回 65 字节，去掉第一个字节转换为 64 字节
+      // 处理签名格式：base58 解码后应该直接得到 64 字节的 ed25519 签名
       let solanaSignature: Buffer;
 
       if (signatureBuffer.length === 64) {
         // 标准的 64 字节 ed25519 签名
         solanaSignature = signatureBuffer;
-        console.log("[TrustWallet] Using 64-byte signature");
-      } else if (signatureBuffer.length === 65) {
-        // Trust Wallet 返回 65 字节签名，去掉第一个字节
-        solanaSignature = signatureBuffer.slice(1);
-        console.log(
-          "[TrustWallet] Converted 65-byte signature to 64-byte format"
-        );
-        console.log(
-          "[TrustWallet] First byte (removed):",
-          signatureBuffer[0].toString(16)
-        );
-        console.log(
-          "[TrustWallet] Final signature hex:",
-          solanaSignature.toString("hex")
-        );
+        console.log("[TrustWallet] Using 64-byte signature from base58 decode");
       } else {
         throw new TrustWalletError(
           TrustWalletErrorType.SIGNATURE_FAILED,
-          `Invalid signature length: expected 64 or 65 bytes, got ${signatureBuffer.length} bytes`
+          `Invalid signature length after base58 decode: expected 64 bytes, got ${signatureBuffer.length} bytes`
         );
       }
 
