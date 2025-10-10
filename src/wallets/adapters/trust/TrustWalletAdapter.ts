@@ -498,151 +498,51 @@ export class TrustWalletAdapter implements TrustWalletAdapterExtended {
         result: result,
       });
 
-      // 根据 Trust Wallet 文档，返回的是完整的已签名交易
-      let signedTransactionData: string;
+      // Trust Wallet 返回的是包含签名的 JSON 对象
+      console.log("[TrustWallet] Processing signature result...");
 
-      if (typeof result === "string") {
-        // 如果是字符串，可能是 HEX 编码的已签名交易
-        signedTransactionData = result;
-        console.log("[TrustWallet] Received HEX encoded signed transaction");
-      } else if (result && typeof result === "object") {
-        // 如果是对象，可能是 JSON 格式的已签名交易
-        signedTransactionData = JSON.stringify(result);
-        console.log("[TrustWallet] Received JSON signed transaction");
-      } else {
+      // 只支持 Trust Wallet 实际返回的格式：{signature: "base64_string"}
+      if (!result || typeof result !== "object" || !("signature" in result)) {
         throw new TrustWalletError(
           TrustWalletErrorType.SIGNATURE_FAILED,
-          "Invalid signature result from Trust Wallet"
+          `Invalid signature result from Trust Wallet. Expected object with 'signature' field, got: ${typeof result}`
         );
       }
 
-      console.log("[TrustWallet] Processing signed transaction data...");
+      const signatureString = (result as { signature: string }).signature;
+
+      if (typeof signatureString !== "string") {
+        throw new TrustWalletError(
+          TrustWalletErrorType.SIGNATURE_FAILED,
+          `Invalid signature type. Expected string, got: ${typeof signatureString}`
+        );
+      }
+
+      console.log("[TrustWallet] Signature length:", signatureString.length);
+
+      // 将签名添加到原始交易中
+      const signatureBuffer = Buffer.from(signatureString, "base64");
+      const userPublicKey = new PublicKey(this.publicKey!);
+      transaction.addSignature(userPublicKey, signatureBuffer);
+
+      console.log("[TrustWallet] Successfully added signature to transaction");
       console.log(
-        "[TrustWallet] Signed transaction data:",
-        signedTransactionData
+        "[TrustWallet] Transaction signatures count:",
+        transaction.signatures.length
       );
 
-      // 尝试解析已签名交易
-      let signedTransaction: Transaction;
+      // 验证签名
+      const isValid = transaction.verifySignatures();
+      console.log("[TrustWallet] Signature verification result:", isValid);
 
-      try {
-        // 首先尝试作为 HEX 字符串解析
-        if (typeof result === "string" && /^[0-9a-fA-F]+$/.test(result)) {
-          // HEX 字符串，转换为 Buffer 然后解析为 Transaction
-          const txBuffer = Buffer.from(result, "hex");
-          signedTransaction = Transaction.from(txBuffer);
-          console.log(
-            "[TrustWallet] Successfully parsed HEX encoded transaction"
-          );
-        } else {
-          // 如果不是 HEX，尝试作为 base64 解析
-          const txBuffer = Buffer.from(signedTransactionData, "base64");
-          signedTransaction = Transaction.from(txBuffer);
-          console.log(
-            "[TrustWallet] Successfully parsed base64 encoded transaction"
-          );
-        }
-      } catch (parseError) {
-        console.error(
-          "[TrustWallet] Failed to parse signed transaction:",
-          parseError
-        );
+      if (!isValid) {
         throw new TrustWalletError(
           TrustWalletErrorType.SIGNATURE_FAILED,
-          `Failed to parse signed transaction from Trust Wallet: ${parseError}`
+          "Signature verification failed"
         );
       }
 
-      // 验证已签名交易
-      if (
-        !signedTransaction.signatures ||
-        signedTransaction.signatures.length === 0
-      ) {
-        throw new TrustWalletError(
-          TrustWalletErrorType.SIGNATURE_FAILED,
-          "Signed transaction has no signatures"
-        );
-      }
-
-      // 找到对应的签名
-      const signerPublicKey = new PublicKey(this.publicKey!);
-      const signatureIndex = signedTransaction.signatures.findIndex((sig) =>
-        sig.publicKey.equals(signerPublicKey)
-      );
-
-      if (signatureIndex === -1) {
-        throw new TrustWalletError(
-          TrustWalletErrorType.SIGNATURE_FAILED,
-          `No signature found for public key: ${signerPublicKey.toString()}`
-        );
-      }
-
-      const signature = signedTransaction.signatures[signatureIndex].signature;
-      if (!signature || signature.length === 0) {
-        throw new TrustWalletError(
-          TrustWalletErrorType.SIGNATURE_FAILED,
-          "Signature is empty"
-        );
-      }
-
-      console.log(
-        "[TrustWallet] Found signature for public key:",
-        signerPublicKey.toString()
-      );
-      console.log("[TrustWallet] Signature length:", signature.length, "bytes");
-      console.log("[TrustWallet] Signature hex:", signature.toString("hex"));
-
-      // 将签名应用到原始交易
-      const sig64 = signature;
-
-      // 验证签名长度
-      if (sig64.length !== 64) {
-        throw new TrustWalletError(
-          TrustWalletErrorType.SIGNATURE_FAILED,
-          `Invalid signature length: expected 64 bytes, got ${sig64.length} bytes`
-        );
-      }
-
-      // 设置签名到原始交易中
-      const originalSignerPublicKey = new PublicKey(this.publicKey!);
-      let signatureSet = false;
-
-      for (let i = 0; i < transaction.signatures.length; i++) {
-        if (
-          transaction.signatures[i].publicKey.equals(originalSignerPublicKey)
-        ) {
-          transaction.signatures[i].signature = sig64;
-          signatureSet = true;
-          console.log(
-            `[TrustWallet] Signature set for public key: ${originalSignerPublicKey.toString()}`
-          );
-          break;
-        }
-      }
-
-      if (!signatureSet) {
-        throw new TrustWalletError(
-          TrustWalletErrorType.SIGNATURE_FAILED,
-          `Could not find signature slot for the connected wallet (${originalSignerPublicKey.toString()}). ` +
-            `Transaction may have been modified or the public key does not match.`
-        );
-      }
-
-      // 尝试验证签名
-      try {
-        if (!transaction.verifySignatures()) {
-          console.warn(
-            "[TrustWallet] Local signature verification failed, but proceeding with on-chain verification"
-          );
-        } else {
-          console.log("[TrustWallet] Local signature verification passed");
-        }
-      } catch (err) {
-        console.warn("[TrustWallet] Local signature verification error:", err);
-        console.log("[TrustWallet] Proceeding with on-chain verification");
-      }
-
-      console.log("[TrustWallet] Transaction signed successfully");
+      console.log("[TrustWallet] Transaction successfully signed and verified");
       return transaction;
     } catch (error) {
       const originalError =
