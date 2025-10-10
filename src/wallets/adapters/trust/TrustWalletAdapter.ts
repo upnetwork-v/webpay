@@ -16,6 +16,7 @@ import { SignClient } from "@walletconnect/sign-client";
 import type { SessionTypes } from "@walletconnect/types";
 import { sendRawTransaction } from "@/utils/transaction";
 import bs58 from "bs58";
+import { openTrustWalletApp } from "../../utils/trust";
 
 // 内联常量定义
 const SOLANA_MAINNET_CHAIN_ID = "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp"; // Solana 主网链 ID
@@ -480,7 +481,8 @@ export class TrustWalletAdapter implements TrustWalletAdapterExtended {
       );
       console.log("[TrustWallet] User public key:", this.publicKey);
 
-      const result = await this.signClient.request({
+      // 发送签名请求
+      const signaturePromise = this.signClient.request({
         topic: this.session.topic,
         chainId: SOLANA_MAINNET_CHAIN_ID,
         request: {
@@ -491,6 +493,13 @@ export class TrustWalletAdapter implements TrustWalletAdapterExtended {
           },
         },
       });
+
+      // 立即尝试唤起 Trust Wallet app，帮助用户看到签名请求
+      console.log("[TrustWallet] Attempting to open Trust Wallet app...");
+      openTrustWalletApp();
+
+      // 等待签名结果
+      const result = await signaturePromise;
 
       console.log("[TrustWallet] Received signature result:", {
         type: typeof result,
