@@ -285,7 +285,7 @@ export class TrustWalletAdapter implements TrustWalletAdapterExtended {
       ) {
         throw new TrustWalletError(
           TrustWalletErrorType.USER_REJECTED,
-          "Connection was cancelled by user",
+          "User rejected the request",
           originalError
         );
       }
@@ -627,7 +627,7 @@ export class TrustWalletAdapter implements TrustWalletAdapterExtended {
       ) {
         throw new TrustWalletError(
           TrustWalletErrorType.USER_REJECTED,
-          "Payment was cancelled by user",
+          "User rejected the request",
           originalError
         );
       }

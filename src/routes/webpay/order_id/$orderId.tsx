@@ -46,8 +46,12 @@ export default function PaymentPage() {
   const data = urlParams.get("data");
   const errorCode = urlParams.get("errorCode");
 
-  // Determine payment flow state from URL
-  const isPaymentCallback = !!(nonce && data && !phantomPk);
+  // Payment callback state - indicates transaction is signed and being broadcasted
+  // For Phantom: set to true when URL contains callback parameters
+  // For Trust/OKX: manually set to true after signTransaction completes
+  const [isPaymentCallback, setIsPaymentCallback] = useState(() => {
+    return !!(nonce && data && !phantomPk);
+  });
 
   // Authentication state
   const { isAuthenticated, user } = useAuthStore();
@@ -216,6 +220,7 @@ export default function PaymentPage() {
                 setTransactionSignature(txHash);
                 setIsComplete(true);
                 setIsPaymentProcessing(false);
+                setIsPaymentCallback(false);
               } catch (broadcastError) {
                 console.error(
                   "Error broadcasting transaction:",
@@ -223,14 +228,17 @@ export default function PaymentPage() {
                 );
                 setError(`Failed to broadcast transaction: ${broadcastError}`);
                 setIsPaymentProcessing(false);
+                setIsPaymentCallback(false);
               }
             } else {
               setError("Payment response missing transaction data");
               setIsPaymentProcessing(false);
+              setIsPaymentCallback(false);
             }
           } else if (!result.success) {
             setError(result.error || "Payment failed");
             setIsPaymentProcessing(false);
+            setIsPaymentCallback(false);
           }
 
           // Clean up the URL
@@ -240,6 +248,7 @@ export default function PaymentPage() {
           console.error("Error processing payment response:", err);
           setError(`Failed to process payment response: ${err}`);
           setIsPaymentProcessing(false);
+          setIsPaymentCallback(false);
         }
       };
 
@@ -359,6 +368,11 @@ export default function PaymentPage() {
         const signedTransaction = await signTransaction(tx);
         console.log("Transaction signed successfully");
 
+        // For Trust/OKX wallets: signature is completed synchronously
+        // Set callback state to show "broadcasting transaction" UI
+        // (Phantom wallet handles this via URL callback parameters)
+        setIsPaymentCallback(true);
+
         // 2. 广播交易 - 不等待确认完成，立即返回
         let txHash: string;
         try {
@@ -393,6 +407,7 @@ export default function PaymentPage() {
         setIsComplete(true);
         console.log("Setting payment processing to false");
         setIsPaymentProcessing(false);
+        setIsPaymentCallback(false);
         console.log("Payment process completed successfully");
       } catch (signError: unknown) {
         // 如果是钱包的重定向错误，说明需要等待回调处理
@@ -416,8 +431,22 @@ export default function PaymentPage() {
           errorMessage.includes("shortfall")
         ) {
           setError(errorMessage);
-        } else if (errorMessage.includes("User rejected") || errorMessage.includes("rejected by user")) {
+        } else if (
+          errorMessage.includes("User rejected") ||
+          errorMessage.includes("rejected by user") ||
+          errorMessage.includes("cancelled by user")
+        ) {
           setError("Payment was cancelled by user");
+        } else if (
+          errorMessage.includes("Wallet not connected") ||
+          errorMessage.includes("SESSION_NOT_FOUND")
+        ) {
+          setError("Wallet disconnected. Please reconnect your wallet and try again.");
+        } else if (
+          errorMessage.includes("Failed to connect") ||
+          errorMessage.includes("CONNECTION_TIMEOUT")
+        ) {
+          setError("Connection timeout. Please check your wallet and try again.");
         } else if (
           errorMessage.includes("Network error") ||
           errorMessage.includes("fetch")
@@ -435,6 +464,7 @@ export default function PaymentPage() {
           setError(`Payment failed: ${errorMessage}`);
         }
         setIsPaymentProcessing(false);
+        setIsPaymentCallback(false);
         return;
       }
     } catch (err: unknown) {
@@ -449,8 +479,22 @@ export default function PaymentPage() {
         errorMessage.includes("shortfall")
       ) {
         setError(errorMessage);
-      } else if (errorMessage.includes("User rejected") || errorMessage.includes("rejected by user")) {
+      } else if (
+        errorMessage.includes("User rejected") ||
+        errorMessage.includes("rejected by user") ||
+        errorMessage.includes("cancelled by user")
+      ) {
         setError("Payment was cancelled by user");
+      } else if (
+        errorMessage.includes("Wallet not connected") ||
+        errorMessage.includes("SESSION_NOT_FOUND")
+      ) {
+        setError("Wallet disconnected. Please reconnect your wallet and try again.");
+      } else if (
+        errorMessage.includes("Failed to connect") ||
+        errorMessage.includes("CONNECTION_TIMEOUT")
+      ) {
+        setError("Connection timeout. Please check your wallet and try again.");
       } else if (
         errorMessage.includes("Network error") ||
         errorMessage.includes("fetch")
@@ -468,6 +512,7 @@ export default function PaymentPage() {
         setError(`Payment failed: ${errorMessage}`);
       }
       setIsPaymentProcessing(false);
+      setIsPaymentCallback(false);
     }
   }, [
     isConnected,
