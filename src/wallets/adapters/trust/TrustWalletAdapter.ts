@@ -251,6 +251,30 @@ export class TrustWalletAdapter implements TrustWalletAdapterExtended {
       this.session = await approval();
 
       console.log("[TrustWallet] Connection approved:", this.session);
+      console.log(
+        "[TrustWallet] Session namespaces:",
+        JSON.stringify(this.session.namespaces, null, 2)
+      );
+
+      // 打印 Trust Wallet 实际支持的方法
+      if (this.session.namespaces.solana) {
+        console.log(
+          "[TrustWallet] Trust Wallet supports Solana methods:",
+          this.session.namespaces.solana.methods
+        );
+        console.log(
+          "[TrustWallet] Trust Wallet supports Solana chains:",
+          this.session.namespaces.solana.chains
+        );
+      } else {
+        console.warn(
+          "[TrustWallet] Trust Wallet does not support Solana namespace"
+        );
+        console.log(
+          "[TrustWallet] Supported namespaces:",
+          Object.keys(this.session.namespaces)
+        );
+      }
 
       // 处理连接成功
       await this.handleConnectionSuccess();
