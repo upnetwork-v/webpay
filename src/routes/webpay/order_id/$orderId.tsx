@@ -14,6 +14,7 @@ import { useAuthStore } from "@/stores";
 import GoogleLoginButton from "@/components/GoogleLoginButton";
 import KYCStatus from "@/components/KYCStatus";
 import { updateOrderStatus } from "@/api/order";
+import { openTrustWalletApp } from "@/wallets/utils/trust";
 
 export default function PaymentPage() {
   const { orderId } = Route.useParams();
@@ -372,6 +373,14 @@ export default function PaymentPage() {
         // Set callback state to show "broadcasting transaction" UI
         // (Phantom wallet handles this via URL callback parameters)
         setIsPaymentCallback(true);
+
+        // 对于 Trust Wallet，延迟1秒后自动唤起 app，帮助用户查看签署界面
+        if (state.walletType === "trust") {
+          setTimeout(() => {
+            console.log("Opening Trust Wallet app after signing request...");
+            openTrustWalletApp();
+          }, 1000);
+        }
 
         // 2. 广播交易 - 不等待确认完成，立即返回
         let txHash: string;

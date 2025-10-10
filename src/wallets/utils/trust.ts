@@ -123,3 +123,47 @@ export function checkTrustWalletInstalled(): boolean {
   const userAgent = navigator.userAgent.toLowerCase();
   return /iphone|ipad|ipod|android/.test(userAgent);
 }
+
+/**
+ * 通过 deeplink 唤起 Trust Wallet app
+ * @description 使用 Trust Wallet 的 deeplink 协议打开应用
+ * 参考文档: https://developer.trustwallet.com/developer/develop-for-trust/deeplinking
+ */
+export function openTrustWalletApp(): void {
+  const userAgent = navigator.userAgent.toLowerCase();
+  const isMobile = /iphone|ipad|ipod|android/.test(userAgent);
+
+  if (isMobile) {
+    // 移动端优先使用 trust:// deeplink 直接打开
+    // 如果 app 未安装，会回退到 universal link
+    const trustDeeplink = "trust://";
+    const universalLink = "https://link.trustwallet.com";
+
+    console.log("[TrustWallet] Opening Trust Wallet app via deeplink...");
+
+    // 先尝试直接打开 deeplink
+    const iframe = document.createElement("iframe");
+    iframe.style.display = "none";
+    iframe.src = trustDeeplink;
+    document.body.appendChild(iframe);
+
+    // 延迟移除 iframe
+    setTimeout(() => {
+      document.body.removeChild(iframe);
+    }, 1000);
+
+    // 设置一个后备方案：如果 deeplink 没有成功打开（可能未安装），使用 universal link
+    setTimeout(() => {
+      try {
+        window.location.href = universalLink;
+      } catch (error) {
+        console.warn("[TrustWallet] Failed to open universal link:", error);
+      }
+    }, 2500);
+  } else {
+    // 桌面端不需要唤起 app
+    console.log(
+      "[TrustWallet] Desktop environment detected, skipping app launch"
+    );
+  }
+}
