@@ -12,9 +12,8 @@ interface TrustWalletAdapterExtended extends WalletAdapter {
 }
 
 import { Transaction, PublicKey } from "@solana/web3.js";
-import Web3 from "web3";
-import WalletConnectProvider from "@walletconnect/web3-provider";
-import Web3Modal from "web3modal";
+import { SignClient } from "@walletconnect/sign-client";
+import type { SessionTypes } from "@walletconnect/types";
 import { sendRawTransaction } from "@/utils/transaction";
 
 // 内联常量定义
@@ -26,11 +25,9 @@ const TRUST_METHODS = {
 const TRUST_SESSION_KEY = "trust_wallet_session";
 const SESSION_EXPIRY = 24 * 60 * 60 * 1000; // 24 hours
 
-// 移除未使用的配置常量
-
-// 全局 Web3Modal 实例管理
-let globalWeb3Modal: Web3Modal | null = null;
-let globalInitPromise: Promise<Web3Modal> | null = null;
+// 全局 SignClient 实例管理
+let globalSignClient: InstanceType<typeof SignClient> | null = null;
+let globalInitPromise: Promise<InstanceType<typeof SignClient>> | null = null;
 
 // 错误类型定义
 enum TrustWalletErrorType {
@@ -54,12 +51,11 @@ class TrustWalletError extends Error {
 }
 
 /**
- * Trust Wallet 适配器 - Web3Modal 实现
+ * Trust Wallet 适配器 - WalletConnect v2 实现
  */
 export class TrustWalletAdapter implements TrustWalletAdapterExtended {
-  private web3Modal: Web3Modal | null = null;
-  private provider: WalletConnectProvider | null = null;
-  private web3: Web3 | null = null;
+  private signClient: InstanceType<typeof SignClient> | null = null;
+  private session: SessionTypes.Struct | null = null;
   private accounts: Array<{ network: number; address: string }> = [];
   private publicKey: string | null = null;
   private connected: boolean = false;
@@ -79,38 +75,38 @@ export class TrustWalletAdapter implements TrustWalletAdapterExtended {
    * 初始化 Trust Wallet
    */
   async init(): Promise<void> {
-    if (this.isInitialized && this.web3Modal) {
+    if (this.isInitialized && this.signClient) {
       return;
     }
 
     try {
-      // 使用全局实例，避免重复初始化 Web3Modal
-      if (globalWeb3Modal) {
-        console.log("[TrustWallet] Using existing Web3Modal instance");
-        this.web3Modal = globalWeb3Modal;
+      // 使用全局实例，避免重复初始化 SignClient
+      if (globalSignClient) {
+        console.log("[TrustWallet] Using existing SignClient instance");
+        this.signClient = globalSignClient;
       } else if (globalInitPromise) {
         console.log(
-          "[TrustWallet] Waiting for existing Web3Modal initialization..."
+          "[TrustWallet] Waiting for existing SignClient initialization..."
         );
-        this.web3Modal = await globalInitPromise;
+        this.signClient = await globalInitPromise;
       } else {
-        console.log("[TrustWallet] Initializing new Web3Modal...");
-        globalInitPromise = this.initializeWeb3Modal();
-        this.web3Modal = await globalInitPromise;
-        globalWeb3Modal = this.web3Modal;
+        console.log("[TrustWallet] Initializing new SignClient...");
+        globalInitPromise = this.initializeSignClient();
+        this.signClient = await globalInitPromise;
+        globalSignClient = this.signClient;
         globalInitPromise = null;
       }
 
       this.isInitialized = true;
 
-      // 检查是否有现有连接
-      if (this.web3Modal.cachedProvider) {
+      // 检查是否有现有会话
+      if (this.session) {
         await this.restoreConnection();
       }
 
       console.log("[TrustWallet] Initialization completed successfully");
     } catch (err) {
-      this.web3Modal = null;
+      this.signClient = null;
       this.isInitialized = false;
       this.clearSession();
       const error = err instanceof Error ? err : new Error(String(err));
@@ -123,157 +119,171 @@ export class TrustWalletAdapter implements TrustWalletAdapterExtended {
   }
 
   /**
-   * 初始化 Web3Modal
+   * 初始化 SignClient
    */
-  private async initializeWeb3Modal(): Promise<Web3Modal> {
-    // 获取 Solana RPC 端点
-    const solanaRpc = import.meta.env.VITE_SOLANA_RPC;
-    if (!solanaRpc) {
+  private async initializeSignClient(): Promise<
+    InstanceType<typeof SignClient>
+  > {
+    const projectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID;
+    if (!projectId) {
       throw new TrustWalletError(
         TrustWalletErrorType.INITIALIZATION_FAILED,
-        "VITE_SOLANA_RPC environment variable is not set"
+        "VITE_WALLETCONNECT_PROJECT_ID environment variable is not set"
       );
     }
 
-    // 配置 Trust Wallet 提供商 - 只支持 Solana 主网
-    const providerOptions = {
-      walletconnect: {
-        package: WalletConnectProvider,
-        options: {
-          rpc: {
-            501: solanaRpc, // Solana mainnet - 使用环境变量
-          },
-          chainId: 501, // Solana 主网作为默认链
-          bridge: "https://bridge.walletconnect.org",
-        },
+    const signClient = await SignClient.init({
+      projectId,
+      metadata: {
+        name: "OntaPay",
+        description: "Web Payment Application",
+        url: window.location.origin,
+        icons: [`${window.location.origin}/logo.svg`],
       },
-    };
-
-    const web3Modal = new Web3Modal({
-      network: "mainnet",
-      cacheProvider: true,
-      providerOptions,
     });
 
-    return web3Modal;
+    // 设置事件监听器
+    signClient.on("session_event", (event) => {
+      console.log("[TrustWallet] Session event:", event);
+    });
+
+    signClient.on("session_update", (event) => {
+      console.log("[TrustWallet] Session update:", event);
+    });
+
+    signClient.on("session_delete", (event) => {
+      console.log("[TrustWallet] Session deleted:", event);
+      this.handleDisconnect();
+    });
+
+    return signClient;
   }
 
   /**
-   * 恢复现有连接
-   */
-  private async restoreConnection(): Promise<void> {
-    try {
-      console.log("[TrustWallet] Restoring existing connection...");
-
-      if (!this.web3Modal?.cachedProvider) {
-        console.log("[TrustWallet] No cached provider found");
-        return;
-      }
-
-      // 连接到缓存的提供商
-      const provider = await this.web3Modal.connectTo("walletconnect");
-      await this.setupProvider(provider);
-
-      console.log(
-        "[TrustWallet] Connection restored successfully:",
-        this.publicKey
-      );
-    } catch (error) {
-      console.error("[TrustWallet] Error restoring connection:", error);
-      this.clearSession();
-    }
-  }
-
-  /**
-   * 连接钱包
+   * 连接 Trust Wallet
    */
   async connect(): Promise<void> {
-    if (this.connected) {
-      throw new Error("Wallet already connected");
+    if (!this.isInitialized || !this.signClient) {
+      throw new TrustWalletError(
+        TrustWalletErrorType.INITIALIZATION_FAILED,
+        "Wallet not initialized. Please call init() first."
+      );
     }
 
-    if (!this.web3Modal) {
-      await this.init();
+    if (this.connected && this.publicKey) {
+      console.log("[TrustWallet] Already connected");
+      return;
     }
 
     try {
-      console.log("[TrustWallet] Connecting via Web3Modal...");
+      console.log("[TrustWallet] Starting connection...");
 
-      // 连接到 Trust Wallet (通过 WalletConnect)
-      const provider = await this.web3Modal!.connectTo("walletconnect");
-      await this.setupProvider(provider);
+      // 创建连接请求
+      const { uri, approval } = await this.signClient.connect({
+        requiredNamespaces: {
+          solana: {
+            methods: [
+              TRUST_METHODS.SIGN_TRANSACTION,
+              TRUST_METHODS.GET_ACCOUNTS,
+            ],
+            chains: [`solana:${SOLANA_NETWORK}`],
+            events: [],
+          },
+        },
+      });
 
-      console.log("[TrustWallet] Connection successful:", this.publicKey);
+      console.log("[TrustWallet] Connection URI generated:", uri);
+
+      // 显示二维码或深链接
+      if (uri) {
+        // 尝试使用深链接打开 Trust Wallet
+        const trustWalletUrl = `trust://wc?uri=${encodeURIComponent(uri)}`;
+        console.log("[TrustWallet] Trust Wallet URL:", trustWalletUrl);
+
+        // 尝试打开 Trust Wallet 应用
+        window.open(trustWalletUrl, "_blank");
+
+        // 也可以显示二维码供用户扫描
+        console.log("[TrustWallet] QR Code URI:", uri);
+      }
+
+      // 等待用户批准连接
+      console.log("[TrustWallet] Waiting for user approval...");
+      this.session = await approval();
+
+      console.log("[TrustWallet] Connection approved:", this.session);
+
+      // 处理连接成功
+      await this.handleConnectionSuccess();
     } catch (error) {
-      console.error("[TrustWallet] Connection failed:", error);
+      const originalError =
+        error instanceof Error ? error : new Error(String(error));
 
       // 检查是否是用户拒绝
-      if (error instanceof Error && error.message.includes("User rejected")) {
+      if (
+        originalError.message.includes("User rejected") ||
+        originalError.message.includes("rejected by user") ||
+        originalError.message.includes("Connection request reset")
+      ) {
         throw new TrustWalletError(
           TrustWalletErrorType.USER_REJECTED,
-          "Connection was rejected by user",
-          error
+          "Connection was cancelled by user",
+          originalError
         );
       }
 
+      throw new TrustWalletError(
+        TrustWalletErrorType.CONNECTION_TIMEOUT,
+        `Failed to connect: ${originalError.message}`,
+        originalError
+      );
+    }
+  }
+
+  /**
+   * 处理连接成功
+   */
+  private async handleConnectionSuccess(): Promise<void> {
+    if (!this.session) {
+      throw new Error("Session not available");
+    }
+
+    try {
+      // 获取账户信息
+      await this.getAccounts();
+
+      // 保存会话
+      this.saveSession();
+
+      this.connected = true;
+
+      console.log("[TrustWallet] Connected successfully");
+      console.log("[TrustWallet] Public key:", this.publicKey);
+      console.log("[TrustWallet] Accounts:", this.accounts);
+    } catch (error) {
+      console.error("[TrustWallet] Error handling connection success:", error);
+      this.handleDisconnect();
       throw error;
     }
   }
 
   /**
-   * 设置提供商
-   */
-  private async setupProvider(provider: WalletConnectProvider): Promise<void> {
-    this.provider = provider as WalletConnectProvider;
-    this.web3 = new Web3(this.provider);
-
-    // 监听账户变化
-    this.provider.on("accountsChanged", (accounts: string[]) => {
-      console.log("[TrustWallet] Accounts changed:", accounts);
-      if (accounts.length > 0) {
-        this.publicKey = accounts[0];
-        this.saveSession();
-      } else {
-        this.clearSession();
-      }
-    });
-
-    // 监听网络变化
-    this.provider.on("chainChanged", (chainId: number) => {
-      console.log("[TrustWallet] Chain changed:", chainId);
-    });
-
-    // 监听断开连接
-    this.provider.on("disconnect", (code: number, reason: string) => {
-      console.log("[TrustWallet] Disconnected:", code, reason);
-      this.clearSession();
-    });
-
-    // 获取账户
-    const accounts = await this.web3.eth.getAccounts();
-    if (accounts.length > 0) {
-      this.publicKey = accounts[0];
-      this.connected = true;
-      this.saveSession();
-    }
-
-    // 获取 Solana 账户（通过 Trust Wallet 扩展方法）
-    await this.getAccounts();
-  }
-
-  /**
-   * 获取 Solana 账户列表
+   * 获取账户信息
    */
   private async getAccounts(): Promise<void> {
-    if (!this.provider) {
-      throw new Error("Provider not initialized");
+    if (!this.signClient || !this.session) {
+      throw new Error("SignClient or session not available");
     }
 
     try {
       // 使用 Trust Wallet 扩展的 get_accounts 方法
-      const result = await this.provider.send({
-        method: TRUST_METHODS.GET_ACCOUNTS,
-        params: [],
+      const result = await this.signClient.request({
+        topic: this.session.topic,
+        chainId: `solana:${SOLANA_NETWORK}`,
+        request: {
+          method: TRUST_METHODS.GET_ACCOUNTS,
+          params: [],
+        },
       });
 
       console.log("[TrustWallet] Accounts received:", result);
@@ -306,19 +316,10 @@ export class TrustWalletAdapter implements TrustWalletAdapterExtended {
    * 签名交易
    */
   async signTransaction(transaction: Transaction): Promise<Transaction> {
-    if (!this.connected || !this.provider) {
+    if (!this.connected || !this.signClient || !this.session) {
       throw new TrustWalletError(
         TrustWalletErrorType.SESSION_NOT_FOUND,
         "Wallet not connected. Please connect first."
-      );
-    }
-
-    // 在签名前验证连接是否仍然有效
-    if (!this.provider.connected) {
-      this.clearInvalidSession();
-      throw new TrustWalletError(
-        TrustWalletErrorType.SESSION_NOT_FOUND,
-        "Wallet session expired. Please reconnect your Trust Wallet."
       );
     }
 
@@ -341,14 +342,18 @@ export class TrustWalletAdapter implements TrustWalletAdapterExtended {
       console.log("[TrustWallet] Requesting transaction signature...");
 
       // 使用 Trust Wallet 的 trust_signTransaction 方法
-      const result = await this.provider.send({
-        method: TRUST_METHODS.SIGN_TRANSACTION,
-        params: [
-          {
-            network: SOLANA_NETWORK,
-            transaction: serializedTransaction,
-          },
-        ],
+      const result = await this.signClient.request({
+        topic: this.session.topic,
+        chainId: `solana:${SOLANA_NETWORK}`,
+        request: {
+          method: TRUST_METHODS.SIGN_TRANSACTION,
+          params: [
+            {
+              network: SOLANA_NETWORK,
+              transaction: serializedTransaction,
+            },
+          ],
+        },
       });
 
       console.log("[TrustWallet] Received signature result:", {
@@ -511,33 +516,18 @@ export class TrustWalletAdapter implements TrustWalletAdapterExtended {
       // 检查是否是用户拒绝签名
       if (
         originalError.message.includes("User rejected") ||
-        originalError.message.includes("rejected") ||
-        originalError.message.includes("denied")
+        originalError.message.includes("rejected by user")
       ) {
         throw new TrustWalletError(
           TrustWalletErrorType.USER_REJECTED,
-          "Transaction was rejected by user",
+          "Payment was cancelled by user",
           originalError
         );
       }
 
-      // 检查是否是网络错误
-      if (
-        originalError.message.includes("network") ||
-        originalError.message.includes("timeout") ||
-        originalError.message.includes("fetch")
-      ) {
-        throw new TrustWalletError(
-          TrustWalletErrorType.NETWORK_ERROR,
-          "Network error during transaction signing",
-          originalError
-        );
-      }
-
-      // 其他错误
       throw new TrustWalletError(
         TrustWalletErrorType.SIGNATURE_FAILED,
-        `Transaction signing failed: ${originalError.message}`,
+        `Failed to sign transaction: ${originalError.message}`,
         originalError
       );
     }
@@ -555,7 +545,7 @@ export class TrustWalletAdapter implements TrustWalletAdapterExtended {
    * 检查是否已连接
    */
   isConnected(): boolean {
-    return this.connected;
+    return this.connected && !!this.publicKey;
   }
 
   /**
@@ -566,115 +556,38 @@ export class TrustWalletAdapter implements TrustWalletAdapterExtended {
   }
 
   /**
-   * 验证当前会话是否仍然有效
-   */
-  async validateSession(): Promise<boolean> {
-    if (!this.provider || !this.connected) {
-      console.log("[TrustWallet] No provider or not connected to validate");
-      return false;
-    }
-
-    // 防止重复验证
-    if (this.isValidationInProgress) {
-      console.log("[TrustWallet] Validation already in progress, skipping");
-      return false;
-    }
-
-    this.isValidationInProgress = true;
-
-    try {
-      // 检查连接是否仍然有效
-      if (!this.provider.connected) {
-        console.log("[TrustWallet] Provider not connected");
-        return false;
-      }
-
-      console.log("[TrustWallet] Session validation successful");
-      return true;
-    } catch (error) {
-      console.error("[TrustWallet] Session validation failed:", error);
-      return false;
-    } finally {
-      this.isValidationInProgress = false;
-    }
-  }
-
-  /**
-   * 清除无效会话并重置状态
-   */
-  clearInvalidSession(): void {
-    console.log("[TrustWallet] Clearing invalid session");
-    this.clearSession();
-  }
-
-  /**
    * 断开连接
    */
   async disconnect(): Promise<void> {
-    try {
-      if (this.provider) {
-        await this.provider.disconnect();
+    console.log("[TrustWallet] Disconnecting...");
+
+    if (this.signClient && this.session) {
+      try {
+        await this.signClient.disconnect({
+          topic: this.session.topic,
+          reason: {
+            code: 6000,
+            message: "User disconnected",
+          },
+        });
+      } catch (error) {
+        console.warn("[TrustWallet] Error during disconnect:", error);
       }
-      if (this.web3Modal) {
-        await this.web3Modal.clearCachedProvider();
-      }
-    } catch (error) {
-      console.warn("Error disconnecting Trust Wallet:", error);
-    } finally {
-      this.clearSession();
-      this.provider = null;
-      this.web3 = null;
     }
+
+    this.handleDisconnect();
   }
 
   /**
-   * 保存 Session
+   * 处理断开连接
    */
-  private saveSession(): void {
-    try {
-      const data = {
-        accounts: this.accounts,
-        publicKey: this.publicKey,
-        timestamp: Date.now(),
-      };
-      localStorage.setItem(TRUST_SESSION_KEY, JSON.stringify(data));
-    } catch (err) {
-      console.error("Failed to save Trust Wallet session:", err);
-    }
-  }
-
-  /**
-   * 恢复 Session
-   */
-  private restoreSession(): void {
-    try {
-      const saved = localStorage.getItem(TRUST_SESSION_KEY);
-      if (!saved) return;
-
-      const { accounts, publicKey, timestamp } = JSON.parse(saved);
-
-      if (Date.now() - timestamp > SESSION_EXPIRY) {
-        localStorage.removeItem(TRUST_SESSION_KEY);
-        return;
-      }
-
-      this.accounts = accounts || [];
-      this.publicKey = publicKey;
-      this.connected = !!publicKey;
-    } catch (err) {
-      console.error("Failed to restore Trust Wallet session:", err);
-      localStorage.removeItem(TRUST_SESSION_KEY);
-    }
-  }
-
-  /**
-   * 清除 Session
-   */
-  private clearSession(): void {
-    localStorage.removeItem(TRUST_SESSION_KEY);
-    this.accounts = [];
-    this.publicKey = null;
+  private handleDisconnect(): void {
     this.connected = false;
+    this.publicKey = null;
+    this.accounts = [];
+    this.session = null;
+    this.clearSession();
+    console.log("[TrustWallet] Disconnected");
   }
 
   /**
@@ -697,9 +610,164 @@ export class TrustWalletAdapter implements TrustWalletAdapterExtended {
       type: "signTransaction",
       success: true,
       data: {
-        message: "Trust Wallet callback handled via Web3Modal",
+        message: "Trust Wallet callback handled via WalletConnect v2",
         params: params,
       } as unknown,
     };
   }
+
+  /**
+   * 验证会话
+   */
+  async validateSession(): Promise<boolean> {
+    if (this.isValidationInProgress) {
+      return false;
+    }
+
+    this.isValidationInProgress = true;
+
+    try {
+      if (!this.session || !this.signClient) {
+        this.clearInvalidSession();
+        return false;
+      }
+
+      // 检查会话是否仍然有效
+      const activeSessions = this.signClient.session.getAll();
+      const sessionExists = activeSessions.some(
+        (session: SessionTypes.Struct) => session.topic === this.session!.topic
+      );
+
+      if (!sessionExists) {
+        console.log("[TrustWallet] Session no longer exists");
+        this.clearInvalidSession();
+        return false;
+      }
+
+      // 检查会话是否过期
+      const now = Date.now();
+      const expiry = this.session.expiry * 1000; // 转换为毫秒
+
+      if (now >= expiry) {
+        console.log("[TrustWallet] Session expired");
+        this.clearInvalidSession();
+        return false;
+      }
+
+      console.log("[TrustWallet] Session is valid");
+      return true;
+    } catch (error) {
+      console.error("[TrustWallet] Error validating session:", error);
+      this.clearInvalidSession();
+      return false;
+    } finally {
+      this.isValidationInProgress = false;
+    }
+  }
+
+  /**
+   * 清除无效会话
+   */
+  clearInvalidSession(): void {
+    console.log("[TrustWallet] Clearing invalid session");
+    this.handleDisconnect();
+  }
+
+  /**
+   * 恢复连接
+   */
+  private async restoreConnection(): Promise<void> {
+    if (!this.session || !this.signClient) {
+      return;
+    }
+
+    try {
+      console.log("[TrustWallet] Restoring connection...");
+
+      // 验证会话是否仍然有效
+      const isValid = await this.validateSession();
+      if (!isValid) {
+        console.log(
+          "[TrustWallet] Session is invalid, cannot restore connection"
+        );
+        return;
+      }
+
+      // 恢复连接状态
+      await this.handleConnectionSuccess();
+
+      console.log("[TrustWallet] Connection restored successfully");
+    } catch (error) {
+      console.error("[TrustWallet] Error restoring connection:", error);
+      this.handleDisconnect();
+    }
+  }
+
+  /**
+   * 保存会话
+   */
+  private saveSession(): void {
+    if (!this.session) {
+      return;
+    }
+
+    try {
+      const sessionData = {
+        session: this.session,
+        accounts: this.accounts,
+        publicKey: this.publicKey,
+        timestamp: Date.now(),
+      };
+
+      localStorage.setItem(TRUST_SESSION_KEY, JSON.stringify(sessionData));
+      console.log("[TrustWallet] Session saved");
+    } catch (error) {
+      console.error("[TrustWallet] Error saving session:", error);
+    }
+  }
+
+  /**
+   * 恢复会话
+   */
+  private restoreSession(): void {
+    try {
+      const sessionDataStr = localStorage.getItem(TRUST_SESSION_KEY);
+      if (!sessionDataStr) {
+        return;
+      }
+
+      const sessionData = JSON.parse(sessionDataStr);
+
+      // 检查会话是否过期
+      const now = Date.now();
+      if (now - sessionData.timestamp > SESSION_EXPIRY) {
+        console.log("[TrustWallet] Stored session expired");
+        this.clearSession();
+        return;
+      }
+
+      this.session = sessionData.session;
+      this.accounts = sessionData.accounts || [];
+      this.publicKey = sessionData.publicKey;
+
+      console.log("[TrustWallet] Session restored from storage");
+    } catch (error) {
+      console.error("[TrustWallet] Error restoring session:", error);
+      this.clearSession();
+    }
+  }
+
+  /**
+   * 清除会话
+   */
+  private clearSession(): void {
+    try {
+      localStorage.removeItem(TRUST_SESSION_KEY);
+      console.log("[TrustWallet] Session cleared from storage");
+    } catch (error) {
+      console.error("[TrustWallet] Error clearing session:", error);
+    }
+  }
 }
+
+export default TrustWalletAdapter;

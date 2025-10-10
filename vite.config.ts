@@ -20,11 +20,9 @@ export default defineConfig(({ mode }) => {
     },
     optimizeDeps: {
       include: [
-        "@walletconnect/web3-provider",
-        "@walletconnect/client",
-        "@walletconnect/qrcode-modal",
-        "web3",
-        "web3modal",
+        "@walletconnect/sign-client",
+        "@walletconnect/types",
+        "@walletconnect/utils",
       ],
     },
     build: {
@@ -37,11 +35,10 @@ export default defineConfig(({ mode }) => {
         output: {
           manualChunks: {
             walletconnect: [
-              "@walletconnect/web3-provider",
-              "@walletconnect/client",
-              "@walletconnect/qrcode-modal",
+              "@walletconnect/sign-client",
+              "@walletconnect/types",
+              "@walletconnect/utils",
             ],
-            web3: ["web3", "web3modal"],
           },
         },
       },
