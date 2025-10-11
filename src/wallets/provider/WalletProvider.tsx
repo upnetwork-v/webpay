@@ -218,19 +218,30 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
 
   // 2. adapter 初始化后，如果 URL 有 Phantom 回调参数，则执行 handleConnectCallback
   useEffect(() => {
+    console.log("[WalletProvider] Callback processing effect triggered, adapter exists:", !!adapter);
+
     const urlParams = new URLSearchParams(window.location.search);
     const phantomPk = urlParams.get("phantom_encryption_public_key");
     const nonce = urlParams.get("nonce");
     const data = urlParams.get("data");
 
+    console.log("[WalletProvider] URL parameters check:", {
+      hasAdapter: !!adapter,
+      hasPhantomPk: !!phantomPk,
+      hasNonce: !!nonce,
+      hasData: !!data,
+      phantomPk: phantomPk ? phantomPk.substring(0, 10) + "..." : null,
+    });
+
     if (adapter && phantomPk && nonce && data) {
-      console.log("[WalletProvider] Detected Phantom callback, processing...");
+      console.log("[WalletProvider] All conditions met, processing Phantom callback...");
       handleConnectCallback({
         phantom_encryption_public_key: phantomPk,
         nonce: nonce,
         data: data,
       })
         .then((result) => {
+          console.log("[WalletProvider] Callback processing result:", result);
           if (result.success) {
             console.log("[WalletProvider] Phantom callback processed successfully");
             // 清理URL参数
@@ -238,6 +249,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
             window.history.replaceState({}, document.title, newUrl);
             // 标记连接成功
             localStorage.setItem("wallet_is_connected", "true");
+            console.log("[WalletProvider] Connection marked as successful");
           } else {
             console.error("[WalletProvider] Phantom callback failed:", result.error);
             setState((prev) => ({
@@ -255,6 +267,8 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
             isLoading: false,
           }));
         });
+    } else {
+      console.log("[WalletProvider] Callback processing skipped - conditions not met");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [adapter]);
@@ -274,11 +288,19 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
 
   // 1. 页面加载时自动恢复 walletType 和连接状态
   useEffect(() => {
+    console.log("[WalletProvider] Initialization effect triggered");
+
     // 检查URL是否包含Phantom回调参数
     const urlParams = new URLSearchParams(window.location.search);
     const hasPhantomCallback = urlParams.has("phantom_encryption_public_key") &&
       urlParams.has("nonce") &&
       urlParams.has("data");
+
+    console.log("[WalletProvider] Callback detection:", {
+      hasPhantomCallback,
+      currentAdapter: !!adapter,
+      url: window.location.href,
+    });
 
     let savedType = localStorage.getItem("wallet_type") as WalletType | null;
     const savedIsConnected =
@@ -291,20 +313,37 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
       localStorage.setItem("wallet_type", "phantom");
     }
 
-    // 防止重复初始化
+    // 如果检测到回调参数且adapter不存在，强制初始化
+    if (hasPhantomCallback && !adapter) {
+      console.log("[WalletProvider] Phantom callback detected without adapter, forcing initialization");
+      // 直接初始化，不等待标志检查
+      (async () => {
+        try {
+          console.log("[WalletProvider] Creating Phantom adapter for callback processing");
+          await selectWallet("phantom");
+          console.log("[WalletProvider] Adapter created successfully");
+        } catch (error) {
+          console.error("[WalletProvider] Failed to create adapter:", error);
+        }
+      })();
+      return; // 等待adapter创建后，回调处理的useEffect会自动触发
+    }
+
+    // 正常的初始化流程（无回调时）
     const hasInitialized = localStorage.getItem("wallet_provider_initialized") === "true";
 
-    if (savedType && !hasInitialized) {
+    if (savedType && !hasInitialized && !adapter) {
+      console.log("[WalletProvider] Normal initialization for wallet type:", savedType);
       localStorage.setItem("wallet_provider_initialized", "true");
 
       (async () => {
         try {
           await selectWallet(savedType);
+          console.log("[WalletProvider] Wallet adapter initialized successfully");
 
           // Phantom 钱包自动恢复连接
           if (savedType === "phantom" && savedIsConnected) {
-            // adapter 会在构造时自动恢复 session
-            // 这里等待 adapter 初始化后自动同步 isConnected
+            console.log("[WalletProvider] Phantom wallet session will be restored");
           }
 
           // Trust Wallet 自动恢复连接
@@ -312,27 +351,26 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
             const isConnecting = localStorage.getItem("trust_wallet_connecting") === "true";
             if (isConnecting || savedIsConnected) {
               console.log("[WalletProvider] Trust Wallet auto-recovery initiated");
-              // 等待一段时间让 TrustWalletAdapter 完成初始化
               setTimeout(() => {
-                if (adapter && adapter.isConnected()) {
-                  setState((prev) => ({
-                    ...prev,
-                    isConnected: true,
-                    publicKey: adapter.getPublicKey(),
-                    isLoading: false,
-                  }));
-                }
+                // Note: adapter状态会通过另一个useEffect同步，这里的检查是为了确保
+                console.log("[WalletProvider] Trust Wallet recovery check timeout reached");
               }, 2000);
             }
           }
         } catch (error) {
           console.error("[WalletProvider] Auto-recovery failed:", error);
-          // 重置初始化标志，允许重试
           localStorage.removeItem("wallet_provider_initialized");
         }
       })();
+    } else {
+      console.log("[WalletProvider] Initialization skipped:", {
+        savedType,
+        hasInitialized,
+        hasAdapter: !!adapter,
+      });
     }
-  }, [adapter]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // 只在组件挂载时执行一次
 
   const openWalletSelector = () => setWalletSelectorOpen(true);
   const closeWalletSelector = () => setWalletSelectorOpen(false);
