@@ -46,8 +46,12 @@ export default function PaymentPage() {
   const data = urlParams.get("data");
   const errorCode = urlParams.get("errorCode");
 
-  // Determine payment flow state from URL
-  const isPaymentCallback = !!(nonce && data && !phantomPk);
+  // Payment callback state - indicates transaction is signed and being broadcasted
+  // For Phantom: set to true when URL contains callback parameters
+  // For Trust/OKX: manually set to true after signTransaction completes
+  const [isPaymentCallback, setIsPaymentCallback] = useState(() => {
+    return !!(nonce && data && !phantomPk);
+  });
 
   // Authentication state
   const { isAuthenticated, user } = useAuthStore();
@@ -56,7 +60,6 @@ export default function PaymentPage() {
     state,
     signTransaction,
     sendRawTransaction,
-    handleConnectCallback,
     handlePaymentCallback,
     openWalletSelector,
   } = useWallet();
@@ -163,91 +166,96 @@ export default function PaymentPage() {
     }
   }, [tx, setIsEstimatingFee, setEstimatedFee]);
 
-  // Check for Phantom connection callback or payment response when component mounts
+  // Check for Phantom payment response when component mounts
+  // Note: Connection callback is handled by WalletProvider, not here
   useEffect(() => {
     // Use the URL parameters already parsed above
 
-    // Handle connection callback
-    if (phantomPk && nonce && data) {
-      const processConnectCallback = async () => {
-        const result = await handleConnectCallback({
-          phantom_encryption_public_key: phantomPk,
-          nonce: nonce,
-          data: data,
-        });
-        if (result.success && result.type === "connect") {
-          // 清除 URL 参数
-          const cleanUrl = window.location.pathname;
-          window.history.replaceState({}, document.title, cleanUrl);
-        } else if (!result.success) {
-          setError(result.error || "Connection failed");
-        }
-      };
-      processConnectCallback();
-    }
-    // Handle payment response
-    else if (nonce && data) {
+    // Handle payment response (signature callback)
+    // Note: Connection callback (with phantom_encryption_public_key) is handled by WalletProvider
+    if (nonce && data && !phantomPk) {
       const processPaymentResponse = async () => {
+        // Wait for wallet to be connected before processing
+        if (!isConnected || !publicKey) {
+          console.log("[PaymentCallback] Waiting for wallet to be connected...", {
+            isConnected,
+            publicKey,
+          });
+          return;
+        }
+
         try {
-          console.log("Processing payment response from Phantom...");
+          console.log("[PaymentCallback] Processing payment response from Phantom...");
+          setIsPaymentProcessing(true);
 
           // 通过 useWallet 暴露的 handlePaymentCallback 统一处理回调
           const result = await handlePaymentCallback({
             nonce: nonce,
             data: data,
           });
+
+          console.log("[PaymentCallback] Callback result:", result);
+
           if (result.success && result.type === "signTransaction") {
             if (
               typeof result.data === "object" &&
               result.data !== null &&
               "transaction" in result.data &&
               typeof (result.data as { transaction?: unknown }).transaction ===
-                "string"
+              "string"
             ) {
               // 签名成功，现在需要广播交易
               try {
                 const signedTxData = (result.data as { transaction: string })
                   .transaction;
+                console.log("[PaymentCallback] Signed transaction received, broadcasting...");
+
                 // Phantom 返回的是 base58 编码的交易数据
                 const signedTransaction = Transaction.from(
                   bs58.decode(signedTxData)
                 );
                 const txHash = await sendRawTransaction(signedTransaction);
+                console.log("[PaymentCallback] Transaction broadcasted:", txHash);
+
                 setTransactionSignature(txHash);
                 setIsComplete(true);
                 setIsPaymentProcessing(false);
+                setIsPaymentCallback(false);
               } catch (broadcastError) {
                 console.error(
-                  "Error broadcasting transaction:",
+                  "[PaymentCallback] Error broadcasting transaction:",
                   broadcastError
                 );
                 setError(`Failed to broadcast transaction: ${broadcastError}`);
                 setIsPaymentProcessing(false);
+                setIsPaymentCallback(false);
               }
             } else {
+              console.error("[PaymentCallback] Payment response missing transaction data");
               setError("Payment response missing transaction data");
               setIsPaymentProcessing(false);
+              setIsPaymentCallback(false);
             }
           } else if (!result.success) {
+            console.error("[PaymentCallback] Payment callback failed:", result.error);
             setError(result.error || "Payment failed");
             setIsPaymentProcessing(false);
+            setIsPaymentCallback(false);
           }
 
           // Clean up the URL
+          console.log("[PaymentCallback] Cleaning up URL parameters");
           const cleanUrl = window.location.pathname;
           window.history.replaceState({}, document.title, cleanUrl);
         } catch (err) {
-          console.error("Error processing payment response:", err);
+          console.error("[PaymentCallback] Error processing payment response:", err);
           setError(`Failed to process payment response: ${err}`);
           setIsPaymentProcessing(false);
+          setIsPaymentCallback(false);
         }
       };
 
-      if (publicKey) {
-        processPaymentResponse();
-      } else {
-        setError("Wallet not connected");
-      }
+      processPaymentResponse();
     }
     // Handle payment errors
     else if (errorCode) {
@@ -260,12 +268,16 @@ export default function PaymentPage() {
       const cleanUrl = window.location.pathname;
       window.history.replaceState({}, document.title, cleanUrl);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-    orderId,
-    handleConnectCallback,
+    isConnected,
     publicKey,
-    setError,
     handlePaymentCallback,
+    sendRawTransaction,
+    nonce,
+    data,
+    phantomPk,
+    errorCode,
   ]);
 
   // Connect to Phantom wallet
@@ -359,26 +371,104 @@ export default function PaymentPage() {
         const signedTransaction = await signTransaction(tx);
         console.log("Transaction signed successfully");
 
-        // 2. 广播交易
-        const txHash = await sendRawTransaction(signedTransaction);
-        console.log("Transaction broadcasted successfully:", txHash);
+        // For Trust/OKX wallets: signature is completed synchronously
+        // Set callback state to show "broadcasting transaction" UI
+        // (Phantom wallet handles this via URL callback parameters)
+        setIsPaymentCallback(true);
 
-        // 3. 设置结果
+        // 2. 广播交易 - 不等待确认完成，立即返回
+        let txHash: string;
+        try {
+          txHash = await sendRawTransaction(signedTransaction);
+          console.log("Transaction broadcasted successfully:", txHash);
+        } catch (broadcastError) {
+          // 如果广播过程中出现 WebSocket 错误，但交易可能已经成功，尝试获取交易哈希
+          const errorMessage = broadcastError instanceof Error ? broadcastError.message : String(broadcastError);
+          console.error("Broadcast error:", errorMessage);
+
+          // 如果是 WebSocket 错误，交易可能已经成功广播，尝试从错误中提取交易哈希
+          if (errorMessage.includes("ws error") || errorMessage.includes("WebSocket")) {
+            console.warn("WebSocket error during broadcast, but transaction may have succeeded");
+            // 从已签名的交易中获取签名作为交易 ID
+            const sig = signedTransaction.signatures[0];
+            if (sig && sig.signature) {
+              // 使用 bs58 编码签名作为交易 ID
+              txHash = bs58.encode(sig.signature);
+              console.log("Extracted transaction signature:", txHash);
+            } else {
+              throw broadcastError;
+            }
+          } else {
+            throw broadcastError;
+          }
+        }
+
+        // 3. 设置结果 - 立即更新状态，不等待交易确认
+        console.log("Setting transaction signature:", txHash);
         setTransactionSignature(txHash);
+        console.log("Setting payment complete to true");
         setIsComplete(true);
+        console.log("Setting payment processing to false");
         setIsPaymentProcessing(false);
-      } catch (signError: any) {
-        // 如果是 Phantom 钱包的重定向错误，说明需要等待回调处理
-        if (signError.message === "PHANTOM_REDIRECT_PENDING") {
+        setIsPaymentCallback(false);
+        console.log("Payment process completed successfully");
+      } catch (signError: unknown) {
+        // 如果是钱包的重定向错误，说明需要等待回调处理
+        if (signError instanceof Error &&
+          signError.message === "PHANTOM_REDIRECT_PENDING") {
           console.log(
-            "Phantom wallet redirect pending, waiting for callback..."
+            "Wallet redirect pending, waiting for callback..."
           );
           // 保持 payment processing 状态，不重置
           // 不设置错误，让回调处理完成支付流程
           return;
         }
-        // 其他错误正常抛出
-        throw signError;
+        // 直接处理签名错误，不重新抛出
+        const errorMessage = signError instanceof Error ? signError.message : "Payment failed";
+        console.error("Payment process failed:", signError);
+
+        // Categorize and handle different types of errors
+        if (
+          errorMessage.includes("Insufficient balance") ||
+          errorMessage.includes("insufficient funds") ||
+          errorMessage.includes("shortfall")
+        ) {
+          setError(errorMessage);
+        } else if (
+          errorMessage.includes("User rejected") ||
+          errorMessage.includes("rejected by user") ||
+          errorMessage.includes("cancelled by user")
+        ) {
+          setError("Payment was cancelled by user");
+        } else if (
+          errorMessage.includes("Wallet not connected") ||
+          errorMessage.includes("SESSION_NOT_FOUND")
+        ) {
+          setError("Wallet disconnected. Please reconnect your wallet and try again.");
+        } else if (
+          errorMessage.includes("Failed to connect") ||
+          errorMessage.includes("CONNECTION_TIMEOUT")
+        ) {
+          setError("Connection timeout. Please check your wallet and try again.");
+        } else if (
+          errorMessage.includes("Network error") ||
+          errorMessage.includes("fetch")
+        ) {
+          setError(
+            "Network connection error. Please check your internet connection and try again."
+          );
+        } else if (errorMessage.includes("Transaction failed")) {
+          setError("Transaction failed. Please try again.");
+        } else if (errorMessage.includes("ws error") || errorMessage.includes("WebSocket")) {
+          // WebSocket 错误通常不影响交易成功，忽略这些错误
+          console.warn("WebSocket error detected, but transaction may have succeeded:", errorMessage);
+          // 不设置错误，让用户检查交易状态
+        } else {
+          setError(`Payment failed: ${errorMessage}`);
+        }
+        setIsPaymentProcessing(false);
+        setIsPaymentCallback(false);
+        return;
       }
     } catch (err: unknown) {
       const errorMessage =
@@ -392,8 +482,22 @@ export default function PaymentPage() {
         errorMessage.includes("shortfall")
       ) {
         setError(errorMessage);
-      } else if (errorMessage.includes("User rejected")) {
+      } else if (
+        errorMessage.includes("User rejected") ||
+        errorMessage.includes("rejected by user") ||
+        errorMessage.includes("cancelled by user")
+      ) {
         setError("Payment was cancelled by user");
+      } else if (
+        errorMessage.includes("Wallet not connected") ||
+        errorMessage.includes("SESSION_NOT_FOUND")
+      ) {
+        setError("Wallet disconnected. Please reconnect your wallet and try again.");
+      } else if (
+        errorMessage.includes("Failed to connect") ||
+        errorMessage.includes("CONNECTION_TIMEOUT")
+      ) {
+        setError("Connection timeout. Please check your wallet and try again.");
       } else if (
         errorMessage.includes("Network error") ||
         errorMessage.includes("fetch")
@@ -403,10 +507,15 @@ export default function PaymentPage() {
         );
       } else if (errorMessage.includes("Transaction failed")) {
         setError("Transaction failed. Please try again.");
+      } else if (errorMessage.includes("ws error") || errorMessage.includes("WebSocket")) {
+        // WebSocket 错误通常不影响交易成功，忽略这些错误
+        console.warn("WebSocket error detected, but transaction may have succeeded:", errorMessage);
+        // 不设置错误，让用户检查交易状态
       } else {
         setError(`Payment failed: ${errorMessage}`);
       }
       setIsPaymentProcessing(false);
+      setIsPaymentCallback(false);
     }
   }, [
     isConnected,
@@ -509,8 +618,8 @@ export default function PaymentPage() {
   // Calculate error types once
   const isBalanceError = error
     ? error.includes("Insufficient balance") ||
-      error.includes("insufficient funds") ||
-      error.includes("shortfall")
+    error.includes("insufficient funds") ||
+    error.includes("shortfall")
     : false;
 
   const isTokenNotFoundError = error
@@ -529,7 +638,7 @@ export default function PaymentPage() {
   const upToLimit = useMemo(() => {
     return user && user.transaction_limit
       ? Number(user.transaction_total) >= Number(user.transaction_limit) &&
-          user.verified !== 2
+      user.verified !== 2
       : false;
   }, [user]);
 
@@ -737,8 +846,8 @@ export default function PaymentPage() {
                         }
                       >
                         {isLoading ||
-                        isPaymentProcessing ||
-                        isPaymentCallback ? (
+                          isPaymentProcessing ||
+                          isPaymentCallback ? (
                           <span className="loading loading-spinner loading-xs"></span>
                         ) : null}
                         {isPaymentCallback

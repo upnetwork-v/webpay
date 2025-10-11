@@ -1,6 +1,6 @@
 import type { Transaction } from "@solana/web3.js";
 
-export type WalletType = "phantom" | "okx"; // 未来可扩展更多钱包
+export type WalletType = "phantom" | "okx" | "trust"; // 支持 Phantom, OKX, Trust Wallet
 
 export interface WalletAdapter {
   connect: () => Promise<void>;
