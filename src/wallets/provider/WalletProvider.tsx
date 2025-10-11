@@ -31,7 +31,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
       const newAdapter = createAdapter(type);
       // 类型守卫函数
       const hasInitMethod = (adapter: WalletAdapter): adapter is WalletAdapter & { init: () => Promise<void> } => {
-        return 'init' in adapter && typeof (adapter as any).init === 'function';
+        return 'init' in adapter && typeof (adapter as WalletAdapter & { init?: unknown }).init === 'function';
       };
 
       const isTrustWalletAdapter = (adapter: WalletAdapter): adapter is WalletAdapter & {
@@ -41,8 +41,8 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
         return type === "trust" &&
           'validateSession' in adapter &&
           'clearInvalidSession' in adapter &&
-          typeof (adapter as any).validateSession === 'function' &&
-          typeof (adapter as any).clearInvalidSession === 'function';
+          typeof (adapter as WalletAdapter & { validateSession?: unknown }).validateSession === 'function' &&
+          typeof (adapter as WalletAdapter & { clearInvalidSession?: unknown }).clearInvalidSession === 'function';
       };
 
       if (hasInitMethod(newAdapter)) {
@@ -224,11 +224,37 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
     const data = urlParams.get("data");
 
     if (adapter && phantomPk && nonce && data) {
+      console.log("[WalletProvider] Detected Phantom callback, processing...");
       handleConnectCallback({
         phantom_encryption_public_key: phantomPk,
         nonce: nonce,
         data: data,
-      });
+      })
+        .then((result) => {
+          if (result.success) {
+            console.log("[WalletProvider] Phantom callback processed successfully");
+            // 清理URL参数
+            const newUrl = window.location.pathname + window.location.hash;
+            window.history.replaceState({}, document.title, newUrl);
+            // 标记连接成功
+            localStorage.setItem("wallet_is_connected", "true");
+          } else {
+            console.error("[WalletProvider] Phantom callback failed:", result.error);
+            setState((prev) => ({
+              ...prev,
+              error: result.error || "Connection failed",
+              isLoading: false,
+            }));
+          }
+        })
+        .catch((error) => {
+          console.error("[WalletProvider] Error processing Phantom callback:", error);
+          setState((prev) => ({
+            ...prev,
+            error: error.message || "Connection failed",
+            isLoading: false,
+          }));
+        });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [adapter]);
@@ -248,9 +274,22 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
 
   // 1. 页面加载时自动恢复 walletType 和连接状态
   useEffect(() => {
-    const savedType = localStorage.getItem("wallet_type") as WalletType | null;
+    // 检查URL是否包含Phantom回调参数
+    const urlParams = new URLSearchParams(window.location.search);
+    const hasPhantomCallback = urlParams.has("phantom_encryption_public_key") &&
+      urlParams.has("nonce") &&
+      urlParams.has("data");
+
+    let savedType = localStorage.getItem("wallet_type") as WalletType | null;
     const savedIsConnected =
       localStorage.getItem("wallet_is_connected") === "true";
+
+    // 如果URL包含Phantom回调参数但没有保存的wallet_type，设置为phantom
+    if (hasPhantomCallback && !savedType) {
+      console.log("[WalletProvider] Detected Phantom callback without saved wallet type, setting to phantom");
+      savedType = "phantom";
+      localStorage.setItem("wallet_type", "phantom");
+    }
 
     // 防止重复初始化
     const hasInitialized = localStorage.getItem("wallet_provider_initialized") === "true";
