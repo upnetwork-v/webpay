@@ -428,11 +428,17 @@ export default function PaymentPage() {
           10 ** (paymentToken.decimal || 6)
         ).toString();
 
+        const memo = JSON.stringify({
+          webpay: {
+            orderId: order.orderId,
+          },
+        });
+
         console.log("[Trust Wallet] Payment params:", {
           to: paymentToken.paymentAddress,
           amount,
           asset,
-          memo: `Order:${order.orderId}`,
+          memo,
         });
 
         // 发起支付（会显示确认弹窗）
@@ -441,7 +447,7 @@ export default function PaymentPage() {
             to: paymentToken.paymentAddress,
             amount: amount,
             asset: asset,
-            memo: `Order:${order.orderId}`,
+            memo,
           },
           // 用户确认后的回调
           () => {
