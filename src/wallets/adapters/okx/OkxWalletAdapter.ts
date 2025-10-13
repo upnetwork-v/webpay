@@ -1,4 +1,4 @@
-import type { WalletAdapter } from "@/wallets/types/wallet";
+import type { WalletAdapter, WalletCapabilities } from "@/wallets/types/wallet";
 import type { Transaction } from "@solana/web3.js";
 import { OKXUniversalProvider } from "@okxconnect/universal-provider";
 import { OKXSolanaProvider } from "@okxconnect/solana-provider";
@@ -14,6 +14,13 @@ export class OkxWalletAdapter implements WalletAdapter {
   private session: any = null;
   private publicKey: string | null = null;
   private connected: boolean = false;
+
+  capabilities: WalletCapabilities = {
+    supportsSeparateSign: true,
+    requiresConnect: true,
+    hasCallback: true,
+    needsUserConfirmation: false,
+  };
 
   constructor() {
     // 只做 session 标记，不做异步初始化

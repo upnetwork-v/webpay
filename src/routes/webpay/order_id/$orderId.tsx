@@ -14,6 +14,7 @@ import { useAuthStore } from "@/stores";
 import GoogleLoginButton from "@/components/GoogleLoginButton";
 import KYCStatus from "@/components/KYCStatus";
 import { updateOrderStatus } from "@/api/order";
+import { TrustWalletAdapter } from "@/wallets/adapters/trust/TrustWalletAdapter";
 
 export default function PaymentPage() {
   const { orderId } = Route.useParams();
@@ -54,10 +55,12 @@ export default function PaymentPage() {
 
   const {
     state,
+    adapter,
     signTransaction,
     sendRawTransaction,
     handleConnectCallback,
     handlePaymentCallback,
+    sendTrustWalletPayment,
     openWalletSelector,
   } = useWallet();
   const { isConnected, publicKey } = state;
@@ -94,6 +97,12 @@ export default function PaymentPage() {
   const [tx, setTx] = useState<Transaction | null>(null);
 
   useEffect(() => {
+    // Trust Wallet 不需要预先创建交易，跳过
+    if (state.walletType === "trust") {
+      console.log("[Trust Wallet] Skipping transaction creation");
+      return;
+    }
+
     if (!tx && !isLoadingCalculator && !error) {
       if (createPaymentTransaction && publicKey && coinCalculator) {
         // Clear any previous errors before attempting to create transaction
@@ -145,6 +154,7 @@ export default function PaymentPage() {
     }
   }, [
     tx,
+    state.walletType,
     createPaymentTransaction,
     publicKey,
     coinCalculator,
@@ -202,7 +212,7 @@ export default function PaymentPage() {
               result.data !== null &&
               "transaction" in result.data &&
               typeof (result.data as { transaction?: unknown }).transaction ===
-                "string"
+              "string"
             ) {
               // 签名成功，现在需要广播交易
               try {
@@ -333,7 +343,19 @@ export default function PaymentPage() {
 
   // Handle payment
   const handlePay = useCallback(async () => {
-    if (!isConnected || !publicKey) {
+    console.log("[handlePay] Called with:", {
+      isConnected,
+      publicKey,
+      walletType: state.walletType,
+      hasAdapter: !!adapter,
+      capabilities: adapter?.capabilities,
+      hasOrder: !!order,
+      hasPaymentToken: !!paymentToken,
+      hasCoinCalculator: !!coinCalculator,
+    });
+
+    // Trust Wallet 不需要 publicKey（会自动使用用户当前账户）
+    if (!isConnected || (!publicKey && state.walletType !== "trust")) {
       console.log("handlePay not connected", isConnected, publicKey);
       await handleConnectWallet();
       return;
@@ -347,38 +369,91 @@ export default function PaymentPage() {
     try {
       setIsPaymentProcessing(true);
 
-      if (!tx) {
-        throw new Error("Failed to create transaction");
-      }
+      console.log("[handlePay] Checking wallet capabilities:", adapter?.capabilities);
 
-      // 新的两步流程：签名 + 广播
-      console.log("Starting payment process...");
-
-      try {
-        // 1. 签名交易
-        const signedTransaction = await signTransaction(tx);
-        console.log("Transaction signed successfully");
-
-        // 2. 广播交易
-        const txHash = await sendRawTransaction(signedTransaction);
-        console.log("Transaction broadcasted successfully:", txHash);
-
-        // 3. 设置结果
-        setTransactionSignature(txHash);
-        setIsComplete(true);
-        setIsPaymentProcessing(false);
-      } catch (signError: any) {
-        // 如果是 Phantom 钱包的重定向错误，说明需要等待回调处理
-        if (signError.message === "PHANTOM_REDIRECT_PENDING") {
-          console.log(
-            "Phantom wallet redirect pending, waiting for callback..."
-          );
-          // 保持 payment processing 状态，不重置
-          // 不设置错误，让回调处理完成支付流程
-          return;
+      // 判断钱包类型
+      if (adapter?.capabilities.supportsSeparateSign) {
+        // ===== Phantom / OKX 流程（现有逻辑） =====
+        if (!tx) {
+          throw new Error("Failed to create transaction");
         }
-        // 其他错误正常抛出
-        throw signError;
+
+        console.log("Starting payment process...");
+
+        try {
+          // 1. 签名交易
+          const signedTransaction = await signTransaction(tx);
+          console.log("Transaction signed successfully");
+
+          // 2. 广播交易
+          const txHash = await sendRawTransaction(signedTransaction);
+          console.log("Transaction broadcasted successfully:", txHash);
+
+          // 3. 设置结果
+          setTransactionSignature(txHash);
+          setIsComplete(true);
+          setIsPaymentProcessing(false);
+        } catch (signError: unknown) {
+          // 如果是 Phantom 钱包的重定向错误，说明需要等待回调处理
+          if (
+            signError instanceof Error &&
+            signError.message === "PHANTOM_REDIRECT_PENDING"
+          ) {
+            console.log(
+              "Phantom wallet redirect pending, waiting for callback..."
+            );
+            // 保持 payment processing 状态，不重置
+            // 不设置错误，让回调处理完成支付流程
+            return;
+          }
+          // 其他错误正常抛出
+          throw signError;
+        }
+      } else if (adapter?.capabilities.needsUserConfirmation) {
+        // ===== Trust Wallet 流程（新增） =====
+        if (!paymentToken || !coinCalculator) {
+          throw new Error("Missing payment parameters");
+        }
+
+        console.log("Starting Trust Wallet payment process...");
+
+        // 构建 UAI 格式的 asset
+        const asset = TrustWalletAdapter.toUAI(
+          paymentToken.tokenAddress || null
+        );
+
+        // 计算金额（转换为实际单位）
+        const amount = (
+          Number(coinCalculator.payTokenAmount) /
+          10 ** (paymentToken.decimal || 6)
+        ).toString();
+
+        console.log("[Trust Wallet] Payment params:", {
+          to: paymentToken.paymentAddress,
+          amount,
+          asset,
+          memo: `Order:${order.orderId}`,
+        });
+
+        // 发起支付（会显示确认弹窗）
+        await sendTrustWalletPayment(
+          {
+            to: paymentToken.paymentAddress,
+            amount: amount,
+            asset: asset,
+            memo: `Order:${order.orderId}`,
+          },
+          // 用户确认后的回调
+          () => {
+            console.log("[Trust Wallet] User confirmed payment completion");
+            // 设置占位符，触发轮询
+            setTransactionSignature("trust_wallet_pending");
+            setIsComplete(true);
+            setIsPaymentProcessing(false);
+          }
+        );
+      } else {
+        throw new Error("Unsupported wallet type");
       }
     } catch (err: unknown) {
       const errorMessage =
@@ -413,9 +488,14 @@ export default function PaymentPage() {
     publicKey,
     order,
     tx,
+    adapter,
+    paymentToken,
+    coinCalculator,
+    state.walletType,
     handleConnectWallet,
     signTransaction,
     sendRawTransaction,
+    sendTrustWalletPayment,
     setError,
   ]);
 
@@ -457,6 +537,22 @@ export default function PaymentPage() {
       }
     };
   }, [isComplete, transactionSignature, orderConfirmed, orderId]);
+
+  // 从订单结果中提取真实的交易哈希 (Trust Wallet)
+  useEffect(() => {
+    if (
+      orderConfirmed &&
+      transactionSignature === "trust_wallet_pending" &&
+      order?.paymentResult?.txHash
+    ) {
+      console.log(
+        "[Trust Wallet] Extracting real transaction hash:",
+        order.paymentResult.txHash
+      );
+      // 更新为真实的交易哈希
+      setTransactionSignature(order.paymentResult.txHash);
+    }
+  }, [orderConfirmed, transactionSignature, order]);
 
   // update order status
   useEffect(() => {
@@ -509,8 +605,8 @@ export default function PaymentPage() {
   // Calculate error types once
   const isBalanceError = error
     ? error.includes("Insufficient balance") ||
-      error.includes("insufficient funds") ||
-      error.includes("shortfall")
+    error.includes("insufficient funds") ||
+    error.includes("shortfall")
     : false;
 
   const isTokenNotFoundError = error
@@ -529,7 +625,7 @@ export default function PaymentPage() {
   const upToLimit = useMemo(() => {
     return user && user.transaction_limit
       ? Number(user.transaction_total) >= Number(user.transaction_limit) &&
-          user.verified !== 2
+      user.verified !== 2
       : false;
   }, [user]);
 
@@ -737,8 +833,8 @@ export default function PaymentPage() {
                         }
                       >
                         {isLoading ||
-                        isPaymentProcessing ||
-                        isPaymentCallback ? (
+                          isPaymentProcessing ||
+                          isPaymentCallback ? (
                           <span className="loading loading-spinner loading-xs"></span>
                         ) : null}
                         {isPaymentCallback
