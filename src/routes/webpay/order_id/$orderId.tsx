@@ -804,14 +804,19 @@ export default function PaymentPage() {
                       <>
                         <div className="text-xs text-base-content text-center p-4">
                           Pay Success!{" "}
-                          <a
-                            href={getSolanaExplorerUrl(transactionSignature)}
-                            target="_blank"
-                            className="link link-primary"
-                          >
-                            View on Solana Explorer
-                          </a>
-                          .
+                          {/* Trust Wallet 暂时没有交易哈希，不显示链接 */}
+                          {transactionSignature !== "trust_wallet_pending" && (
+                            <>
+                              <a
+                                href={getSolanaExplorerUrl(transactionSignature)}
+                                target="_blank"
+                                className="link link-primary"
+                              >
+                                View on Solana Explorer
+                              </a>
+                              .
+                            </>
+                          )}
                         </div>
                         <button className={MainButtonClass} disabled>
                           <span className="loading loading-spinner loading-xs"></span>
