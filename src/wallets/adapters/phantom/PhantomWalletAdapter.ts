@@ -261,11 +261,11 @@ export class PhantomWalletAdapter implements WalletAdapter {
         success: false,
         error: "Unknown callback type",
       };
-    } catch (err: unknown) {
+    } catch (err: any) {
       return {
         type: "error",
         success: false,
-        error: err instanceof Error ? err.message : String(err),
+        error: err?.message || String(err),
       };
     }
   }
