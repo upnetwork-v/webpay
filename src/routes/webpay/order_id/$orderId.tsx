@@ -816,16 +816,20 @@ export default function PaymentPage() {
                       <button
                         className={MainButtonClass}
                         onClick={async () => {
-                          // Double-check balance before payment
-                          const balanceCheck = await checkBalance();
-                          if (!balanceCheck.sufficient) {
-                            setError(balanceCheck.details);
-                            return;
+                          // Trust Wallet 跳过余额检查（会在钱包内检查）
+                          if (state.walletType !== "trust") {
+                            // Double-check balance before payment
+                            const balanceCheck = await checkBalance();
+                            if (!balanceCheck.sufficient) {
+                              setError(balanceCheck.details);
+                              return;
+                            }
                           }
                           handlePay();
                         }}
                         disabled={
-                          !tx ||
+                          // Trust Wallet 不需要预先创建交易，所以不检查 tx
+                          (state.walletType !== "trust" && !tx) ||
                           isLoading ||
                           isLoadingCalculator ||
                           isPaymentProcessing ||
