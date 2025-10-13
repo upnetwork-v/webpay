@@ -11,10 +11,36 @@ export default defineConfig(({ mode }) => {
     base,
     define: {
       "import.meta.env.VITE_APP_BASE": JSON.stringify(base),
+      global: "globalThis",
     },
     resolve: {
       alias: {
         "@": "/src",
+      },
+    },
+    optimizeDeps: {
+      include: [
+        "@walletconnect/sign-client",
+        "@walletconnect/types",
+        "@walletconnect/utils",
+      ],
+    },
+    build: {
+      commonjsOptions: {
+        include: [/node_modules/],
+        transformMixedEsModules: true,
+      },
+      rollupOptions: {
+        external: [],
+        output: {
+          manualChunks: {
+            walletconnect: [
+              "@walletconnect/sign-client",
+              "@walletconnect/types",
+              "@walletconnect/utils",
+            ],
+          },
+        },
       },
     },
     plugins: [
