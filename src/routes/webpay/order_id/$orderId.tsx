@@ -805,14 +805,19 @@ export default function PaymentPage() {
                       <>
                         <div className="text-xs text-base-content text-center p-4">
                           Pay Success!{" "}
-                          <a
-                            href={getSolanaExplorerUrl(transactionSignature)}
-                            target="_blank"
-                            className="link link-primary"
-                          >
-                            View on Solana Explorer
-                          </a>
-                          .
+                          {/* Trust Wallet 暂时没有交易哈希，不显示链接 */}
+                          {transactionSignature !== "trust_wallet_pending" && (
+                            <>
+                              <a
+                                href={getSolanaExplorerUrl(transactionSignature)}
+                                target="_blank"
+                                className="link link-primary"
+                              >
+                                View on Solana Explorer
+                              </a>
+                              .
+                            </>
+                          )}
                         </div>
                         <button className={MainButtonClass} disabled>
                           <span className="loading loading-spinner loading-xs"></span>
@@ -823,16 +828,20 @@ export default function PaymentPage() {
                       <button
                         className={MainButtonClass}
                         onClick={async () => {
-                          // Double-check balance before payment
-                          const balanceCheck = await checkBalance();
-                          if (!balanceCheck.sufficient) {
-                            setError(balanceCheck.details);
-                            return;
+                          // Trust Wallet 跳过余额检查（会在钱包内检查）
+                          if (state.walletType !== "trust") {
+                            // Double-check balance before payment
+                            const balanceCheck = await checkBalance();
+                            if (!balanceCheck.sufficient) {
+                              setError(balanceCheck.details);
+                              return;
+                            }
                           }
                           handlePay();
                         }}
                         disabled={
-                          !tx ||
+                          // Trust Wallet 不需要预先创建交易，所以不检查 tx
+                          (state.walletType !== "trust" && !tx) ||
                           isLoading ||
                           isLoadingCalculator ||
                           isPaymentProcessing ||

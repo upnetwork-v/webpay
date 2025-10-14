@@ -323,14 +323,14 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
       {showTrustConfirmModal && (
         <div className="modal modal-open">
           <div className="modal-box">
-            <h3 className="font-bold text-lg">确认支付状态</h3>
+            <h3 className="font-bold text-lg">Confirm Payment Status</h3>
             <p className="py-4">
-              已唤起 Trust Wallet 进行支付。
+              Trust Wallet has been opened for payment.
               <br />
-              请在 Trust Wallet 中确认并发送交易。
+              Please confirm and send the transaction in Trust Wallet.
               <br />
               <span className="text-warning font-semibold">
-                完成后请返回本页面并点击"我已完成支付"
+                After completion, please return to this page and click "I Have Completed Payment"
               </span>
             </p>
             <div className="modal-action">
@@ -338,13 +338,13 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
                 className="btn btn-ghost"
                 onClick={handleTrustPaymentNotCompleted}
               >
-                我还没完成
+                Not Yet
               </button>
               <button
                 className="btn btn-primary"
                 onClick={handleTrustPaymentCompleted}
               >
-                我已完成支付
+                I Have Completed Payment
               </button>
             </div>
           </div>
