@@ -428,11 +428,18 @@ export default function PaymentPage() {
           10 ** (paymentToken.decimal || 6)
         ).toString();
 
+        // 构建 base64 编码的 memo
+        const memoData = btoa(JSON.stringify({
+          webpay: {
+            orderId: order.orderId,
+          },
+        }));
+
         console.log("[Trust Wallet] Payment params:", {
           to: paymentToken.paymentAddress,
           amount,
           asset,
-          memo: `Order:${order.orderId}`,
+          memo: memoData,
         });
 
         // 发起支付（会显示确认弹窗）
@@ -441,7 +448,7 @@ export default function PaymentPage() {
             to: paymentToken.paymentAddress,
             amount: amount,
             asset: asset,
-            memo: `Order:${order.orderId}`,
+            memo: memoData,
           },
           // 用户确认后的回调
           () => {
