@@ -329,9 +329,6 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
               <br />
               Please confirm and send the transaction in Trust Wallet.
               <br />
-              <span className="text-warning font-semibold">
-                After completion, please return to this page and click "I Have Completed Payment"
-              </span>
             </p>
             <div className="modal-action">
               <button
