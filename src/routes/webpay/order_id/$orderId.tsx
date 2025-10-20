@@ -785,7 +785,7 @@ export default function PaymentPage() {
               coinCalculator={coinCalculator}
               isEstimatingFee={isEstimatingFee}
               estimatedFee={estimatedFee}
-              backgroundColor={orderConfirmed ? "bg-success" : undefined}
+              // backgroundColor={orderConfirmed ? "bg-success" : undefined}
               isLoading={isLoading || isLoadingCalculator}
             />
 

@@ -11,12 +11,10 @@ interface OrderDetailCardProps {
   coinCalculator: CoinCalculator | null;
   isEstimatingFee: boolean;
   estimatedFee: string;
-  backgroundColor?: string;
   isLoading?: boolean;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const CardSplitter = ({ backgroundColor }: { backgroundColor?: string }) => {
+const CardSplitter = () => {
   return (
     <div className="h-6 my-4 -mx-7 relative">
       <div className="border-t border-dashed border-base-content/10 h-[0px] top-3 right-8 left-8 absolute"></div>
@@ -33,7 +31,6 @@ const CardSplitter = ({ backgroundColor }: { backgroundColor?: string }) => {
 const OrderDetailCard: React.FC<OrderDetailCardProps> = ({
   order,
   paymentToken,
-  backgroundColor,
   coinCalculator,
   isEstimatingFee,
   estimatedFee,
@@ -54,7 +51,7 @@ const OrderDetailCard: React.FC<OrderDetailCardProps> = ({
           </div>
         </div>
 
-        <CardSplitter backgroundColor={backgroundColor} />
+        <CardSplitter />
 
         <div className="space-y-2">
           <div className="flex items-center">
@@ -152,7 +149,7 @@ const OrderDetailCard: React.FC<OrderDetailCardProps> = ({
           )} */}
         </div>
 
-        <CardSplitter backgroundColor={backgroundColor} />
+        <CardSplitter />
 
         <div className="flex flex-col opacity-40 gap-2 relative text-left">
           {/* logo */}
