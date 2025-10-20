@@ -15,16 +15,17 @@ interface OrderDetailCardProps {
   isLoading?: boolean;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const CardSplitter = ({ backgroundColor }: { backgroundColor?: string }) => {
   return (
     <div className="h-6 my-4 -mx-7 relative">
       <div className="border-t border-dashed border-base-content/10 h-[0px] top-3 right-8 left-8 absolute"></div>
-      <div
+      {/* <div
         className={`rounded-full ${backgroundColor || "bg-base-300"} h-6 top-0 left-0 w-6 absolute`}
       ></div>
       <div
         className={`rounded-full ${backgroundColor || "bg-base-300"} h-6 top-0 right-0 w-6 absolute`}
-      ></div>
+      ></div> */}
     </div>
   );
 };
