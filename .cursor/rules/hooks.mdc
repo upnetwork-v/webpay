@@ -1,8 +1,7 @@
 ---
-description:
-globs:
-alwaysApply: true
+alwaysApply: false
 ---
+
 # Hooks Directory Structure
 
 The `src/hooks` directory contains custom React hooks for shared logic.
@@ -11,5 +10,6 @@ The `src/hooks` directory contains custom React hooks for shared logic.
 - [index.ts](mdc:src/hooks/index.ts): Main export or aggregation file for hooks.
 
 ## Usage
+
 - Add new files here for additional custom hooks.
 - Import and use hooks from this directory in your components.

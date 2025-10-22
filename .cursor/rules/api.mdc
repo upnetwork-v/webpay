@@ -1,8 +1,7 @@
 ---
-description:
-globs:
-alwaysApply: true
+alwaysApply: false
 ---
+
 # API Directory Structure
 
 The `src/api` directory contains modules for interacting with backend APIs.
@@ -11,5 +10,6 @@ The `src/api` directory contains modules for interacting with backend APIs.
 - [index.ts](mdc:src/api/index.ts): Main API entry point, may aggregate or export API functions.
 
 ## Usage
+
 - Add new files here for additional API modules.
 - Import and use API functions from this directory in your components or hooks.

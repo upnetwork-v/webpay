@@ -25,12 +25,19 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
 
   const [walletSelectorOpen, setWalletSelectorOpen] = useState(false);
 
+  // Trust Wallet 确认弹窗状态
+  const [showTrustConfirmModal, setShowTrustConfirmModal] = useState(false);
+  const [trustPaymentCallback, setTrustPaymentCallback] = useState<
+    (() => void) | null
+  >(null);
+
   const selectWallet = async (type: WalletType) => {
     localStorage.setItem("wallet_type", type);
     try {
       const newAdapter = createAdapter(type);
-      if (typeof (newAdapter as any).init === "function") {
-        await (newAdapter as any).init();
+      // OKX adapter 有 init 方法，需要先初始化
+      if ("init" in newAdapter && typeof newAdapter.init === "function") {
+        await newAdapter.init();
       }
       setAdapter(newAdapter);
       setState((prev) => ({
@@ -55,8 +62,8 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
     try {
       await adapter.connect();
       localStorage.setItem("wallet_is_connected", "true");
-      // 如果 walletType 是 okx，则设置为已连接状态
-      if (state.walletType === "okx") {
+      // OKX 和 Trust Wallet 需要立即设置为已连接状态
+      if (state.walletType === "okx" || state.walletType === "trust") {
         setState((prev) => ({
           ...prev,
           isConnected: true,
@@ -146,6 +153,53 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
     [adapter]
   );
 
+  // Trust Wallet 专用支付方法
+  const sendTrustWalletPayment = async (
+    params: {
+      to: string;
+      amount: string;
+      asset: string;
+      memo?: string;
+    },
+    onConfirmed: () => void
+  ) => {
+    if (!adapter || state.walletType !== "trust") {
+      throw new Error("Trust Wallet not connected");
+    }
+
+    if (!adapter.sendPayment) {
+      throw new Error("Trust Wallet adapter does not support sendPayment");
+    }
+
+    // 发起支付
+    await adapter.sendPayment(params);
+
+    // 保存回调
+    setTrustPaymentCallback(() => onConfirmed);
+
+    // 延时 1 秒后显示确认弹窗
+    setTimeout(() => {
+      setShowTrustConfirmModal(true);
+    }, 1000);
+  };
+
+  // 用户确认已完成支付
+  const handleTrustPaymentCompleted = () => {
+    setShowTrustConfirmModal(false);
+    if (trustPaymentCallback) {
+      trustPaymentCallback();
+      setTrustPaymentCallback(null);
+    }
+  };
+
+  // 用户未完成支付
+  const handleTrustPaymentNotCompleted = () => {
+    setShowTrustConfirmModal(false);
+    setTrustPaymentCallback(null);
+    // 刷新页面，让用户可以重新支付
+    window.location.reload();
+  };
+
   // 2. adapter 初始化后，如果 URL 有 Phantom 回调参数，则执行 handleConnectCallback
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -221,6 +275,17 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
         />
       ),
     },
+    {
+      type: "trust",
+      name: "Trust Wallet",
+      icon: (
+        <img
+          src={new URL("../adapters/trust/logo.png", import.meta.url).href}
+          alt="Trust Wallet"
+          className="rounded-full object-cover h-10 w-10"
+        />
+      ),
+    },
   ];
 
   return (
@@ -234,6 +299,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
         sendRawTransaction,
         handleConnectCallback,
         handlePaymentCallback,
+        sendTrustWalletPayment,
         adapter,
         openWalletSelector,
         closeWalletSelector,
@@ -252,6 +318,35 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
         onConnect={connect}
         onDisconnect={disconnect}
       />
+
+      {/* Trust Wallet 确认弹窗 */}
+      {showTrustConfirmModal && (
+        <div className="modal modal-open">
+          <div className="modal-box">
+            <h3 className="font-bold text-lg">Confirm Payment Status</h3>
+            <p className="py-4">
+              Trust Wallet has been opened for payment.
+              <br />
+              Please confirm and send the transaction in Trust Wallet.
+              <br />
+            </p>
+            <div className="modal-action">
+              <button
+                className="btn btn-ghost"
+                onClick={handleTrustPaymentNotCompleted}
+              >
+                Not Yet
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={handleTrustPaymentCompleted}
+              >
+                I Have Completed Payment
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </WalletContext.Provider>
   );
 };

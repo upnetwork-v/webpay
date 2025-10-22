@@ -1,0 +1,1 @@
+export { TrustWalletAdapter } from "./TrustWalletAdapter";

@@ -1,4 +1,9 @@
-import type { WalletAdapter } from "../../types/wallet";
+import type {
+  WalletAdapter,
+  WalletCapabilities,
+  WalletCallbackRequest,
+  WalletCallbackResponse,
+} from "../../types/wallet";
 import * as nacl from "tweetnacl";
 import { Transaction } from "@solana/web3.js";
 import {
@@ -8,10 +13,6 @@ import {
 import { sendRawTransaction } from "@/utils";
 import { processConnectCallback } from "../../utils/callbacks";
 import bs58 from "bs58";
-import type {
-  WalletCallbackRequest,
-  WalletCallbackResponse,
-} from "../../types/wallet";
 
 const DAPP_KEYPAIR_SESSION_KEY = "phantom_dapp_keypair";
 const PHANTOM_WALLET_STATE_KEY = "phantom_wallet_state";
@@ -76,6 +77,13 @@ export class PhantomWalletAdapter implements WalletAdapter {
   public dappKeyPair: nacl.BoxKeyPair | null;
   private phantomEncryptionPublicKey: string | null = null;
   private session: string | null = null;
+
+  capabilities: WalletCapabilities = {
+    supportsSeparateSign: true,
+    requiresConnect: true,
+    hasCallback: true,
+    needsUserConfirmation: false,
+  };
 
   constructor() {
     this.dappKeyPair = loadDappKeyPairFromSession();
