@@ -29,6 +29,7 @@ export interface PreferredRoute {
   tokenDecimals: number;
   tokenPrice: string;
   tokenSymbol: string;
+  isNative?: boolean;
   [property: string]: unknown;
 }
 
