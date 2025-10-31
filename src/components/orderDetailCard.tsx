@@ -1,4 +1,4 @@
-import type { Order, CoinCalculator, Token } from "@/types";
+import type { Order, PreferredRoute } from "@/types";
 import React from "react";
 import Logo from "@/assets/img/Vector.png";
 import SolanaLogo from "@/assets/img/solana-logo.png";
@@ -7,8 +7,7 @@ import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 
 interface OrderDetailCardProps {
   order: Order | null;
-  paymentToken: Token | null;
-  coinCalculator: CoinCalculator | null;
+  preferredRoute: PreferredRoute | null;
   isEstimatingFee: boolean;
   estimatedFee: string;
   isLoading?: boolean;
@@ -30,8 +29,7 @@ const CardSplitter = () => {
 
 const OrderDetailCard: React.FC<OrderDetailCardProps> = ({
   order,
-  paymentToken,
-  coinCalculator,
+  preferredRoute,
   isEstimatingFee,
   estimatedFee,
 }) => {
@@ -57,7 +55,7 @@ const OrderDetailCard: React.FC<OrderDetailCardProps> = ({
           <div className="flex items-center">
             <span className="text-neutral-content">Pay</span>
             <span className="flex-1 text-base-content text-ellipsis text-right overflow-hidden">
-              {(Number(order.orderValue) / 100).toFixed(2)} {order.currency}
+              {order.fiatAmount} {order.currency}
             </span>
           </div>
           {/* <div className="flex items-center">
@@ -67,35 +65,33 @@ const OrderDetailCard: React.FC<OrderDetailCardProps> = ({
             </span>
           </div> */}
 
-          <div className="flex items-center">
+          {preferredRoute && <div className="flex items-center">
             <span className="text-neutral-content">In Crypto</span>
             <span className="flex-1 text-base-content text-ellipsis text-right overflow-hidden">
-              {order.paymentStatus === "success" ? (
+              {order.status === 2 ? (
                 `${formatUnits(
-                  BigInt(order.paymentResult?.amount || "0"),
-                  paymentToken?.decimal || 0
-                )} ${order.paymentResult?.symbol}`
+                  BigInt(preferredRoute.tokenAmount || "0"),
+                  preferredRoute.tokenDecimals || 0
+                )} ${preferredRoute.tokenSymbol}`
               ) : (
                 <>
-                  {!coinCalculator && (
-                    <div className="loading loading-spinner loading-xs"></div>
-                  )}
+
                   {formatUnits(
-                    BigInt(coinCalculator?.payTokenAmount || "0"),
-                    coinCalculator?.payTokenDecimal || 0
+                    BigInt(preferredRoute.tokenAmount || "0"),
+                    preferredRoute.tokenDecimals || 0
                   )}{" "}
-                  {coinCalculator?.payTokenSymbol}
+                  {preferredRoute.tokenSymbol}
                 </>
               )}
             </span>
-          </div>
+          </div>}
 
           <div className="flex items-center">
             <span className="text-neutral-content">Fees</span>
             <span className="flex-1 text-base-content text-ellipsis text-right overflow-hidden">
               {order.paymentStatus === "success" ? (
                 <div>
-                  {Number(order.paymentResult?.gasFee || 0) / LAMPORTS_PER_SOL}{" "}
+                  {Number(order.tx?.gasFee || "0") / LAMPORTS_PER_SOL}{" "}
                   SOL
                 </div>
               ) : isEstimatingFee ? (
@@ -161,13 +157,13 @@ const OrderDetailCard: React.FC<OrderDetailCardProps> = ({
 
           <div className="flex flex-col gap-y-1">
             <div className=" text-base-content text-xs ">Order ID</div>
-            <div className="text-base-content text-sm">{order.orderId}</div>
+            <div className="text-base-content text-sm">{order.id}</div>
           </div>
 
           <div className="flex flex-col gap-y-1">
             <div className="text-base-content text-xs">Order Time</div>
             <div className="text-base-content text-sm">
-              {new Date(order.createTime).toLocaleString()}
+              {new Date(order.createdAt).toLocaleString()}
             </div>
           </div>
         </div>

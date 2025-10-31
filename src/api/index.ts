@@ -60,6 +60,7 @@ const handleResponse = async (response: Response) => {
   try {
     data = isJson ? await response.json() : await response.text();
   } catch (error) {
+    console.error("Error parsing response:", error);
     data = response.statusText;
   }
 
@@ -75,7 +76,7 @@ const handleResponse = async (response: Response) => {
     }
 
     const error = new Error(
-      data?.message || response.statusText || "Request failed"
+      data?.msg || data?.message || response.statusText || "Request failed"
     );
     (error as any).response = {
       ...response,

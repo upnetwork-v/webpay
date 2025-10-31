@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { getOrderById, coinCalculatorQuery } from "@/api/order";
-import type { Order, CoinCalculator } from "@/types";
+import { getPreOrder, createOrder, getOrderById } from "@/api/order";
+import type { Order } from "@/types";
 import { Transaction } from "@solana/web3.js";
 import { useWallet } from "@/wallets/provider/useWallet";
 import { getSolanaExplorerUrl, estimateTransactionFee } from "@/utils";
@@ -13,16 +13,11 @@ import CheckIcon from "@/assets/img/check.png";
 import { useAuthStore } from "@/stores";
 import GoogleLoginButton from "@/components/GoogleLoginButton";
 import KYCStatus from "@/components/KYCStatus";
-import { updateOrderStatus } from "@/api/order";
 import { TrustWalletAdapter } from "@/wallets/adapters/trust/TrustWalletAdapter";
 
 export default function PaymentPage() {
   const { orderId } = Route.useParams();
   const [order, setOrder] = useState<Order | null>(null);
-  const [coinCalculator, setCoinCalculator] = useState<CoinCalculator | null>(
-    null
-  );
-  const [isLoadingCalculator, setIsLoadingCalculator] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isComplete, setIsComplete] = useState(false);
   const [transactionSignature, setTransactionSignature] = useState<
@@ -66,18 +61,13 @@ export default function PaymentPage() {
   const { isConnected, publicKey } = state;
 
   // Get payment token
-  const paymentToken = useMemo(() => {
+  const preferredRoute = useMemo(() => {
     if (!order) return null;
     return (
-      order.supportTokenList.find(
-        (token) =>
-          token.chainName?.toLowerCase() === "solana" &&
-          token.symbol.toLowerCase() === "usdc"
-        // 临时锁定 Solana usdc 支付
-        // token.symbol ===
-        //   (order.paymentStatus === "success"
-        //     ? order.paymentResult?.symbol
-        //     : order.defaultPaymentToken)
+      order.preferredRoutes?.find(
+        (route) =>
+          route.chainName?.toLowerCase() === "solana" &&
+          route.tokenSymbol?.toLowerCase() === "usdc"
       ) || null
     );
   }, [order]);
@@ -86,8 +76,8 @@ export default function PaymentPage() {
   // Always call usePayment hook to maintain hook consistency
   const paymentHook = usePayment({
     order: order,
-    paymentToken: paymentToken,
-    coinCalculator: coinCalculator,
+    PreferredRoute: preferredRoute,
+    payTokenAmount: preferredRoute?.tokenAmount || 0,
     phantomPublicKey: publicKey,
   });
 
@@ -103,8 +93,8 @@ export default function PaymentPage() {
       return;
     }
 
-    if (!tx && !isLoadingCalculator && !error) {
-      if (createPaymentTransaction && publicKey && coinCalculator) {
+    if (!tx && !error) {
+      if (createPaymentTransaction && publicKey && preferredRoute) {
         // Clear any previous errors before attempting to create transaction
         setError(null);
 
@@ -146,8 +136,7 @@ export default function PaymentPage() {
           {
             hasCreatePaymentTransaction: !!createPaymentTransaction,
             hasPublicKey: !!publicKey,
-            hasCoinCalculator: !!coinCalculator,
-            isLoadingCalculator,
+            hasPreferredRoute: !!preferredRoute,
           }
         );
       }
@@ -157,8 +146,7 @@ export default function PaymentPage() {
     state.walletType,
     createPaymentTransaction,
     publicKey,
-    coinCalculator,
-    isLoadingCalculator,
+    preferredRoute,
     error,
     setError,
   ]);
@@ -283,63 +271,35 @@ export default function PaymentPage() {
     openWalletSelector();
   }, [openWalletSelector]);
 
-  // Fetch order details
+  // Create order
   useEffect(() => {
     if (orderId) {
       setIsLoading(true);
-      getOrderById(orderId)
-        .then(setOrder)
-        .catch((err) => {
-          console.error("Error fetching order:", err);
-          setError(`Failed to load order details: ${err}`);
-        })
-        .finally(() => {
-          setIsLoading(false);
-        });
+      if (isAuthenticated) {
+        createOrder(orderId)
+          .then(setOrder)
+          .catch((err) => {
+            console.error("Error createOrder:", err);
+            setError(`${err}`);
+          })
+          .finally(() => {
+            setIsLoading(false);
+          });
+      } else {
+        getPreOrder(orderId)
+          .then(setOrder)
+          .catch((err) => {
+            console.error("Error getPreOrder:", err);
+            setError(` ${err}`);
+          })
+          .finally(() => {
+            setIsLoading(false);
+          });
+      }
+
     }
-  }, [orderId, setError]);
+  }, [orderId, isAuthenticated, setError]);
 
-  //
-  useEffect(() => {
-    if (order && paymentToken) {
-      if (!paymentToken?.paymentAddress) {
-        setError("Payment address is not set");
-        return;
-      }
-
-      if (order.paymentStatus === "success") {
-        console.log("order already paid", order);
-        setIsComplete(true);
-        return;
-      }
-
-      if (order.paymentStatus === "faile") {
-        setError("Order payment failed");
-        return;
-      }
-
-      if (order.paymentStatus === "pending") {
-        setError("Order payment pending");
-        return;
-      }
-
-      setIsLoadingCalculator(true);
-      coinCalculatorQuery({
-        id: order.orderId,
-        symbol: paymentToken?.symbol || "",
-        tokenAddress: paymentToken?.tokenAddress,
-      })
-        .then((calculator) => {
-          setCoinCalculator(calculator);
-          setIsLoadingCalculator(false);
-        })
-        .catch((err) => {
-          console.error("Error fetching Calculator:", err);
-          setError(`Failed to Calculator: ${err}`);
-          setIsLoadingCalculator(false);
-        });
-    }
-  }, [order, setError, paymentToken]);
 
   // Handle payment
   const handlePay = useCallback(async () => {
@@ -350,8 +310,7 @@ export default function PaymentPage() {
       hasAdapter: !!adapter,
       capabilities: adapter?.capabilities,
       hasOrder: !!order,
-      hasPaymentToken: !!paymentToken,
-      hasCoinCalculator: !!coinCalculator,
+      hasPreferredRoute: !!preferredRoute,
     });
 
     // Trust Wallet 不需要 publicKey（会自动使用用户当前账户）
@@ -411,32 +370,29 @@ export default function PaymentPage() {
         }
       } else if (adapter?.capabilities.needsUserConfirmation) {
         // ===== Trust Wallet 流程（新增） =====
-        if (!paymentToken || !coinCalculator) {
-          throw new Error("Missing payment parameters");
+        if (!preferredRoute) {
+          throw new Error("Missing preferred route");
         }
 
         console.log("Starting Trust Wallet payment process...");
 
         // 构建 UAI 格式的 asset
         const asset = TrustWalletAdapter.toUAI(
-          paymentToken.tokenAddress || null
+          preferredRoute.tokenAddress || null
         );
 
         // 计算金额（转换为实际单位）
-        const amount = (
-          Number(coinCalculator.payTokenAmount) /
-          10 ** (paymentToken.decimal || 6)
-        ).toString();
+        const amount = preferredRoute.tokenAmount.toString();
 
         // 构建 base64 编码的 memo
         const memoData = btoa(JSON.stringify({
           webpay: {
-            orderId: order.orderId,
+            orderId: order.id,
           },
         }));
 
         console.log("[Trust Wallet] Payment params:", {
-          to: paymentToken.paymentAddress,
+          to: preferredRoute.payToAddress,
           amount,
           asset,
           memo: memoData,
@@ -445,7 +401,7 @@ export default function PaymentPage() {
         // 发起支付（会显示确认弹窗）
         await sendTrustWalletPayment(
           {
-            to: paymentToken.paymentAddress,
+            to: preferredRoute.payToAddress,
             amount: amount,
             asset: asset,
             memo: memoData,
@@ -496,8 +452,7 @@ export default function PaymentPage() {
     order,
     tx,
     adapter,
-    paymentToken,
-    coinCalculator,
+    preferredRoute,
     state.walletType,
     handleConnectWallet,
     signTransaction,
@@ -545,66 +500,6 @@ export default function PaymentPage() {
     };
   }, [isComplete, transactionSignature, orderConfirmed, orderId]);
 
-  // 从订单结果中提取真实的交易哈希 (Trust Wallet)
-  useEffect(() => {
-    if (
-      orderConfirmed &&
-      transactionSignature === "trust_wallet_pending" &&
-      order?.paymentResult?.txHash
-    ) {
-      console.log(
-        "[Trust Wallet] Extracting real transaction hash:",
-        order.paymentResult.txHash
-      );
-      // 更新为真实的交易哈希
-      setTransactionSignature(order.paymentResult.txHash);
-    }
-  }, [orderConfirmed, transactionSignature, order]);
-
-  // update order status
-  useEffect(() => {
-    if (
-      order &&
-      orderConfirmed &&
-      transactionSignature &&
-      paymentToken &&
-      coinCalculator &&
-      publicKey
-    ) {
-      const updateOrderStatusParams = {
-        collectWallet: paymentToken?.paymentAddress || "",
-        cryptoAmount: (Number(order.orderValue) / 100).toFixed(2),
-        cryptoSymbol: coinCalculator?.payTokenSymbol || "",
-        cryptoTxHash: transactionSignature || "",
-        payerWallet: publicKey || "",
-        paymentStatus: "success",
-        transactionId: order.orderId,
-      };
-
-      updateOrderStatus(updateOrderStatusParams)
-        .then((res) => {
-          console.log(
-            "update order status success",
-            updateOrderStatusParams,
-            res
-          );
-        })
-        .catch((err) => {
-          console.error(
-            "Error updating order status:",
-            updateOrderStatusParams,
-            err
-          );
-        });
-    }
-  }, [
-    order,
-    orderConfirmed,
-    transactionSignature,
-    paymentToken,
-    coinCalculator,
-    publicKey,
-  ]);
 
   // Determine what to render
   const shouldShowError = !!error;
@@ -641,7 +536,7 @@ export default function PaymentPage() {
     <div className="h-full bg-base-200 relative overflow-auto">
       {shouldShowError ? (
         // Error state UI
-        <div className="max-w-md">
+        <div className="w-xs m-auto py-10">
           <h1 className="font-bold text-5xl">
             {isBalanceError
               ? "Insufficient Balance"
@@ -677,7 +572,7 @@ export default function PaymentPage() {
                     <h3 className="font-bold">Check your wallet balance</h3>
                     <div className="text-xs">
                       Make sure you have sufficient{" "}
-                      {paymentToken?.symbol || "tokens"} and SOL for transaction
+                      {preferredRoute?.tokenSymbol || "tokens"} and SOL for transaction
                       fees
                     </div>
                   </div>
@@ -702,7 +597,7 @@ export default function PaymentPage() {
                   <div>
                     <h3 className="font-bold">Add token to your wallet</h3>
                     <div className="text-xs">
-                      Add {paymentToken?.symbol || "the required token"} to your
+                      Add {preferredRoute?.tokenSymbol} to your
                       wallet and try again
                     </div>
                   </div>
@@ -735,7 +630,7 @@ export default function PaymentPage() {
             </div>
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-4">
             <button
               className="btn btn-primary btn-block"
               onClick={() => {
@@ -764,7 +659,7 @@ export default function PaymentPage() {
       ) : (
         // Normal payment UI
         <div className="flex h-full bg-base-300 w-full justify-center items-center py-4 px-8 pb-8 ">
-          <div>
+          <div className="min-w-xs">
             {orderConfirmed && <div className="paid-bg-gradient"></div>}
             <div className="flex flex-col my-10 text-center gap-y-4">
               <img src={Logo} alt="Onta pay" className="mx-auto h-6" />
@@ -781,12 +676,11 @@ export default function PaymentPage() {
             {/* 订单详情 */}
             <OrderDetailCard
               order={order}
-              paymentToken={paymentToken}
-              coinCalculator={coinCalculator}
+              preferredRoute={preferredRoute}
               isEstimatingFee={isEstimatingFee}
               estimatedFee={estimatedFee}
               // backgroundColor={orderConfirmed ? "bg-success" : undefined}
-              isLoading={isLoading || isLoadingCalculator}
+              isLoading={isLoading}
             />
 
             {/* 按钮 */}
@@ -843,7 +737,6 @@ export default function PaymentPage() {
                           // Trust Wallet 不需要预先创建交易，所以不检查 tx
                           (state.walletType !== "trust" && !tx) ||
                           isLoading ||
-                          isLoadingCalculator ||
                           isPaymentProcessing ||
                           isPaymentCallback
                         }

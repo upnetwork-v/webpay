@@ -88,6 +88,7 @@ export const useAuthStore = create<AuthStore>()(
               });
             }
           } catch (error) {
+            console.error("Failed to initialize auth:", error);
             set({
               isAuthenticated: false,
               authToken: null,
