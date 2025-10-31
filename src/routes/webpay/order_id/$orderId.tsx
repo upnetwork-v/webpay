@@ -18,6 +18,10 @@ import { TrustWalletAdapter } from "@/wallets/adapters/trust/TrustWalletAdapter"
 export default function PaymentPage() {
   const { orderId } = Route.useParams();
   const [order, setOrder] = useState<Order | null>(null);
+  const paymentOrderId = useMemo(() => {
+    return order?.id || null;
+  }, [order]);
+
   const [isLoading, setIsLoading] = useState(true);
   const [isComplete, setIsComplete] = useState(false);
   const [transactionSignature, setTransactionSignature] = useState<
@@ -271,7 +275,7 @@ export default function PaymentPage() {
     openWalletSelector();
   }, [openWalletSelector]);
 
-  // Create order
+  // Create or fetch pre order
   useEffect(() => {
     if (orderId) {
       setIsLoading(true);
@@ -476,9 +480,9 @@ export default function PaymentPage() {
     }
 
     // Only start polling if we have all required conditions
-    if (orderId && isComplete && transactionSignature && !orderConfirmed) {
+    if (paymentOrderId && isComplete && transactionSignature && !orderConfirmed) {
       const pollOrder = () => {
-        getOrderById(orderId).then((res) => {
+        getOrderById(paymentOrderId).then((res) => {
           console.log("polling order", res);
           setOrder(res);
         });
@@ -498,7 +502,7 @@ export default function PaymentPage() {
         requestTimeout.current = null;
       }
     };
-  }, [isComplete, transactionSignature, orderConfirmed, orderId]);
+  }, [isComplete, transactionSignature, orderConfirmed, paymentOrderId]);
 
 
   // Determine what to render
