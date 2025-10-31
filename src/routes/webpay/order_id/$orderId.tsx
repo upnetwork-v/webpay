@@ -464,7 +464,7 @@ export default function PaymentPage() {
   // confirm order
   const orderConfirmed = useMemo(() => {
     if (!order) return false;
-    return order.paymentStatus === "success";
+    return order.status === 2;
   }, [order]);
 
   const requestTimeout = useRef<NodeJS.Timeout | null>(null);

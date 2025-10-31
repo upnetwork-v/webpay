@@ -89,7 +89,7 @@ const OrderDetailCard: React.FC<OrderDetailCardProps> = ({
           <div className="flex items-center">
             <span className="text-neutral-content">Fees</span>
             <span className="flex-1 text-base-content text-ellipsis text-right overflow-hidden">
-              {order.paymentStatus === "success" ? (
+              {order.status === 2 ? (
                 <div>
                   {Number(order.tx?.gasFee || "0") / LAMPORTS_PER_SOL}{" "}
                   SOL
@@ -105,7 +105,7 @@ const OrderDetailCard: React.FC<OrderDetailCardProps> = ({
           {/* <div className="flex items-center">
             <span className="text-neutral-content">Total</span>
             <div className="font-semibold flex-1 text-white text-right">
-              {order.paymentStatus === "success" ? (
+              {order.status === 2 ? (
                 <>
                   {formatUnits(
                     BigInt(order.paymentResult?.amount || "0"),
