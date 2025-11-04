@@ -313,8 +313,7 @@ export default function PaymentPage() {
       walletType: state.walletType,
       hasAdapter: !!adapter,
       capabilities: adapter?.capabilities,
-      hasOrder: !!order,
-      hasPreferredRoute: !!preferredRoute,
+      paymentOrderId,
     });
 
     // Trust Wallet 不需要 publicKey（会自动使用用户当前账户）
@@ -324,14 +323,22 @@ export default function PaymentPage() {
       return;
     }
 
-    if (!order) {
-      setError(`Order not found`);
+    // TODO: 立即查询 order 信息，如果order 状态为 1，方可继续支付，否则提示订单已支付
+    if (!paymentOrderId) {
+      setError(`paymentOrderId not init`);
+      return;
+    }
+
+    setIsPaymentProcessing(true);
+
+    const order = await getOrderById(paymentOrderId);
+    console.log("fetch order status", order.status);
+    if (order.status !== 1) {
+      setError(`Order status is not 1`);
       return;
     }
 
     try {
-      setIsPaymentProcessing(true);
-
       console.log("[handlePay] Checking wallet capabilities:", adapter?.capabilities);
 
       // 判断钱包类型
@@ -453,7 +460,6 @@ export default function PaymentPage() {
   }, [
     isConnected,
     publicKey,
-    order,
     tx,
     adapter,
     preferredRoute,
@@ -463,6 +469,7 @@ export default function PaymentPage() {
     sendRawTransaction,
     sendTrustWalletPayment,
     setError,
+    paymentOrderId,
   ]);
 
   // confirm order
