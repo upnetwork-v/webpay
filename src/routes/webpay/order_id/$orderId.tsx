@@ -335,6 +335,7 @@ export default function PaymentPage() {
     console.log("fetch order status", order.status);
     if (order.status !== 1) {
       setError(`Order status is not 1`);
+      setIsPaymentProcessing(false);
       return;
     }
 
