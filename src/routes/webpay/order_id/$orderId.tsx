@@ -5,8 +5,9 @@ import type { Order } from "@/types";
 import { Transaction } from "@solana/web3.js";
 import { useWallet } from "@/wallets/provider/useWallet";
 import { getSolanaExplorerUrl, estimateTransactionFee } from "@/utils";
-import bs58 from "bs58";
 import Logo from "@/assets/img/logo.svg";
+import bs58 from "bs58";
+
 import { usePayment } from "@/hooks";
 import OrderDetailCard from "@/components/orderDetailCard";
 import CheckIcon from "@/assets/img/check.png";
@@ -154,6 +155,16 @@ export default function PaymentPage() {
     error,
     setError,
   ]);
+
+  // order status check
+  useEffect(() => {
+    if (order) {
+      if (order.status === 4) {
+        setError(`Order expired`);
+      }
+
+    }
+  }, [order, setError]);
 
   useEffect(() => {
     if (tx) {

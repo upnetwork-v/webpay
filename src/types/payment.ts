@@ -12,7 +12,7 @@ export interface Order {
   id: string;
   preferredRoutes?: PreferredRoute[];
   selectionMode: "acquirer" | "user" | "either";
-  status: 1 | 2;
+  status: 1 | 2 | 4; // 1: pending, 2: completed, 4: expired
   transactionId: string;
   createdAt: string;
   updatedAt: string;
