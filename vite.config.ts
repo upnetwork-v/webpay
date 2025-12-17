@@ -1,27 +1,27 @@
-import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
-import tailwindcss from "@tailwindcss/vite";
-import { TanStackRouterVite } from "@tanstack/router-plugin/vite";
-import { nodePolyfills } from "vite-plugin-node-polyfills";
+import tailwindcss from '@tailwindcss/vite'
+import { TanStackRouterVite } from '@tanstack/router-plugin/vite'
+import react from '@vitejs/plugin-react'
+import { defineConfig } from 'vite'
+import { nodePolyfills } from 'vite-plugin-node-polyfills'
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
-  const base = mode === "test" ? "/webpay/" : "/";
+  const base = mode === 'test' ? '/' : '/'
   return {
     base,
     define: {
-      "import.meta.env.VITE_APP_BASE": JSON.stringify(base),
+      'import.meta.env.VITE_APP_BASE': JSON.stringify(base),
     },
     resolve: {
       alias: {
-        "@": "/src",
+        '@': '/src',
       },
     },
     plugins: [
       nodePolyfills(),
-      TanStackRouterVite({ target: "react", autoCodeSplitting: true }),
+      TanStackRouterVite({ target: 'react', autoCodeSplitting: true }),
       react(),
       tailwindcss(),
     ],
-  };
-});
+  }
+})
