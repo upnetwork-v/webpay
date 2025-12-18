@@ -56,17 +56,17 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({
     try {
       await adapter.connect()
       localStorage.setItem('wallet_is_connected', 'true')
-      // OKX 需要立即设置为已连接状态
-      if (state.walletType === 'okx') {
-        setState((prev) => ({
-          ...prev,
-          isConnected: true,
-          publicKey: adapter.getPublicKey(),
-          isLoading: false,
-        }))
 
-        setWalletSelectorOpen(false)
-      }
+      // connect() 成功返回（没有抛出 PHANTOM_REDIRECT_PENDING 等错误）
+      // 说明使用的是 injected provider 或同步连接的钱包，需要立即更新状态
+      // 这包括: OKX 钱包、Phantom 内嵌浏览器/桌面扩展
+      setState((prev) => ({
+        ...prev,
+        isConnected: true,
+        publicKey: adapter.getPublicKey(),
+        isLoading: false,
+      }))
+      setWalletSelectorOpen(false)
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error ? error.message : 'Connection failed'
