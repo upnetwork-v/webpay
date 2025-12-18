@@ -1,14 +1,13 @@
 import { createOrder, getOrderById, getPreOrder } from '@/api/order'
 import CheckIcon from '@/assets/img/check.png'
 import Logo from '@/assets/img/logo.svg'
-import GoogleLoginButton from '@/components/GoogleLoginButton'
 import KYCStatus from '@/components/KYCStatus'
 import OrderDetailCard from '@/components/orderDetailCard'
 import { usePayment } from '@/hooks'
+import { useSIWS } from '@/hooks/useSIWS'
 import { useAuthStore } from '@/stores'
 import type { Order } from '@/types'
 import { estimateTransactionFee, getSolanaExplorerUrl } from '@/utils'
-import { TrustWalletAdapter } from '@/wallets/adapters/trust/TrustWalletAdapter'
 import { useWallet } from '@/wallets/provider/useWallet'
 import { Transaction } from '@solana/web3.js'
 import { createFileRoute } from '@tanstack/react-router'
@@ -59,10 +58,17 @@ export default function PaymentPage() {
     sendRawTransaction,
     handleConnectCallback,
     handlePaymentCallback,
-    sendTrustWalletPayment,
     openWalletSelector,
   } = useWallet()
   const { isConnected, publicKey } = state
+
+  // SIWS Login hook
+  const {
+    signIn,
+    handleSignInCallback,
+    isSigningIn,
+    error: siwsError,
+  } = useSIWS()
 
   // Get payment token
   const preferredRoute = useMemo(() => {
@@ -91,12 +97,6 @@ export default function PaymentPage() {
   const [tx, setTx] = useState<Transaction | null>(null)
 
   useEffect(() => {
-    // Trust Wallet 不需要预先创建交易，跳过
-    if (state.walletType === 'trust') {
-      console.log('[Trust Wallet] Skipping transaction creation')
-      return
-    }
-
     if (!tx && !error) {
       if (createPaymentTransaction && publicKey && preferredRoute) {
         // Clear any previous errors before attempting to create transaction
@@ -177,6 +177,11 @@ export default function PaymentPage() {
   // Check for Phantom connection callback or payment response when component mounts
   useEffect(() => {
     // Use the URL parameters already parsed above
+    console.log('[Callback] URL params:', { phantomPk, nonce, data, errorCode })
+
+    // 检查是否有待处理的 SIWS 登录
+    const pendingSiwsMessage = localStorage.getItem('siws_pending_message')
+    console.log('[Callback] Pending SIWS message:', !!pendingSiwsMessage)
 
     // Handle connection callback
     if (phantomPk && nonce && data) {
@@ -196,65 +201,94 @@ export default function PaymentPage() {
       }
       processConnectCallback()
     }
-    // Handle payment response
+    // Handle signMessage callback (SIWS login) or payment response
     else if (nonce && data) {
-      const processPaymentResponse = async () => {
-        try {
-          console.log('Processing payment response from Phantom...')
+      // 检查是否是 SIWS 登录的 signMessage 回调
+      if (pendingSiwsMessage && !isAuthenticated) {
+        console.log('[Callback] Processing SIWS signMessage callback...')
+        const processSignInCallback = async () => {
+          try {
+            const result = await handleSignInCallback({
+              nonce: nonce,
+              data: data,
+            })
+            if (result.success) {
+              console.log('[Callback] SIWS login successful')
+              // 清除 URL 参数
+              const cleanUrl = window.location.pathname
+              window.history.replaceState({}, document.title, cleanUrl)
+            } else {
+              setError(result.error || 'Sign in failed')
+            }
+          } catch (err) {
+            console.error('[Callback] SIWS signMessage error:', err)
+            setError(`Sign in failed: ${err}`)
+          }
+        }
+        processSignInCallback()
+      } else {
+        // 否则是支付交易的 signTransaction 回调
+        const processPaymentResponse = async () => {
+          try {
+            console.log('Processing payment response from Phantom...')
 
-          // 通过 useWallet 暴露的 handlePaymentCallback 统一处理回调
-          const result = await handlePaymentCallback({
-            nonce: nonce,
-            data: data,
-          })
-          if (result.success && result.type === 'signTransaction') {
-            if (
-              typeof result.data === 'object' &&
-              result.data !== null &&
-              'transaction' in result.data &&
-              typeof (result.data as { transaction?: unknown }).transaction ===
-                'string'
-            ) {
-              // 签名成功，现在需要广播交易
-              try {
-                const signedTxData = (result.data as { transaction: string })
-                  .transaction
-                // Phantom 返回的是 base58 编码的交易数据
-                const signedTransaction = Transaction.from(
-                  bs58.decode(signedTxData)
-                )
-                const txHash = await sendRawTransaction(signedTransaction)
-                setTransactionSignature(txHash)
-                setIsComplete(true)
-                setIsPaymentProcessing(false)
-              } catch (broadcastError) {
-                console.error('Error broadcasting transaction:', broadcastError)
-                setError(`Failed to broadcast transaction: ${broadcastError}`)
+            // 通过 useWallet 暴露的 handlePaymentCallback 统一处理回调
+            const result = await handlePaymentCallback({
+              nonce: nonce,
+              data: data,
+            })
+            if (result.success && result.type === 'signTransaction') {
+              if (
+                typeof result.data === 'object' &&
+                result.data !== null &&
+                'transaction' in result.data &&
+                typeof (result.data as { transaction?: unknown })
+                  .transaction === 'string'
+              ) {
+                // 签名成功，现在需要广播交易
+                try {
+                  const signedTxData = (result.data as { transaction: string })
+                    .transaction
+                  // Phantom 返回的是 base58 编码的交易数据
+                  const signedTransaction = Transaction.from(
+                    bs58.decode(signedTxData)
+                  )
+                  const txHash = await sendRawTransaction(signedTransaction)
+                  setTransactionSignature(txHash)
+                  setIsComplete(true)
+                  setIsPaymentProcessing(false)
+                } catch (broadcastError) {
+                  console.error(
+                    'Error broadcasting transaction:',
+                    broadcastError
+                  )
+                  setError(`Failed to broadcast transaction: ${broadcastError}`)
+                  setIsPaymentProcessing(false)
+                }
+              } else {
+                setError('Payment response missing transaction data')
                 setIsPaymentProcessing(false)
               }
-            } else {
-              setError('Payment response missing transaction data')
+            } else if (!result.success) {
+              setError(result.error || 'Payment failed')
               setIsPaymentProcessing(false)
             }
-          } else if (!result.success) {
-            setError(result.error || 'Payment failed')
+
+            // Clean up the URL
+            const cleanUrl = window.location.pathname
+            window.history.replaceState({}, document.title, cleanUrl)
+          } catch (err) {
+            console.error('Error processing payment response:', err)
+            setError(`Failed to process payment response: ${err}`)
             setIsPaymentProcessing(false)
           }
-
-          // Clean up the URL
-          const cleanUrl = window.location.pathname
-          window.history.replaceState({}, document.title, cleanUrl)
-        } catch (err) {
-          console.error('Error processing payment response:', err)
-          setError(`Failed to process payment response: ${err}`)
-          setIsPaymentProcessing(false)
         }
-      }
 
-      if (publicKey) {
-        processPaymentResponse()
-      } else {
-        setError('Wallet not connected')
+        if (publicKey) {
+          processPaymentResponse()
+        } else {
+          setError('Wallet not connected')
+        }
       }
     }
     // Handle payment errors
@@ -271,9 +305,16 @@ export default function PaymentPage() {
   }, [
     orderId,
     handleConnectCallback,
+    handleSignInCallback,
+    handlePaymentCallback,
     publicKey,
     setError,
-    handlePaymentCallback,
+    sendRawTransaction,
+    isAuthenticated,
+    phantomPk,
+    nonce,
+    data,
+    errorCode,
   ])
 
   // Connect to Phantom wallet
@@ -320,8 +361,7 @@ export default function PaymentPage() {
       paymentOrderId,
     })
 
-    // Trust Wallet 不需要 publicKey（会自动使用用户当前账户）
-    if (!isConnected || (!publicKey && state.walletType !== 'trust')) {
+    if (!isConnected || !publicKey) {
       console.log('handlePay not connected', isConnected, publicKey)
       await handleConnectWallet()
       return
@@ -349,9 +389,8 @@ export default function PaymentPage() {
         adapter?.capabilities
       )
 
-      // 判断钱包类型
+      // Phantom / OKX 支付流程
       if (adapter?.capabilities.supportsSeparateSign) {
-        // ===== Phantom / OKX 流程（现有逻辑） =====
         if (!tx) {
           throw new Error('Failed to create transaction')
         }
@@ -380,62 +419,10 @@ export default function PaymentPage() {
             console.log(
               'Phantom wallet redirect pending, waiting for callback...'
             )
-            // 保持 payment processing 状态，不重置
-            // 不设置错误，让回调处理完成支付流程
             return
           }
-          // 其他错误正常抛出
           throw signError
         }
-      } else if (adapter?.capabilities.needsUserConfirmation) {
-        // ===== Trust Wallet 流程（新增） =====
-        if (!preferredRoute) {
-          throw new Error('Missing preferred route')
-        }
-
-        console.log('Starting Trust Wallet payment process...')
-
-        // 构建 UAI 格式的 asset
-        const asset = TrustWalletAdapter.toUAI(
-          preferredRoute.tokenAddress || null
-        )
-
-        // 计算金额（转换为实际单位）
-        const amount = preferredRoute.tokenAmount.toString()
-
-        // 构建 base64 编码的 memo
-        const memoData = btoa(
-          JSON.stringify({
-            webpay: {
-              orderId: order.id,
-            },
-          })
-        )
-
-        console.log('[Trust Wallet] Payment params:', {
-          to: preferredRoute.payToAddress,
-          amount,
-          asset,
-          memo: memoData,
-        })
-
-        // 发起支付（会显示确认弹窗）
-        await sendTrustWalletPayment(
-          {
-            to: preferredRoute.payToAddress,
-            amount: amount,
-            asset: asset,
-            memo: memoData,
-          },
-          // 用户确认后的回调
-          () => {
-            console.log('[Trust Wallet] User confirmed payment completion')
-            // 设置占位符，触发轮询
-            setTransactionSignature('trust_wallet_pending')
-            setIsComplete(true)
-            setIsPaymentProcessing(false)
-          }
-        )
       } else {
         throw new Error('Unsupported wallet type')
       }
@@ -471,12 +458,9 @@ export default function PaymentPage() {
     publicKey,
     tx,
     adapter,
-    preferredRoute,
-    state.walletType,
     handleConnectWallet,
     signTransaction,
     sendRawTransaction,
-    sendTrustWalletPayment,
     setError,
     paymentOrderId,
   ])
@@ -560,7 +544,7 @@ export default function PaymentPage() {
     <div className="bg-base-200 relative h-full overflow-auto">
       {shouldShowError ? (
         // Error state UI
-        (<div className="m-auto w-xs py-10">
+        <div className="m-auto w-xs py-10">
           <h1 className="text-5xl font-bold">
             {isBalanceError
               ? 'Insufficient Balance'
@@ -677,10 +661,10 @@ export default function PaymentPage() {
               Back to Payment
             </button>
           </div>
-        </div>)
+        </div>
       ) : (
         // Normal payment UI
-        (<div className="bg-base-300 flex h-full w-full items-center justify-center px-8 py-4 pb-8">
+        <div className="bg-base-300 flex h-full w-full items-center justify-center px-8 py-4 pb-8">
           <div className="min-w-xs">
             {orderConfirmed && <div className="paid-bg-gradient"></div>}
             <div className="my-10 flex flex-col gap-y-4 text-center">
@@ -721,21 +705,16 @@ export default function PaymentPage() {
                       <>
                         <div className="text-base-content p-4 text-center text-xs">
                           Pay Success!{' '}
-                          {/* Trust Wallet 暂时没有交易哈希，不显示链接 */}
-                          {transactionSignature !== 'trust_wallet_pending' && (
-                            <>
-                              <a
-                                href={getSolanaExplorerUrl(
-                                  transactionSignature
-                                )}
-                                target="_blank"
-                                className="link link-primary"
-                              >
-                                View on Solana Explorer
-                              </a>
-                              .
-                            </>
-                          )}
+                          <>
+                            <a
+                              href={getSolanaExplorerUrl(transactionSignature)}
+                              target="_blank"
+                              className="link link-primary"
+                            >
+                              View on Solana Explorer
+                            </a>
+                            .
+                          </>
                         </div>
                         <button className={MainButtonClass} disabled>
                           <span className="loading loading-spinner loading-xs"></span>
@@ -746,20 +725,16 @@ export default function PaymentPage() {
                       <button
                         className={MainButtonClass}
                         onClick={async () => {
-                          // Trust Wallet 跳过余额检查（会在钱包内检查）
-                          if (state.walletType !== 'trust') {
-                            // Double-check balance before payment
-                            const balanceCheck = await checkBalance()
-                            if (!balanceCheck.sufficient) {
-                              setError(balanceCheck.details)
-                              return
-                            }
+                          // Double-check balance before payment
+                          const balanceCheck = await checkBalance()
+                          if (!balanceCheck.sufficient) {
+                            setError(balanceCheck.details)
+                            return
                           }
                           handlePay()
                         }}
                         disabled={
-                          // Trust Wallet 不需要预先创建交易，所以不检查 tx
-                          (state.walletType !== 'trust' && !tx) ||
+                          !tx ||
                           isLoading ||
                           isPaymentProcessing ||
                           isPaymentCallback
@@ -783,10 +758,73 @@ export default function PaymentPage() {
                 </div>
               ) : null
             ) : (
-              <GoogleLoginButton />
+              <div className="py-4">
+                <div className="mx-auto max-w-md px-1">
+                  {!isConnected ? (
+                    // 未连接钱包：显示连接按钮
+                    <button
+                      className="btn btn-primary btn-block h-14 rounded-full text-base font-bold shadow-lg"
+                      onClick={() => openWalletSelector()}
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="mr-2 h-6 w-6"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                        />
+                      </svg>
+                      Connect Wallet
+                    </button>
+                  ) : (
+                    // 已连接钱包但未登录：显示登录按钮
+                    <button
+                      className="btn btn-primary btn-block h-14 rounded-full text-base font-bold shadow-lg"
+                      onClick={() => signIn()}
+                      disabled={isSigningIn}
+                    >
+                      {isSigningIn ? (
+                        <span className="loading loading-spinner loading-sm mr-2"></span>
+                      ) : (
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="mr-2 h-6 w-6"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"
+                          />
+                        </svg>
+                      )}
+                      {isSigningIn ? 'Signing In...' : 'Sign In with Wallet'}
+                    </button>
+                  )}
+                  {siwsError && (
+                    <p className="text-error mt-2 text-center text-xs">
+                      {siwsError}
+                    </p>
+                  )}
+                  <p className="mt-3 text-center text-xs text-gray-500">
+                    {isConnected
+                      ? `Wallet: ${publicKey?.slice(0, 6)}...${publicKey?.slice(-4)}`
+                      : 'Sign in with your Solana wallet to continue'}
+                  </p>
+                </div>
+              </div>
             )}
           </div>
-        </div>)
+        </div>
       )}
     </div>
   )

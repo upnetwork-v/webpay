@@ -1,64 +1,67 @@
 /**
  * Authentication related types for OntaPay KYC system
+ * Supports both SIWS (Sign In With Solana) and legacy Google OAuth users
  */
 
-export interface User {
+/**
+ * SIWS 用户核心字段（来自 /api/siws/user）
+ */
+export interface SIWSUserFields {
+  id: string
+  address: string
+  chain: string
+  createdAt: string
+  updatedAt: string
+  transaction_limit: string
+  transaction_total: string
   /**
-   * 徽章数量
+   * kyc状态
+   * 0 - 未验证
+   * 1 - 验证中
+   * 2 - 验证通过
+   * 3 - 验证失败
    */
-  badge: number;
-  createdAt: string;
-  google_email: string;
-  google_id: string;
-  id: string;
-  inviteCode: string;
-  principal_id: string;
-  /**
-   * 白名单标志位
-   */
-  privilege: boolean;
-  transaction_limit: string;
-  transaction_total: string;
-  updatedAt: string;
-  username: string;
-  /**
-   * kyc状态，0 未验证
-   * 1 验证中
-   * 2 验证通过
-   * 3 验证失败
-   */
-  verified: 0 | 1 | 2 | 3;
+  verified: 0 | 1 | 2 | 3
+}
+
+/**
+ * 统一用户类型 - 兼容 SIWS 和 Google OAuth
+ */
+export interface User extends SIWSUserFields {
+  // 以下字段为遗留 Google OAuth 字段，现为可选
+  badge?: number
+  google_email?: string
+  google_id?: string
+  inviteCode?: string
+  principal_id?: string
+  privilege?: boolean
+  username?: string
 }
 
 export interface UserResponse {
-  code: number;
-  data: User | null;
-  message: string;
+  code: number
+  data: User | null
+  message: string
 }
 
 export interface AuthState {
-  isAuthenticated: boolean;
-  authToken: string | null;
-  user: User | null;
-  isLoading: boolean;
-  error: string | null;
+  isAuthenticated: boolean
+  authToken: string | null
+  user: User | null
+  isLoading: boolean
+  error: string | null
+  // SIWS 登录需要记录钱包地址
+  walletAddress: string | null
 }
 
 export interface AuthActions {
-  login: (token: string) => void;
-  logout: () => void;
-  setLoading: (loading: boolean) => void;
-  setError: (error: string | null) => void;
-  checkAuth: () => boolean;
-  clearError: () => void;
-  initialize: () => Promise<void>;
+  login: (token: string, address?: string) => void
+  logout: () => void
+  setLoading: (loading: boolean) => void
+  setError: (error: string | null) => void
+  checkAuth: () => boolean
+  clearError: () => void
+  initialize: () => Promise<void>
 }
 
 export interface AuthStore extends AuthState, AuthActions {}
-
-export interface GoogleOAuthConfig {
-  clientId: string;
-  redirectUri: string;
-  authorizeUrl: string;
-  scopes: string[];
-}

@@ -46,7 +46,7 @@ export async function generateMessage(
     }
     return null
   } catch (error) {
-    console.error('Failed to get user info:', error)
+    console.error('Failed to generate message:', error)
     return null
   }
 }
@@ -85,9 +85,7 @@ export async function verifySignature(
 }
 
 //获取siws用户资料
-export interface GetUserInfoRequest {
-  address: string
-}
+
 export interface GetUserInfoResponse {
   code: number
   data: GetUserInfoData
@@ -111,13 +109,10 @@ export interface GetUserInfoData {
   verified: number
 }
 
-export async function getUserInfo(
-  request: GetUserInfoRequest
-): Promise<GetUserInfoData | null> {
+export async function getUserInfo(): Promise<GetUserInfoData | null> {
   try {
-    const response = await fetchInstance.post<GetUserInfoResponse>(
-      `${import.meta.env.VITE_UP_SERVICE_API_HOST}/api/siws/user`,
-      request
+    const response = await fetchInstance.get<GetUserInfoResponse>(
+      `${import.meta.env.VITE_UP_SERVICE_API_HOST}/api/siws/user`
     )
     if (response.code === 200) {
       return response.data
