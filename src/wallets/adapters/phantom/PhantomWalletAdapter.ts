@@ -72,6 +72,38 @@ function clearPhantomWalletState() {
   localStorage.removeItem(PHANTOM_WALLET_STATE_KEY)
 }
 
+/**
+ * Phantom Solana Provider 接口定义
+ * 用于 in-app browser 或 browser extension 环境
+ */
+interface PhantomSolanaProvider {
+  isPhantom: boolean
+  publicKey: { toString(): string } | null
+  isConnected: boolean
+  connect(): Promise<{ publicKey: { toString(): string } }>
+  disconnect(): Promise<void>
+  signMessage(
+    message: Uint8Array,
+    encoding: string
+  ): Promise<{ signature: Uint8Array }>
+  signTransaction(transaction: Transaction): Promise<Transaction>
+  signAndSendTransaction(
+    transaction: Transaction
+  ): Promise<{ signature: string }>
+}
+
+/**
+ * 获取 Phantom 的 injected provider
+ * 在 Phantom 内嵌浏览器或已安装 Phantom 扩展的桌面浏览器中可用
+ */
+function getPhantomProvider(): PhantomSolanaProvider | null {
+  const provider = (window as any).phantom?.solana || (window as any).solana
+  if (provider?.isPhantom) {
+    return provider as PhantomSolanaProvider
+  }
+  return null
+}
+
 export class PhantomWalletAdapter implements WalletAdapter {
   private _publicKey: string | null = null
   private _connected: boolean = false
@@ -103,6 +135,25 @@ export class PhantomWalletAdapter implements WalletAdapter {
   }
 
   async connect(): Promise<void> {
+    // 优先尝试使用 injected provider（Phantom 内嵌浏览器或桌面扩展）
+    const provider = getPhantomProvider()
+
+    if (provider) {
+      console.log('[connect] Using injected Phantom provider')
+      try {
+        const resp = await provider.connect()
+        this._publicKey = resp.publicKey.toString()
+        this._connected = true
+        // 对于 injected provider，不需要保存加密相关的状态
+        return
+      } catch (err) {
+        console.error('[connect] Injected provider failed:', err)
+        throw err
+      }
+    }
+
+    // Fall back 到 Deep Link 模式（手机浏览器）
+    console.log('[connect] Using deep link mode')
     if (!this.dappKeyPair) {
       this.dappKeyPair = nacl.box.keyPair()
       saveDappKeyPairToSession(this.dappKeyPair)
@@ -126,6 +177,17 @@ export class PhantomWalletAdapter implements WalletAdapter {
   }
 
   async disconnect(): Promise<void> {
+    // 如果有 injected provider，调用其 disconnect
+    const provider = getPhantomProvider()
+    if (provider?.isConnected) {
+      console.log('[disconnect] Disconnecting from injected provider')
+      try {
+        await provider.disconnect()
+      } catch (err) {
+        console.warn('[disconnect] Provider disconnect failed:', err)
+      }
+    }
+
     console.log('[disconnect] 清理 dappKeyPair')
     this._publicKey = null
     this._connected = false
@@ -141,7 +203,22 @@ export class PhantomWalletAdapter implements WalletAdapter {
   }
 
   async signTransaction(transaction: Transaction): Promise<Transaction> {
-    console.log('signTransaction', {
+    // 优先尝试使用 injected provider
+    const provider = getPhantomProvider()
+
+    if (provider) {
+      console.log('[signTransaction] Using injected Phantom provider')
+      try {
+        const signedTx = await provider.signTransaction(transaction)
+        return signedTx
+      } catch (err) {
+        console.error('[signTransaction] Injected provider failed:', err)
+        throw err
+      }
+    }
+
+    // Fall back 到 Deep Link 模式
+    console.log('[signTransaction] Using deep link mode', {
       phantomEncryptionPublicKey: this.phantomEncryptionPublicKey,
       session: this.session,
       dappKeyPair: this.dappKeyPair,
@@ -271,10 +348,20 @@ export class PhantomWalletAdapter implements WalletAdapter {
   }
 
   isConnected(): boolean {
+    // 优先检查 injected provider 的连接状态
+    const provider = getPhantomProvider()
+    if (provider) {
+      return provider.isConnected
+    }
     return this._connected
   }
 
   getPublicKey(): string | null {
+    // 优先从 injected provider 获取公钥
+    const provider = getPhantomProvider()
+    if (provider?.publicKey) {
+      return provider.publicKey.toString()
+    }
     return this._publicKey
   }
 
