@@ -122,9 +122,16 @@ export function useSIWS(): UseSIWSResult {
         if (result.success && result.type === 'signMessage') {
           const signatureData = result.data as { signature: string }
 
+          // 从 adapter 获取 publicKey，因为在 deeplink 回调时 state.publicKey 可能还未同步
+          // adapter 在构造时会从 localStorage 恢复状态
+          const walletPublicKey = adapter?.getPublicKey() || state.publicKey
+          if (!walletPublicKey) {
+            throw new Error('Wallet public key not found')
+          }
+
           // 验证签名获取 token
           const authData = await verifySignature({
-            address: state.publicKey!,
+            address: walletPublicKey,
             signature: signatureData.signature,
           })
 
@@ -133,7 +140,7 @@ export function useSIWS(): UseSIWSResult {
           }
 
           // 登录
-          await login(authData.authToken, state.publicKey!)
+          await login(authData.authToken, walletPublicKey)
 
           return { success: true }
         } else if (!result.success) {
@@ -150,7 +157,7 @@ export function useSIWS(): UseSIWSResult {
         setIsSigningIn(false)
       }
     },
-    [state.publicKey, login, handleSignMessageCallback]
+    [state.publicKey, adapter, login, handleSignMessageCallback]
   )
 
   return {

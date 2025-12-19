@@ -17,6 +17,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 export default function PaymentPage() {
   const { orderId } = Route.useParams()
   const [order, setOrder] = useState<Order | null>(null)
+
+  // Ref to track if SIWS callback has been handled (prevents duplicate processing)
+  const siwsCallbackHandledRef = useRef(false)
   const paymentOrderId = useMemo(() => {
     return order?.id || null
   }, [order])
@@ -34,8 +37,11 @@ export default function PaymentPage() {
     const nonce = urlParams.get('nonce')
     const data = urlParams.get('data')
     const phantomPk = urlParams.get('phantom_encryption_public_key')
-    // If we have payment callback parameters, we're processing a payment
-    return !!(nonce && data && !phantomPk)
+    // 检查是否是 SIWS 登录回调（有待处理的签名消息）
+    const pendingSiwsMessage = localStorage.getItem('siws_pending_message')
+    // If we have payment callback parameters AND it's not a SIWS callback, we're processing a payment
+    // SIWS 回调也有 nonce 和 data，但同时有 siws_pending_message
+    return !!(nonce && data && !phantomPk && !pendingSiwsMessage)
   })
 
   // Check URL parameters to determine if we're in a payment callback state
@@ -205,7 +211,18 @@ export default function PaymentPage() {
     else if (nonce && data) {
       // 检查是否是 SIWS 登录的 signMessage 回调
       if (pendingSiwsMessage && !isAuthenticated) {
+        // 防止重复处理（isAuthenticated 改变会触发 useEffect 再次执行）
+        if (siwsCallbackHandledRef.current) {
+          console.log('[Callback] SIWS callback already handled, skipping...')
+          return
+        }
+        siwsCallbackHandledRef.current = true
+
         console.log('[Callback] Processing SIWS signMessage callback...')
+        // 立即清除 URL 参数，防止 useEffect 重复执行时再次处理
+        const cleanUrl = window.location.pathname
+        window.history.replaceState({}, document.title, cleanUrl)
+
         const processSignInCallback = async () => {
           try {
             const result = await handleSignInCallback({
@@ -214,9 +231,6 @@ export default function PaymentPage() {
             })
             if (result.success) {
               console.log('[Callback] SIWS login successful')
-              // 清除 URL 参数
-              const cleanUrl = window.location.pathname
-              window.history.replaceState({}, document.title, cleanUrl)
             } else {
               setError(result.error || 'Sign in failed')
             }
@@ -227,6 +241,15 @@ export default function PaymentPage() {
         }
         processSignInCallback()
       } else {
+        // 如果 SIWS 回调已经处理过，跳过支付处理
+        // （isAuthenticated 变化会触发 useEffect，但此时不应该走支付分支）
+        if (siwsCallbackHandledRef.current) {
+          console.log(
+            '[Callback] SIWS callback was handled, skipping payment processing...'
+          )
+          return
+        }
+
         // 否则是支付交易的 signTransaction 回调
         const processPaymentResponse = async () => {
           try {
