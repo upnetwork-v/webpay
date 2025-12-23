@@ -1,94 +1,94 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect } from "react";
-import { useAuthStore } from "@/stores";
-import Logo from "@/assets/img/logo.svg";
+import Logo from '@/assets/img/logo.svg'
+import { useAuthStore } from '@/stores'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { useEffect } from 'react'
 
-export const Route = createFileRoute("/")({
+export const Route = createFileRoute('/')({
   component: Index,
   validateSearch: (search: Record<string, unknown>) => {
     return {
-      auth_token: search["auth-token"] as string | undefined,
-      error: search["error"] as string | undefined,
-    };
+      auth_token: search['auth-token'] as string | undefined,
+      error: search['error'] as string | undefined,
+    }
   },
-});
+})
 
 function Index() {
-  const navigate = useNavigate();
-  const { auth_token, error } = Route.useSearch();
+  const navigate = useNavigate()
+  const { auth_token, error } = Route.useSearch()
   const {
     login,
     setError,
     isAuthenticated,
-    user,
     isLoading,
     error: authError,
-  } = useAuthStore();
+  } = useAuthStore()
 
+  // Handle OAuth callback
   useEffect(() => {
     const handleAuthCallback = async () => {
       if (error) {
-        console.error("Authentication error:", error);
-        setError(`Authentication failed: ${error}`);
-        return;
+        console.error('Authentication error:', error)
+        setError(`Authentication failed: ${error}`)
+        return
       }
 
-      // 获取重定向 URL
-      const redirectRoute = sessionStorage.getItem("ontapay_redirect_route");
-
-      if (auth_token && redirectRoute) {
+      if (auth_token) {
         try {
-          // 登录用户
-          login(auth_token);
+          // Login user
+          await login(auth_token)
 
-          sessionStorage.removeItem("ontapay_redirect_route");
-          navigate({ to: redirectRoute });
+          // Get saved redirect route or default to wallet
+          const redirectRoute =
+            sessionStorage.getItem('ontapay_redirect_route') || '/wallet'
+          sessionStorage.removeItem('ontapay_redirect_route')
+          navigate({ to: redirectRoute })
         } catch (err) {
-          console.error("Failed to process auth token:", err);
-          setError("Failed to process authentication");
+          console.error('Failed to process auth token:', err)
+          setError('Failed to process authentication')
         }
       }
-    };
+    }
 
-    handleAuthCallback();
-  }, [auth_token, error, login, setError, navigate]);
+    handleAuthCallback()
+  }, [auth_token, error, login, setError, navigate])
 
-  // 显示加载状态
-  if (auth_token || error) {
-    return (
-      <div className="min-h-screen bg-base-200 hero">
-        <div className="text-center hero-content">
-          <div className="max-w-md">
-            <img src={Logo} alt="OntaPay" className="mx-auto h-8 mb-4" />
-            <div className="loading loading-spinner loading-lg"></div>
-            <p className="py-4">
-              {error ? "Authentication failed" : "Processing authentication..."}
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // Auto-redirect when not processing OAuth callback
+  useEffect(() => {
+    // Skip if we're processing OAuth callback
+    if (auth_token || error) {
+      return
+    }
 
-  // 正常首页内容
+    // Skip if still loading auth state
+    if (isLoading) {
+      return
+    }
+
+    // Redirect based on auth state
+    if (isAuthenticated) {
+      navigate({ to: '/wallet' })
+    } else {
+      navigate({ to: '/login' })
+    }
+  }, [auth_token, error, isAuthenticated, isLoading, navigate])
+
+  // Show loading state while processing OAuth or checking auth
   return (
-    <div className="min-h-screen bg-base-200 hero">
-      <div className="text-center hero-content">
+    <div className="bg-base-200 hero min-h-screen">
+      <div className="hero-content text-center">
         <div className="max-w-md">
-          <img src={Logo} alt="OntaPay" className="mx-auto h-8 mb-4" />
-          <h1 className="font-bold text-3xl mb-4">Welcome to OntaPay</h1>
-          <p className="py-4">Secure cryptocurrency payments for merchants</p>
-
-          {/* Debug info for auth store initialization */}
-          <div className="mt-8 p-4 bg-base-100 rounded-lg text-left text-sm">
-            <h3 className="font-bold mb-2">Auth Store Status:</h3>
-            <p>Authenticated: {isAuthenticated ? "✅" : "❌"}</p>
-            <p>Loading: {isLoading ? "⏳" : "✅"}</p>
-            <p>User: {user ? `✅ ${user.username}` : "❌"}</p>
-            {authError && <p className="text-error">Error: {authError}</p>}
-          </div>
+          <img src={Logo} alt="OntaPay" className="mx-auto mb-4 h-8" />
+          <div className="loading loading-spinner loading-lg"></div>
+          <p className="py-4">
+            {error
+              ? `Authentication failed: ${error}`
+              : authError
+                ? authError
+                : 'Loading...'}
+          </p>
         </div>
       </div>
     </div>
-  );
+  )
 }

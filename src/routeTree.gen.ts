@@ -9,10 +9,22 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as WalletRouteImport } from './routes/wallet'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as WebpayOrder_idOrderIdRouteImport } from './routes/webpay/order_id/$orderId'
 
+const WalletRoute = WalletRouteImport.update({
+  id: '/wallet',
+  path: '/wallet',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AboutRoute = AboutRouteImport.update({
   id: '/about',
   path: '/about',
@@ -32,35 +44,63 @@ const WebpayOrder_idOrderIdRoute = WebpayOrder_idOrderIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/login': typeof LoginRoute
+  '/wallet': typeof WalletRoute
   '/webpay/order_id/$orderId': typeof WebpayOrder_idOrderIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/login': typeof LoginRoute
+  '/wallet': typeof WalletRoute
   '/webpay/order_id/$orderId': typeof WebpayOrder_idOrderIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/login': typeof LoginRoute
+  '/wallet': typeof WalletRoute
   '/webpay/order_id/$orderId': typeof WebpayOrder_idOrderIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/about' | '/webpay/order_id/$orderId'
+  fullPaths: '/' | '/about' | '/login' | '/wallet' | '/webpay/order_id/$orderId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/about' | '/webpay/order_id/$orderId'
-  id: '__root__' | '/' | '/about' | '/webpay/order_id/$orderId'
+  to: '/' | '/about' | '/login' | '/wallet' | '/webpay/order_id/$orderId'
+  id:
+    | '__root__'
+    | '/'
+    | '/about'
+    | '/login'
+    | '/wallet'
+    | '/webpay/order_id/$orderId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AboutRoute: typeof AboutRoute
+  LoginRoute: typeof LoginRoute
+  WalletRoute: typeof WalletRoute
   WebpayOrder_idOrderIdRoute: typeof WebpayOrder_idOrderIdRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/wallet': {
+      id: '/wallet'
+      path: '/wallet'
+      fullPath: '/wallet'
+      preLoaderRoute: typeof WalletRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/about': {
       id: '/about'
       path: '/about'
@@ -88,6 +128,8 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AboutRoute: AboutRoute,
+  LoginRoute: LoginRoute,
+  WalletRoute: WalletRoute,
   WebpayOrder_idOrderIdRoute: WebpayOrder_idOrderIdRoute,
 }
 export const routeTree = rootRouteImport
