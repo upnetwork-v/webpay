@@ -44,8 +44,8 @@ function PayNowPaymentComponent() {
   const pollPayoutStatus = async (
     payoutId: string
   ): Promise<'success' | 'failed' | 'timeout'> => {
-    const maxAttempts = 60 // 3 minutes
-    const interval = 3000 // 3 seconds
+    const maxAttempts = 60 // 5 minutes
+    const interval = 5000 // 5 seconds
 
     for (let i = 0; i < maxAttempts; i++) {
       try {
