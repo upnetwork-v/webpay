@@ -26,6 +26,7 @@ export const Route = createFileRoute('/wallet/pay/paynow')({
 function PayNowPaymentComponent() {
   const navigate = useNavigate()
   const location = useLocation()
+  const { payoutId } = Route.useParams()
   const {
     adapter,
     state,
@@ -52,8 +53,6 @@ function PayNowPaymentComponent() {
   const [error, setError] = useState<string>('')
   const [loading, setLoading] = useState(false)
   const [isPolling, setIsPolling] = useState(false)
-  const [restoredPayNowData, setRestoredPayNowData] =
-    useState<PayNowQRData | null>(payNowData || null)
 
   // Polling function for payout status
   const pollPayoutStatus = async (
@@ -115,6 +114,51 @@ function PayNowPaymentComponent() {
     return 'timeout'
   }
 
+  // Load payout data from API if payoutId is provided
+  useEffect(() => {
+    if (payoutId && !payoutData) {
+      console.log('[PayNow] Loading payout data for ID:', payoutId)
+      const loadPayoutData = async () => {
+        try {
+          const record = await getPayoutRecord(payoutId)
+          if (record.data) {
+            console.log('[PayNow] Payout data loaded:', record.data)
+            setPayoutData(record.data as PayoutData)
+            // Set step based on payment status
+            if (record.data.cryptoPaymentStatus === 'pending') {
+              setStep('preview')
+            } else if (
+              (record.data.cryptoPaymentStatus === 'verified' &&
+                record.data.fiatPaymentStatus === 'processing') ||
+              record.data.fiatPaymentStatus === 'processing'
+            ) {
+              setStep('verifying')
+              setIsPolling(true)
+              // Start polling
+              const pollResult = await pollPayoutStatus(payoutId)
+              setIsPolling(false)
+              if (pollResult === 'success') {
+                setStep('success')
+              } else {
+                setError('Payment verification failed or timeout')
+                setStep('preview')
+              }
+            } else if (
+              record.data.cryptoPaymentStatus === 'verified' &&
+              record.data.fiatPaymentStatus === 'success'
+            ) {
+              setStep('success')
+            }
+          }
+        } catch (err) {
+          console.error('[PayNow] Failed to load payout data:', err)
+          setError('Failed to load payment information')
+          navigate({ to: '/wallet' })
+        }
+      }
+      loadPayoutData()
+    }
+  }, [payoutId, payoutData, navigate])
   // Handle Phantom payment callback
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search)
@@ -123,19 +167,10 @@ function PayNowPaymentComponent() {
     const phantomPk = urlParams.get('phantom_encryption_public_key')
 
     // Handle payment response (not connection)
-    if (nonce && data && !phantomPk) {
+    if (nonce && data && !phantomPk && payoutId) {
       const processPaymentResponse = async () => {
         try {
           console.log('Processing payment response from Phantom...')
-
-          // Restore state from sessionStorage
-          const savedStateStr = sessionStorage.getItem('paynow_payment_state')
-          if (savedStateStr) {
-            const savedState = JSON.parse(savedStateStr)
-            setAmount(savedState.amount)
-            setPayoutData(savedState.payoutData)
-            setRestoredPayNowData(savedState.payNowData) // ⭐ Restore payNowData
-          }
 
           // Process the callback
           const result = await handlePaymentCallback({
@@ -166,39 +201,24 @@ function PayNowPaymentComponent() {
                 setLoading(true)
                 setIsPolling(true)
 
-                // Restore payoutData from saved state
-                const savedStateStr = sessionStorage.getItem(
-                  'paynow_payment_state'
-                )
-                if (savedStateStr) {
-                  const savedState = JSON.parse(savedStateStr)
-                  const pollResult = await pollPayoutStatus(
-                    savedState.payoutData.id
-                  )
+                const pollResult = await pollPayoutStatus(payoutId)
+                setIsPolling(false)
 
-                  setIsPolling(false)
-
-                  if (pollResult === 'success') {
-                    setStep('success')
-                  } else if (pollResult === 'failed') {
-                    setError(
-                      'Payment verification failed. Please contact support.'
-                    )
-                    setStep('preview')
-                  } else {
-                    setError(
-                      'Payment verification timeout. Please check your transaction status.'
-                    )
-                    setStep('preview')
-                  }
-                } else {
-                  // No saved state, just show success (fallback)
+                if (pollResult === 'success') {
                   setStep('success')
+                } else if (pollResult === 'failed') {
+                  setError(
+                    'Payment verification failed. Please contact support.'
+                  )
+                  setStep('preview')
+                } else {
+                  setError(
+                    'Payment verification timeout. Please check your transaction status.'
+                  )
+                  setStep('preview')
                 }
 
                 setLoading(false)
-                // Clean up
-                sessionStorage.removeItem('paynow_payment_state')
               } catch (broadcastError) {
                 console.error('Error broadcasting transaction:', broadcastError)
                 setError(`Failed to broadcast transaction: ${broadcastError}`)
@@ -229,42 +249,26 @@ function PayNowPaymentComponent() {
 
       processPaymentResponse()
     }
-  }, [handlePaymentCallback, sendRawTransaction])
+  }, [handlePaymentCallback, sendRawTransaction, payoutId])
 
-  // Handle payNowData - restore from sessionStorage if needed
-  useEffect(() => {
-    const currentPayNowData = payNowData || restoredPayNowData
-
-    if (!currentPayNowData) {
-      // Try to restore from sessionStorage first
-      const savedStateStr = sessionStorage.getItem('paynow_payment_state')
-      if (savedStateStr) {
-        try {
-          const savedState = JSON.parse(savedStateStr)
-          setRestoredPayNowData(savedState.payNowData)
-          // Don't redirect, let the restoration complete
-          return
-        } catch (err) {
-          console.error('Failed to restore state:', err)
-        }
-      }
-      // Really no data, redirect
-      navigate({ to: '/wallet' })
-    }
-  }, [payNowData, restoredPayNowData, navigate])
-
-  // Use either original payNowData or restored one
-  const activePayNowData = payNowData || restoredPayNowData
-
-  if (!activePayNowData) {
+  // Only require payNowData if we don't have payoutId
+  if (!payoutId && !payNowData) {
+    console.log('[Render] No payoutId or payNowData, redirecting to /wallet')
+    navigate({ to: '/wallet' })
     return null
   }
 
   const handleCancel = () => {
+    console.log('[handleCancel] Navigating to /wallet')
     navigate({ to: '/wallet' })
   }
 
   const handleContinue = async () => {
+    if (!payNowData) {
+      setError('Missing payment information')
+      return
+    }
+
     setError('')
     setLoading(true)
 
@@ -282,33 +286,39 @@ function PayNowPaymentComponent() {
 
       // Determine entity type based on proxy type
       const entityType =
-        activePayNowData.proxyType === 'uen' ? 'company' : 'individual'
+        payNowData?.proxyType === 'uen' ? 'company' : 'individual'
 
-      // Call createPayout API
-      const response = await createPayout({
+      // Create payout
+      console.log('[handleContinue] Creating payout...')
+      const payout = await createPayout({
         entityType,
-        entityValue: activePayNowData.proxyValue,
+        entityValue: payNowData?.proxyValue,
         value: amountInCents,
         currency: 'SGD',
         cryptoCurrency: 'USDC',
         cryptoChain: 'SOLANA',
         country: 'SG',
-        remark: activePayNowData.merchantName,
-        qrString: JSON.stringify(activePayNowData.rawData),
+        // optional fields
+        remark: payNowData?.merchantName,
+        qrString: JSON.stringify(payNowData?.rawData),
       })
 
-      if (!response.data) {
-        throw new Error('Failed to create payout order')
+      console.log('[handleContinue] Payout created:', payout.data?.id)
+
+      if (!payout.data) {
+        throw new Error('Failed to create payout')
       }
 
-      setPayoutData(response.data)
-      setStep('preview')
+      // Navigate to URL with payoutId
+      navigate({
+        to: `/wallet/pay/paynow/${payout.data.id}`,
+      })
     } catch (err) {
       console.error('Create payout error:', err)
       if (err instanceof PayoutAPIError) {
-        setError(err.message)
+        setError(`Failed to create payout: ${err.message}`)
       } else {
-        setError('Failed to create payment order. Please try again.')
+        setError('Failed to create payout')
       }
     } finally {
       setLoading(false)
@@ -328,17 +338,6 @@ function PayNowPaymentComponent() {
     try {
       // Convert crypto amount from smallest unit to USDC
       const usdcAmount = BigInt(payoutData.cryptoAmount)
-
-      // Save state to sessionStorage before deeplink (in case of redirect)
-      sessionStorage.setItem(
-        'paynow_payment_state',
-        JSON.stringify({
-          payNowData,
-          payoutData,
-          amount,
-          step: 'paying',
-        })
-      )
 
       // Create transaction with orderId
       const transaction = await createSPLTransferTransaction({
@@ -397,13 +396,10 @@ function PayNowPaymentComponent() {
       )
       setStep('preview')
       setLoading(false)
-
-      // Clean up sessionStorage on error
-      sessionStorage.removeItem('paynow_payment_state')
     }
   }
 
-  const isAmountEditable = !activePayNowData.amount
+  const isAmountEditable = !payNowData?.amount
 
   // Success Page
   if (step === 'success' && payoutData) {
@@ -440,7 +436,7 @@ function PayNowPaymentComponent() {
               <div>
                 <div className="text-sm text-gray-400">Place</div>
                 <div className="text-lg font-bold text-white">
-                  {activePayNowData.proxyValue}
+                  {payNowData?.proxyValue}
                 </div>
               </div>
             </div>
@@ -529,7 +525,7 @@ function PayNowPaymentComponent() {
             <div className="rounded-2xl bg-gray-800 p-6">
               <div className="mb-2 text-sm text-gray-400">Pay To</div>
               <div className="text-2xl font-bold text-blue-400">
-                {activePayNowData.proxyValue}
+                {payNowData?.proxyValue}
               </div>
             </div>
 
@@ -610,7 +606,7 @@ function PayNowPaymentComponent() {
             <h2 className="text-center text-xl font-normal">
               Review & confirm withdrawing SGD to
               <br />
-              <span className="font-bold">{activePayNowData.proxyValue}</span>
+              <span className="font-bold">{payNowData?.proxyValue}</span>
             </h2>
 
             {/* Transaction Details */}
@@ -639,7 +635,7 @@ function PayNowPaymentComponent() {
               <div className="flex justify-between">
                 <span className="text-gray-400">PayNow ID</span>
                 <span className="font-semibold text-purple-400">
-                  {activePayNowData.proxyValue}
+                  {payNowData?.proxyValue}
                 </span>
               </div>
 
@@ -737,7 +733,7 @@ function PayNowPaymentComponent() {
             <h2 className="text-center text-xl font-normal">
               Review & confirm withdrawing SGD to
               <br />
-              <span className="font-bold">{activePayNowData.proxyValue}</span>
+              <span className="font-bold">{payNowData?.proxyValue}</span>
             </h2>
 
             {/* Transaction Details (same as preview) */}
@@ -761,7 +757,7 @@ function PayNowPaymentComponent() {
               <div className="flex justify-between">
                 <span className="text-gray-400">PayNow ID</span>
                 <span className="font-semibold text-purple-400">
-                  {activePayNowData.proxyValue}
+                  {payNowData?.proxyValue}
                 </span>
               </div>
               <div className="flex justify-between">

@@ -60,14 +60,17 @@ function ScanPageComponent() {
   const onScanSuccess = async (decodedText: string) => {
     // Prevent multiple scans
     if (hasScanned) {
+      console.log('[Scanner] Already scanned, ignoring')
       return
     }
+
+    console.log('[Scanner] QR scanned:', decodedText)
     setHasScanned(true)
 
-    console.log('QR scanned:', decodedText)
-
-    // Stop scanning immediately
+    // Stop scanning immediately before any processing
+    console.log('[Scanner] Stopping scanner...')
     await stopScanning()
+    console.log('[Scanner] Scanner stopped')
 
     // Check if it's a PayNow QR code
     if (!isLikelyPayNowQR(decodedText)) {
@@ -85,6 +88,7 @@ function ScanPageComponent() {
     }
 
     // Navigate to payment page
+    console.log('[Scanner] Navigating to payment page')
     navigate({
       to: '/wallet/pay/paynow',
       state: {
@@ -98,8 +102,9 @@ function ScanPageComponent() {
     // Don't log to avoid console spam
   }
 
-  const handleCancel = () => {
-    stopScanning()
+  const handleCancel = async () => {
+    console.log('[Scanner] Cancel clicked, stopping scanner')
+    await stopScanning()
     navigate({ to: '/wallet' })
   }
 
