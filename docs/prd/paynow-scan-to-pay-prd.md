@@ -89,7 +89,7 @@ upnetwork-v2 (React Native App) 已实现扫码→支付功能，支持 PayNow�
       ↓
 6. [支付] 点击"确认支付" → 钱包弹窗签名 → 广播交易
       ↓
-7. [验证] 交易上链 → 调用 verifyCryptoTransaction → 轮询 getPayoutRecord
+7. [验证] 交易上链 → 轮询 getPayoutRecord（根据 fiatPaymentStatus 判断）
       ↓
 8. [完成] 显示支付成功页面 → 可查看交易详情
 ```
@@ -188,12 +188,12 @@ upnetwork-v2 (React Native App) 已实现扫码→支付功能，支持 PayNow�
 | ---- | ---------------------------------- | -------- | ------------------------------ |
 | F1   | 摄像头 QR 码扫描                   | 必须实现 | 使用 html5-qrcode 库           |
 | F2   | PayNow QR 码解析（EMVCo 标准）     | 必须实现 | 复用 upnetwork-v2 paynow.ts    |
-| F3   | Payout API 集成                    | 必须实现 | createPayout / verify / record |
+| F3   | Payout API 集成                    | 必须实现 | createPayout / getPayoutRecord |
 | F4   | 支付金额输入与校验                 | 必须实现 | SGD 格式，2 位小数             |
 | F5   | 汇率计算与展示                     | 必须实现 | 后端返回，前端展示             |
 | F6   | Solana USDC 转账                   | 必须实现 | 复用现有 transaction.ts        |
 | F7   | 交易签名（Phantom/OKX）            | 必须实现 | 复用现有钱包适配器             |
-| F8   | 交易状态轮询                       | 必须实现 | 最多 60 次，每 3 秒            |
+| F8   | 交易状态轮询                       | 必须实现 | 轮询 getPayoutRecord，判断 fiatPaymentStatus |
 | F9   | 支付结果展示                       | 必须实现 | 成功/失败状态                  |
 | F10  | 订单超时处理                       | 必须实现 | 5 分钟超时返回输入步骤         |
 
@@ -296,9 +296,8 @@ interface CreatePayoutParams {
   entityValue: string;        // PayNow ID（手机号/UEN）
   value: string;              // 金额（分，如 "1000" = 10.00 SGD）
   currency: 'SGD';            // 法币类型
-  cryptoCurrency: 'USDC';     // 加密货币类型
-  cryptoChain: 'SOLANA';      // 链名称
-  paymentAddress: string;     // 付款方 Solana 地址
+  cryptoCurrency: 'USDC';     // ⭐ 必须指定 'USDC' 生成 USDC 支付订单
+  cryptoChain: 'SOLANA';      // ⭐ 必须指定 'SOLANA' 生成 Solana 链订单
   country: 'SG';              // 国家
   remark?: string;            // 备注（可选）
   qrString?: string;          // 原始 QR 字符串（可选）
@@ -312,20 +311,40 @@ interface CreatePayoutResponse {
   code: number;               // 200 = 成功
   msg: string;
   data: {
-    id: string;               // Payout 订单 ID
+    id: string;               // Payout 订单 ID（用于 Memo 中的 orderId）
     fiatAmount: number;       // 法币金额
     fiatCurrency: string;     // 法币类型
-    cryptoCurrency: string;   // 加密货币类型
+    cryptoCurrency: string;   // 后端返回的加密货币类型
     cryptoAmount: string;     // 需支付的加密货币数量（最小单位）
     cryptoDecimal: number;    // 精度
-    cryptoChain: string;      // 链名称
-    paymentAddress: string;   // 收款地址
+    cryptoChain: string;      // 后端返回的链名称
+    paymentAddress: string;   // ⭐ 收款地址（用于链上转账的目标地址）
     exchangeRate: string;     // 汇率
     orderExpiresAt: string;   // ISO 时间
     orderExpiresAtTs: number; // 时间戳
-    cryptoPaymentStatus: 'pending' | 'success' | 'failed';
-    fiatPaymentStatus: 'pending' | 'success' | 'failed';
+    cryptoPaymentStatus: 'pending' | 'verified' | 'failed' | 'expired';
+    fiatPaymentStatus: 'pending' | 'processing' | 'success' | 'failed';
   } | null;
+}
+```
+
+**状态字段说明：**
+
+| 字段 | 可能值 | 说明 |
+|------|--------|------|
+| `cryptoPaymentStatus` | `pending` | 加密货币支付待确认 |
+|  | `verified` | 加密货币支付已验证 |
+|  | `failed` | 加密货币支付失败 |
+|  | `expired` | 订单已过期 |
+| `fiatPaymentStatus` | `pending` | 法币支付待处理 |
+|  | `processing` | 法币支付处理中 |
+|  | `success` | 法币支付成功 |
+|  | `failed` | 法币支付失败 |
+
+**⭐ 支付成功判断条件：**
+```typescript
+if (cryptoPaymentStatus === 'verified' && fiatPaymentStatus === 'success') {
+  // 交易完成
 }
 ```
 
@@ -338,32 +357,7 @@ interface CreatePayoutResponse {
 
 ---
 
-#### `POST /payout/verify-crypto-transaction`
-
-验证链上交易
-
-**Request Body:**
-
-```typescript
-interface VerifyCryptoTransactionParams {
-  blockIndex: number;  // 对于 Solana 应传入 slot 或签名的数字形式
-}
-```
-
-**Response:**
-
-```typescript
-interface VerifyCryptoTransactionResponse {
-  code: number;
-  msg: string;
-  data: {
-    payoutRecordId: string;
-    blockIndex: number;
-    cryptoPaymentStatus: string;
-    verifiedAt: string;
-  } | null;
-}
-```
+> **注意：** Solana 链支付不需要调用 `verifyCryptoTransaction` 接口，交易广播后直接轮询 `getPayoutRecord` 即可。
 
 ---
 
@@ -379,11 +373,27 @@ interface PayoutRecordResponse {
   msg: string;
   data: {
     id: string;
-    cryptoPaymentStatus: 'pending' | 'verified' | 'failed';
-    fiatPaymentStatus: 'pending' | 'success' | 'failed';
+    cryptoPaymentStatus: 'pending' | 'verified' | 'failed' | 'expired';
+    fiatPaymentStatus: 'pending' | 'processing' | 'success' | 'failed';
     // ... 其他字段
   } | null;
 }
+```
+
+**轮询成功判断：**
+```typescript
+// 支付成功
+if (data.cryptoPaymentStatus === 'verified' && data.fiatPaymentStatus === 'success') {
+  return 'success';
+}
+
+// 支付失败
+if (data.cryptoPaymentStatus === 'failed' || data.fiatPaymentStatus === 'failed') {
+  return 'failed';
+}
+
+// 继续轮询
+return 'pending';
 ```
 
 ### 7.3 前端所需字段清单
@@ -454,10 +464,9 @@ interface PayoutRecordResponse {
 
 ### 10.1 后端检查项
 
-- [ ] `/payout/create` API 返回 Solana USDC 支付选项
-- [ ] `/payout/verify-crypto-transaction` 可正确解析 Solana 交易
-- [ ] `/payout/record/{id}` 返回正确的支付状态
-- [ ] 交易 Memo `{"webpay":{"orderId":"xxx"}}` 可被正确解析
+- [ ] `/payout/create` API 返回 cryptoChain、cryptoCurrency、paymentAddress
+- [ ] `/payout/record/{id}` 返回正确的 fiatPaymentStatus
+- [ ] 交易 Memo `{"webpay":{"orderId":"payoutId"}}` 可被正确解析
 
 ### 10.2 前端检查项
 
