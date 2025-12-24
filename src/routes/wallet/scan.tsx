@@ -17,6 +17,8 @@ function ScanPageComponent() {
 
   const [hasScanned, setHasScanned] = useState(false)
 
+  const scannerRunning = useRef(false)
+
   useEffect(() => {
     // Only start scanner once when component mounts
     startScanning()
@@ -28,6 +30,11 @@ function ScanPageComponent() {
   }, []) // Empty dependency array - only run once
 
   const startScanning = async () => {
+    if (scannerRunning.current) {
+      console.log('[Scanner] Already running, skipping start')
+      return
+    }
+
     try {
       // Ensure previous instance is cleaned up
       if (html5QrCodeRef.current) {
@@ -46,6 +53,7 @@ function ScanPageComponent() {
       setError('')
 
       console.log('[Scanner] Starting scanner...')
+      scannerRunning.current = true
       await html5QrCode.start(
         { facingMode: 'environment' },
         {
@@ -57,23 +65,32 @@ function ScanPageComponent() {
       )
     } catch (err) {
       console.error('Failed to start scanner:', err)
+      scannerRunning.current = false
       setError('无法启动摄像头，请检查权限设置')
     }
   }
 
   const stopScanning = async () => {
-    // Force stop if reference exists, don't rely solely on isScanning property
-    // which might be flaky inside callbacks
+    // Prevent multiple stop calls
+    if (!scannerRunning.current && !html5QrCodeRef.current) {
+      return
+    }
+
+    // Force stop if reference exists
     if (html5QrCodeRef.current) {
       try {
         console.log('[Scanner] Attempting to stop scanner...')
-        await html5QrCodeRef.current.stop()
+        // Check if library thinks it's scanning before calling stop to avoid error
+        if (html5QrCodeRef.current.isScanning) {
+          await html5QrCodeRef.current.stop()
+        }
         html5QrCodeRef.current.clear()
         console.log('[Scanner] Scanner stopped successfully')
       } catch (err) {
         // html5-qrcode throws if you try to stop when not scanning.
-        // We can ignore that specific error, but log others.
-        console.log('[Scanner] Stop warning (likely already stopped):', err)
+        console.log('[Scanner] Stop warning:', err)
+      } finally {
+        scannerRunning.current = false
       }
     }
   }
