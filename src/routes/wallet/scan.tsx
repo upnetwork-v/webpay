@@ -89,7 +89,22 @@ function ScanPageComponent() {
     }
 
     try {
-      console.log('[Scanner] Creating payout order...')
+      // Check if amount exists in QR code
+      if (!payNowData.amount || parseFloat(payNowData.amount) <= 0) {
+        console.log('[Scanner] No amount in QR, navigating to input page')
+        navigate({
+          to: '/wallet/pay/paynow',
+          search: {
+            proxyType: payNowData.proxyType,
+            proxyValue: payNowData.proxyValue,
+            merchantName: payNowData.merchantName,
+            qrString: decodedText,
+          },
+        })
+        return
+      }
+
+      console.log('[Scanner] Amount found, creating payout order...')
 
       // Determine entity type
       const entityType =
