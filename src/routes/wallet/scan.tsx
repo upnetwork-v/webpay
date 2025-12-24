@@ -15,7 +15,8 @@ function ScanPageComponent() {
   const html5QrCodeRef = useRef<Html5Qrcode | null>(null)
   const scannerDivId = 'qr-reader'
 
-  const [hasScanned, setHasScanned] = useState(false)
+  // Use ref for hasScanned to avoid stale closure issues in onScanSuccess callback
+  const hasScannedRef = useRef(false)
 
   const scannerRunning = useRef(false)
 
@@ -49,7 +50,7 @@ function ScanPageComponent() {
       html5QrCodeRef.current = html5QrCode
 
       // Reset state for new scan session
-      setHasScanned(false)
+      hasScannedRef.current = false
       setError('')
 
       console.log('[Scanner] Starting scanner...')
@@ -96,14 +97,14 @@ function ScanPageComponent() {
   }
 
   const onScanSuccess = async (decodedText: string) => {
-    // Prevent multiple scans
-    if (hasScanned) {
+    // Prevent multiple scans using Ref to avoid closure staleness
+    if (hasScannedRef.current) {
       console.log('[Scanner] Already scanned, ignoring')
       return
     }
 
     console.log('[Scanner] QR scanned:', decodedText)
-    setHasScanned(true)
+    hasScannedRef.current = true
 
     // Stop scanning immediately before any processing
     console.log('[Scanner] Stopping scanner...')
