@@ -1,14 +1,15 @@
-import { createPayout, PayoutAPIError } from '@/api/payout'
+import { createPayout, getPayoutRecord, PayoutAPIError } from '@/api/payout'
 import { USDC_TOKEN_MINT } from '@/constants/token'
 import type { PayNowQRData, PayoutData } from '@/types/payout'
 import { createSPLTransferTransaction } from '@/utils/transaction'
 import { useWallet } from '@/wallets/provider/useWallet'
-import { Connection } from '@solana/web3.js'
+import { Connection, Transaction } from '@solana/web3.js'
 import {
   createFileRoute,
   useLocation,
   useNavigate,
 } from '@tanstack/react-router'
+import bs58 from 'bs58'
 import { useEffect, useMemo, useState } from 'react'
 
 // Define the expected location state type
@@ -25,7 +26,13 @@ export const Route = createFileRoute('/wallet/pay/paynow')({
 function PayNowPaymentComponent() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { adapter, state } = useWallet()
+  const {
+    adapter,
+    state,
+    signTransaction,
+    sendRawTransaction,
+    handlePaymentCallback,
+  } = useWallet()
 
   // Extract wallet address and create connection
   const walletAddress = state.publicKey
@@ -44,10 +51,195 @@ function PayNowPaymentComponent() {
   const [payoutData, setPayoutData] = useState<PayoutData | null>(null)
   const [error, setError] = useState<string>('')
   const [loading, setLoading] = useState(false)
+  const [isPolling, setIsPolling] = useState(false)
 
+  // Polling function for payout status
+  const pollPayoutStatus = async (
+    payoutId: string
+  ): Promise<'success' | 'failed' | 'timeout'> => {
+    const maxAttempts = 60 // 3 minutes
+    const interval = 3000 // 3 seconds
+
+    for (let i = 0; i < maxAttempts; i++) {
+      try {
+        const record = await getPayoutRecord(payoutId)
+
+        if (record.data) {
+          const { cryptoPaymentStatus, fiatPaymentStatus } = record.data
+
+          console.log(`[Poll ${i + 1}/${maxAttempts}] Status:`, {
+            cryptoPaymentStatus,
+            fiatPaymentStatus,
+          })
+
+          // ✅ Success: both crypto verified and fiat success
+          if (
+            cryptoPaymentStatus === 'verified' &&
+            fiatPaymentStatus === 'success'
+          ) {
+            console.log('Payment fully completed!')
+            return 'success'
+          }
+
+          // ❌ Failure: either failed
+          if (
+            cryptoPaymentStatus === 'failed' ||
+            fiatPaymentStatus === 'failed'
+          ) {
+            console.log('Payment failed:', {
+              cryptoPaymentStatus,
+              fiatPaymentStatus,
+            })
+            return 'failed'
+          }
+
+          // ⏰ Expired
+          if (cryptoPaymentStatus === 'expired') {
+            console.log('Payment expired')
+            return 'failed'
+          }
+
+          // Continue polling for pending/processing states
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, interval))
+      } catch (error) {
+        console.error('Poll error:', error)
+        // Continue polling even on error
+      }
+    }
+
+    console.log('Polling timeout')
+    return 'timeout'
+  }
+
+  // Handle Phantom payment callback
   useEffect(() => {
-    // If no payment data, redirect back to wallet
+    const urlParams = new URLSearchParams(window.location.search)
+    const nonce = urlParams.get('nonce')
+    const data = urlParams.get('data')
+    const phantomPk = urlParams.get('phantom_encryption_public_key')
+
+    // Handle payment response (not connection)
+    if (nonce && data && !phantomPk) {
+      const processPaymentResponse = async () => {
+        try {
+          console.log('Processing payment response from Phantom...')
+
+          // Restore state from sessionStorage
+          const savedStateStr = sessionStorage.getItem('paynow_payment_state')
+          if (savedStateStr) {
+            const savedState = JSON.parse(savedStateStr)
+            setAmount(savedState.amount)
+            setPayoutData(savedState.payoutData)
+            // payNowData will be restored from location.state or we keep the current one
+          }
+
+          // Process the callback
+          const result = await handlePaymentCallback({
+            nonce: nonce,
+            data: data,
+          })
+
+          if (result.success && result.type === 'signTransaction') {
+            if (
+              typeof result.data === 'object' &&
+              result.data !== null &&
+              'transaction' in result.data &&
+              typeof (result.data as { transaction?: unknown }).transaction ===
+                'string'
+            ) {
+              // Signature successful, broadcast transaction
+              try {
+                const signedTxData = (result.data as { transaction: string })
+                  .transaction
+                const signedTransaction = Transaction.from(
+                  bs58.decode(signedTxData)
+                )
+                const txHash = await sendRawTransaction(signedTransaction)
+                console.log('Transaction broadcasted:', txHash)
+
+                // Start polling payout status
+                setStep('verifying')
+                setLoading(true)
+                setIsPolling(true)
+
+                // Restore payoutData from saved state
+                const savedStateStr = sessionStorage.getItem(
+                  'paynow_payment_state'
+                )
+                if (savedStateStr) {
+                  const savedState = JSON.parse(savedStateStr)
+                  const pollResult = await pollPayoutStatus(
+                    savedState.payoutData.id
+                  )
+
+                  setIsPolling(false)
+
+                  if (pollResult === 'success') {
+                    setStep('success')
+                  } else if (pollResult === 'failed') {
+                    setError(
+                      'Payment verification failed. Please contact support.'
+                    )
+                    setStep('preview')
+                  } else {
+                    setError(
+                      'Payment verification timeout. Please check your transaction status.'
+                    )
+                    setStep('preview')
+                  }
+                } else {
+                  // No saved state, just show success (fallback)
+                  setStep('success')
+                }
+
+                setLoading(false)
+                // Clean up
+                sessionStorage.removeItem('paynow_payment_state')
+              } catch (broadcastError) {
+                console.error('Error broadcasting transaction:', broadcastError)
+                setError(`Failed to broadcast transaction: ${broadcastError}`)
+                setStep('preview')
+                setLoading(false)
+              }
+            } else {
+              setError('Payment response missing transaction data')
+              setStep('preview')
+              setLoading(false)
+            }
+          } else if (!result.success) {
+            setError(result.error || 'Payment failed')
+            setStep('preview')
+            setLoading(false)
+          }
+
+          // Clean up the URL
+          const cleanUrl = window.location.pathname
+          window.history.replaceState({}, document.title, cleanUrl)
+        } catch (err) {
+          console.error('Error processing payment response:', err)
+          setError(`Failed to process payment response: ${err}`)
+          setStep('preview')
+          setLoading(false)
+        }
+      }
+
+      processPaymentResponse()
+    }
+  }, [handlePaymentCallback, sendRawTransaction])
+
+  // Handle payNowData - restore from sessionStorage if needed
+  useEffect(() => {
     if (!payNowData) {
+      // Try to restore from sessionStorage first
+      const savedStateStr = sessionStorage.getItem('paynow_payment_state')
+      if (savedStateStr) {
+        // We have saved state, the callback handler will restore it
+        // Don't redirect yet
+        return
+      }
+      // Really no data, redirect
       navigate({ to: '/wallet' })
     }
   }, [payNowData, navigate])
@@ -125,6 +317,17 @@ function PayNowPaymentComponent() {
       // Convert crypto amount from smallest unit to USDC
       const usdcAmount = BigInt(payoutData.cryptoAmount)
 
+      // Save state to sessionStorage before deeplink (in case of redirect)
+      sessionStorage.setItem(
+        'paynow_payment_state',
+        JSON.stringify({
+          payNowData,
+          payoutData,
+          amount,
+          step: 'paying',
+        })
+      )
+
       // Create transaction with orderId
       const transaction = await createSPLTransferTransaction({
         from: walletAddress.toBase58(),
@@ -134,29 +337,57 @@ function PayNowPaymentComponent() {
         orderId: payoutData.id,
       })
 
-      // Sign and send transaction
-      const signedTx = await wallet.signTransaction(transaction)
-      const signature = await connection.sendRawTransaction(
-        signedTx.serialize()
-      )
+      // Sign transaction (may trigger deeplink)
+      const signedTx = await signTransaction(transaction)
 
+      // If we reach here, it's in-app browser (no deeplink)
+      const signature = await sendRawTransaction(signedTx)
       console.log('Transaction sent:', signature)
 
       // Wait for confirmation
       setStep('verifying')
+      setIsPolling(true)
       await connection.confirmTransaction(signature, 'confirmed')
+      console.log('Transaction confirmed on-chain')
 
-      // Show success page
-      setStep('success')
+      // Poll payout status to verify fiat payment
+      const pollResult = await pollPayoutStatus(payoutData.id)
+      setIsPolling(false)
+
+      if (pollResult === 'success') {
+        setStep('success')
+      } else if (pollResult === 'failed') {
+        setError('Payment verification failed. Please contact support.')
+        setStep('preview')
+      } else {
+        setError(
+          'Payment verification timeout. Please check your transaction status.'
+        )
+        setStep('preview')
+      }
+
+      // Clean up sessionStorage on success
+      sessionStorage.removeItem('paynow_payment_state')
     } catch (err) {
       console.error('Payment error:', err)
+
+      // Handle Phantom deeplink redirect (not an error)
+      if (err instanceof Error && err.message === 'PHANTOM_REDIRECT_PENDING') {
+        console.log('Phantom wallet redirect pending, waiting for callback...')
+        // Don't set error, keep loading state, let callback handle the rest
+        return
+      }
+
+      // Real errors
       setError(
         'Payment failed: ' +
           (err instanceof Error ? err.message : 'Unknown error')
       )
       setStep('preview')
-    } finally {
       setLoading(false)
+
+      // Clean up sessionStorage on error
+      sessionStorage.removeItem('paynow_payment_state')
     }
   }
 
@@ -574,7 +805,7 @@ function PayNowPaymentComponent() {
                     d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                   />
                 </svg>
-                Payment
+                {isPolling ? 'Verifying payment...' : 'Payment'}
               </span>
             </button>
           </div>
