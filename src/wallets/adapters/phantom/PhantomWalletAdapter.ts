@@ -151,7 +151,13 @@ export class PhantomWalletAdapter implements WalletAdapter {
     ) {
       throw new Error('Wallet not connected')
     }
-    const redirectUrl = `${window.location.origin}${window.location.pathname}`
+    // Use full URL including path to ensure Phantom returns to correct page
+    // Strip any existing query parameters to avoid conflicts
+    const currentUrl = new URL(window.location.href)
+    currentUrl.search = '' // Remove query parameters
+    const redirectUrl = currentUrl.toString()
+    console.log('[PhantomWalletAdapter] Current page:', window.location.href)
+    console.log('[PhantomWalletAdapter] Redirect URL:', redirectUrl)
     openPhantomSignTransactionDeeplink(
       transaction,
       redirectUrl,

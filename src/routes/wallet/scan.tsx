@@ -14,13 +14,17 @@ function ScanPageComponent() {
   const html5QrCodeRef = useRef<Html5Qrcode | null>(null)
   const scannerDivId = 'qr-reader'
 
+  const [hasScanned, setHasScanned] = useState(false)
+
   useEffect(() => {
-    startScanning()
+    if (!hasScanned) {
+      startScanning()
+    }
 
     return () => {
       stopScanning()
     }
-  }, [])
+  }, [hasScanned])
 
   const startScanning = async () => {
     try {
@@ -53,12 +57,22 @@ function ScanPageComponent() {
     }
   }
 
-  const onScanSuccess = (decodedText: string) => {
+  const onScanSuccess = async (decodedText: string) => {
+    // Prevent multiple scans
+    if (hasScanned) {
+      return
+    }
+    setHasScanned(true)
+
     console.log('QR scanned:', decodedText)
+
+    // Stop scanning immediately
+    await stopScanning()
 
     // Check if it's a PayNow QR code
     if (!isLikelyPayNowQR(decodedText)) {
       setError('暂不支持此类型二维码')
+      setHasScanned(false) // Allow rescan
       return
     }
 
@@ -66,11 +80,11 @@ function ScanPageComponent() {
     const payNowData = parsePayNowQR(decodedText)
     if (!payNowData) {
       setError('无法解析二维码')
+      setHasScanned(false) // Allow rescan
       return
     }
 
-    // Stop scanning and navigate to payment page
-    stopScanning()
+    // Navigate to payment page
     navigate({
       to: '/wallet/pay/paynow',
       state: {
@@ -79,9 +93,9 @@ function ScanPageComponent() {
     })
   }
 
-  const onScanFailure = (errorMessage: string) => {
-    // Silently ignore scan failures (continuous scanning)
-    console.debug('Scan failure:', errorMessage)
+  const onScanFailure = () => {
+    // Silently ignore scan failures during continuous scanning
+    // Don't log to avoid console spam
   }
 
   const handleCancel = () => {
@@ -141,29 +155,6 @@ function ScanPageComponent() {
             />
           </svg>
         </button>
-      </div>
-
-      {/* Scan Frame with Corner Indicators */}
-      <div
-        className="absolute z-20"
-        style={{
-          top: '35vh',
-          left: 'calc(50% - 125px)',
-          width: '250px',
-          height: '250px',
-        }}
-      >
-        {/* Top-left corner */}
-        <div className="absolute top-0 left-0 h-8 w-8 rounded-tl-lg border-t-4 border-l-4 border-blue-500" />
-
-        {/* Top-right corner */}
-        <div className="absolute top-0 right-0 h-8 w-8 rounded-tr-lg border-t-4 border-r-4 border-blue-500" />
-
-        {/* Bottom-left corner */}
-        <div className="absolute bottom-0 left-0 h-8 w-8 rounded-bl-lg border-b-4 border-l-4 border-blue-500" />
-
-        {/* Bottom-right corner */}
-        <div className="absolute right-0 bottom-0 h-8 w-8 rounded-br-lg border-r-4 border-b-4 border-blue-500" />
       </div>
 
       {/* Error Message */}
