@@ -170,7 +170,7 @@ function PayNowPaymentComponent() {
               result.data !== null &&
               'transaction' in result.data &&
               typeof (result.data as { transaction?: unknown }).transaction ===
-                'string'
+              'string'
             ) {
               // Signature successful, broadcast transaction
               try {
@@ -344,7 +344,7 @@ function PayNowPaymentComponent() {
       // Real errors
       setError(
         'Payment failed: ' +
-          (err instanceof Error ? err.message : 'Unknown error')
+        (err instanceof Error ? err.message : 'Unknown error')
       )
       setStep('preview')
       setLoading(false)
@@ -388,6 +388,7 @@ function PayNowPaymentComponent() {
                 <div className="text-lg font-bold text-white">
                   {payoutData?.entityValue ||
                     payoutData?.beneficiaryName ||
+                    payoutData?.beneficiaryId ||
                     'Unknown'}
                 </div>
               </div>
@@ -398,7 +399,7 @@ function PayNowPaymentComponent() {
               <div className="mb-2 flex justify-between">
                 <span className="text-gray-400">Pay in currency</span>
                 <span className="font-bold text-white">
-                  ${((payoutData.fiatAmount || 0) / 100).toFixed(2)}
+                  ${((payoutData.amount || 0) / 100).toFixed(2)}
                 </span>
               </div>
 
@@ -489,6 +490,7 @@ function PayNowPaymentComponent() {
               <span className="font-bold">
                 {payoutData?.entityValue ||
                   payoutData?.beneficiaryName ||
+                  payoutData?.beneficiaryId ||
                   'Unknown'}
               </span>
             </h2>
@@ -499,7 +501,7 @@ function PayNowPaymentComponent() {
               <div className="flex justify-between">
                 <span className="text-gray-400">Send SGD</span>
                 <span className="font-semibold text-purple-400">
-                  S$ {((payoutData.fiatAmount || 0) / 100).toFixed(2)}
+                  S$ {((payoutData.amount || 0) / 100).toFixed(2)}
                 </span>
               </div>
 
@@ -521,6 +523,7 @@ function PayNowPaymentComponent() {
                 <span className="font-semibold text-purple-400">
                   {payoutData?.entityValue ||
                     payoutData?.beneficiaryName ||
+                    payoutData?.beneficiaryId ||
                     'Unknown'}
                 </span>
               </div>
@@ -622,6 +625,7 @@ function PayNowPaymentComponent() {
               <span className="font-bold">
                 {payoutData?.entityValue ||
                   payoutData?.beneficiaryName ||
+                  payoutData?.beneficiaryId ||
                   'Unknown'}
               </span>
             </h2>
@@ -631,7 +635,7 @@ function PayNowPaymentComponent() {
               <div className="flex justify-between">
                 <span className="text-gray-400">Send SGD</span>
                 <span className="font-semibold text-purple-400">
-                  S$ {((payoutData.fiatAmount || 0) / 100).toFixed(2)}
+                  S$ {((payoutData.amount || 0) / 100).toFixed(2)}
                 </span>
               </div>
               <div className="flex justify-between">
@@ -649,6 +653,7 @@ function PayNowPaymentComponent() {
                 <span className="font-semibold text-purple-400">
                   {payoutData?.entityValue ||
                     payoutData?.beneficiaryName ||
+                    payoutData?.beneficiaryId ||
                     'Unknown'}
                 </span>
               </div>

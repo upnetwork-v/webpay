@@ -45,24 +45,36 @@ export type FiatPaymentStatus = 'pending' | 'processing' | 'success' | 'failed'
 
 export interface PayoutData {
   id: string // Payout order ID (used as orderId in Memo)
-  fiatAmount: number
-  fiatCurrency: string
+  requestId: string
+  externalId: string | null
+  creationTime: string
+  lastUpdateTime: string
+  amount: number // Amount in cents
+  currency: string
+  provider: string
+  purpose: string | null
+  message: string | null
+  remark: string | null
   cryptoCurrency: string
-  cryptoAmount: string // Amount to pay in smallest unit
-  cryptoDecimal: number
   cryptoChain: string
-  paymentAddress: string // ⭐ Receiving address for blockchain transfer
+  cryptoAmount: string // Amount to pay in smallest unit
   exchangeRate: string
   orderExpiresAt: string // ISO timestamp
-  orderExpiresAtTs: number // Unix timestamp in milliseconds
   cryptoPaymentStatus: CryptoPaymentStatus
   fiatPaymentStatus: FiatPaymentStatus
-  // Additional fields that may be present
+  paymentAddress: string // ⭐ Receiving address for blockchain transfer
+  orderExpiresAtTs: number // Unix timestamp in milliseconds
+  qrString?: string
+
+  // Fields that might differ or be optional based on endpoint
+  fiatAmount?: number
+  fiatCurrency?: string
+  cryptoDecimal?: number
   entityType?: 'company' | 'individual'
   entityValue?: string
   country?: string
-  remark?: string
   beneficiaryName?: string
+  beneficiaryId?: string
 }
 
 export interface CreatePayoutResponse {
@@ -71,14 +83,10 @@ export interface CreatePayoutResponse {
   data: PayoutData | null
 }
 
-export interface PayoutRecordData {
+export interface PayoutRecordData extends Partial<PayoutData> {
   id: string
   cryptoPaymentStatus: CryptoPaymentStatus
   fiatPaymentStatus: FiatPaymentStatus
-  // May include other fields from PayoutData
-  fiatAmount?: number
-  cryptoAmount?: string
-  paymentAddress?: string
 }
 
 export interface PayoutRecordResponse {
