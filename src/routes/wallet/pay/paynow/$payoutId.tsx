@@ -33,8 +33,17 @@ function PayNowPaymentComponent() {
     []
   )
 
+  // Check if we are handling a callback on mount
+  const isPhantomCallback = useMemo(() => {
+    const params = new URLSearchParams(window.location.search)
+    return params.has('nonce') && params.has('data')
+  }, [])
+
   // Payment flow state
-  const [step, setStep] = useState<PaymentStep>('preview') // Start with preview
+  // If we are in callback mode, start in 'verifying' to avoid showing the "Pay" button
+  const [step, setStep] = useState<PaymentStep>(
+    isPhantomCallback ? 'verifying' : 'preview'
+  )
   const [payoutData, setPayoutData] = useState<PayoutData | null>(null)
   const [error, setError] = useState<string>('')
   const [loading, setLoading] = useState(false)
@@ -147,7 +156,14 @@ function PayNowPaymentComponent() {
             setPayoutData(record.data as PayoutData)
             // Set step based on payment status
             if (record.data.cryptoPaymentStatus === 'pending') {
-              setStep('preview')
+              // Only go to preview if NOT processing a callback
+              if (!isPhantomCallback) {
+                setStep('preview')
+              } else {
+                // Ensure we stay in verifying if it's a callback
+                // But don't override if it's already 'success' or something else
+                setStep('verifying')
+              }
             } else if (
               (record.data.cryptoPaymentStatus === 'verified' &&
                 record.data.fiatPaymentStatus === 'processing') ||
@@ -192,7 +208,7 @@ function PayNowPaymentComponent() {
       }
       loadPayoutData()
     }
-  }, [payoutId, payoutData, navigate])
+  }, [payoutId, payoutData, navigate, isPhantomCallback])
   // Handle Phantom payment callback
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search)
