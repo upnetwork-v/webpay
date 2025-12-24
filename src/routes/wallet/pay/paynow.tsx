@@ -52,6 +52,8 @@ function PayNowPaymentComponent() {
   const [error, setError] = useState<string>('')
   const [loading, setLoading] = useState(false)
   const [isPolling, setIsPolling] = useState(false)
+  const [restoredPayNowData, setRestoredPayNowData] =
+    useState<PayNowQRData | null>(payNowData || null)
 
   // Polling function for payout status
   const pollPayoutStatus = async (
@@ -132,7 +134,7 @@ function PayNowPaymentComponent() {
             const savedState = JSON.parse(savedStateStr)
             setAmount(savedState.amount)
             setPayoutData(savedState.payoutData)
-            // payNowData will be restored from location.state or we keep the current one
+            setRestoredPayNowData(savedState.payNowData) // ⭐ Restore payNowData
           }
 
           // Process the callback
@@ -231,20 +233,30 @@ function PayNowPaymentComponent() {
 
   // Handle payNowData - restore from sessionStorage if needed
   useEffect(() => {
-    if (!payNowData) {
+    const currentPayNowData = payNowData || restoredPayNowData
+
+    if (!currentPayNowData) {
       // Try to restore from sessionStorage first
       const savedStateStr = sessionStorage.getItem('paynow_payment_state')
       if (savedStateStr) {
-        // We have saved state, the callback handler will restore it
-        // Don't redirect yet
-        return
+        try {
+          const savedState = JSON.parse(savedStateStr)
+          setRestoredPayNowData(savedState.payNowData)
+          // Don't redirect, let the restoration complete
+          return
+        } catch (err) {
+          console.error('Failed to restore state:', err)
+        }
       }
       // Really no data, redirect
       navigate({ to: '/wallet' })
     }
-  }, [payNowData, navigate])
+  }, [payNowData, restoredPayNowData, navigate])
 
-  if (!payNowData) {
+  // Use either original payNowData or restored one
+  const activePayNowData = payNowData || restoredPayNowData
+
+  if (!activePayNowData) {
     return null
   }
 
@@ -270,19 +282,19 @@ function PayNowPaymentComponent() {
 
       // Determine entity type based on proxy type
       const entityType =
-        payNowData.proxyType === 'uen' ? 'company' : 'individual'
+        activePayNowData.proxyType === 'uen' ? 'company' : 'individual'
 
       // Call createPayout API
       const response = await createPayout({
         entityType,
-        entityValue: payNowData.proxyValue,
+        entityValue: activePayNowData.proxyValue,
         value: amountInCents,
         currency: 'SGD',
         cryptoCurrency: 'USDC',
         cryptoChain: 'SOLANA',
         country: 'SG',
-        remark: payNowData.merchantName,
-        qrString: JSON.stringify(payNowData.rawData),
+        remark: activePayNowData.merchantName,
+        qrString: JSON.stringify(activePayNowData.rawData),
       })
 
       if (!response.data) {
@@ -391,7 +403,7 @@ function PayNowPaymentComponent() {
     }
   }
 
-  const isAmountEditable = !payNowData.amount
+  const isAmountEditable = !activePayNowData.amount
 
   // Success Page
   if (step === 'success' && payoutData) {
@@ -428,7 +440,7 @@ function PayNowPaymentComponent() {
               <div>
                 <div className="text-sm text-gray-400">Place</div>
                 <div className="text-lg font-bold text-white">
-                  {payNowData.proxyValue}
+                  {activePayNowData.proxyValue}
                 </div>
               </div>
             </div>
@@ -517,7 +529,7 @@ function PayNowPaymentComponent() {
             <div className="rounded-2xl bg-gray-800 p-6">
               <div className="mb-2 text-sm text-gray-400">Pay To</div>
               <div className="text-2xl font-bold text-blue-400">
-                {payNowData.proxyValue}
+                {activePayNowData.proxyValue}
               </div>
             </div>
 
@@ -598,7 +610,7 @@ function PayNowPaymentComponent() {
             <h2 className="text-center text-xl font-normal">
               Review & confirm withdrawing SGD to
               <br />
-              <span className="font-bold">{payNowData.proxyValue}</span>
+              <span className="font-bold">{activePayNowData.proxyValue}</span>
             </h2>
 
             {/* Transaction Details */}
@@ -627,7 +639,7 @@ function PayNowPaymentComponent() {
               <div className="flex justify-between">
                 <span className="text-gray-400">PayNow ID</span>
                 <span className="font-semibold text-purple-400">
-                  {payNowData.proxyValue}
+                  {activePayNowData.proxyValue}
                 </span>
               </div>
 
@@ -725,7 +737,7 @@ function PayNowPaymentComponent() {
             <h2 className="text-center text-xl font-normal">
               Review & confirm withdrawing SGD to
               <br />
-              <span className="font-bold">{payNowData.proxyValue}</span>
+              <span className="font-bold">{activePayNowData.proxyValue}</span>
             </h2>
 
             {/* Transaction Details (same as preview) */}
@@ -749,7 +761,7 @@ function PayNowPaymentComponent() {
               <div className="flex justify-between">
                 <span className="text-gray-400">PayNow ID</span>
                 <span className="font-semibold text-purple-400">
-                  {payNowData.proxyValue}
+                  {activePayNowData.proxyValue}
                 </span>
               </div>
               <div className="flex justify-between">
