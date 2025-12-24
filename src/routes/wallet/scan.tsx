@@ -17,14 +17,14 @@ function ScanPageComponent() {
   const [hasScanned, setHasScanned] = useState(false)
 
   useEffect(() => {
-    if (!hasScanned) {
-      startScanning()
-    }
+    // Only start scanner once when component mounts
+    startScanning()
 
     return () => {
+      // Cleanup: always stop scanner when component unmounts
       stopScanning()
     }
-  }, [hasScanned])
+  }, []) // Empty dependency array - only run once
 
   const startScanning = async () => {
     try {

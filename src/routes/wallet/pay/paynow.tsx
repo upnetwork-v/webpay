@@ -286,21 +286,30 @@ function PayNowPaymentComponent() {
 
       // Determine entity type based on proxy type
       const entityType =
-        payNowData?.proxyType === 'uen' ? 'company' : 'individual'
+        payNowData.proxyType === 'uen' ? 'company' : 'individual'
+
+      const entityValue = payNowData.proxyValue
+      if (!entityValue) {
+        throw new Error('Missing PayNow ID')
+      }
 
       // Create payout
-      console.log('[handleContinue] Creating payout...')
+      console.log('[handleContinue] Creating payout...', {
+        entityType,
+        entityValue,
+        amount: amountInCents,
+      })
       const payout = await createPayout({
         entityType,
-        entityValue: payNowData?.proxyValue,
+        entityValue,
         value: amountInCents,
         currency: 'SGD',
         cryptoCurrency: 'USDC',
         cryptoChain: 'SOLANA',
         country: 'SG',
         // optional fields
-        remark: payNowData?.merchantName,
-        qrString: JSON.stringify(payNowData?.rawData),
+        remark: payNowData.merchantName,
+        qrString: JSON.stringify(payNowData.rawData),
       })
 
       console.log('[handleContinue] Payout created:', payout.data?.id)
@@ -309,10 +318,15 @@ function PayNowPaymentComponent() {
         throw new Error('Failed to create payout')
       }
 
+      const targetUrl = `/wallet/pay/paynow/${payout.data.id}`
+      console.log('[handleContinue] Navigating to:', targetUrl)
+
       // Navigate to URL with payoutId
       navigate({
-        to: `/wallet/pay/paynow/${payout.data.id}`,
+        to: targetUrl,
       })
+
+      console.log('[handleContinue] Navigation called')
     } catch (err) {
       console.error('Create payout error:', err)
       if (err instanceof PayoutAPIError) {
