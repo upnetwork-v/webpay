@@ -89,7 +89,6 @@ function ScanPageComponent() {
     navigate({ to: '/wallet' })
   }
 
-
   return (
     <div className="relative flex h-screen w-screen flex-col overflow-hidden bg-black">
       {/* Camera View */}
