@@ -386,7 +386,9 @@ function PayNowPaymentComponent() {
               <div>
                 <div className="text-sm text-gray-400">Place</div>
                 <div className="text-lg font-bold text-white">
-                  {payoutData?.entityValue || 'Unknown'}
+                  {payoutData?.entityValue ||
+                    payoutData?.beneficiaryName ||
+                    'Unknown'}
                 </div>
               </div>
             </div>
@@ -485,7 +487,9 @@ function PayNowPaymentComponent() {
               Review & confirm withdrawing SGD to
               <br />
               <span className="font-bold">
-                {payoutData?.entityValue || 'Unknown'}
+                {payoutData?.entityValue ||
+                  payoutData?.beneficiaryName ||
+                  'Unknown'}
               </span>
             </h2>
 
@@ -515,7 +519,9 @@ function PayNowPaymentComponent() {
               <div className="flex justify-between">
                 <span className="text-gray-400">PayNow ID</span>
                 <span className="font-semibold text-purple-400">
-                  {payoutData?.entityValue || 'Unknown'}
+                  {payoutData?.entityValue ||
+                    payoutData?.beneficiaryName ||
+                    'Unknown'}
                 </span>
               </div>
 
@@ -614,7 +620,9 @@ function PayNowPaymentComponent() {
               Review & confirm withdrawing SGD to
               <br />
               <span className="font-bold">
-                {payoutData?.entityValue || 'Unknown'}
+                {payoutData?.entityValue ||
+                  payoutData?.beneficiaryName ||
+                  'Unknown'}
               </span>
             </h2>
 
@@ -639,7 +647,9 @@ function PayNowPaymentComponent() {
               <div className="flex justify-between">
                 <span className="text-gray-400">PayNow ID</span>
                 <span className="font-semibold text-purple-400">
-                  {payoutData?.entityValue || 'Unknown'}
+                  {payoutData?.entityValue ||
+                    payoutData?.beneficiaryName ||
+                    'Unknown'}
                 </span>
               </div>
               <div className="flex justify-between">

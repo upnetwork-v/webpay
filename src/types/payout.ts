@@ -62,6 +62,7 @@ export interface PayoutData {
   entityValue?: string
   country?: string
   remark?: string
+  beneficiaryName?: string
 }
 
 export interface CreatePayoutResponse {
