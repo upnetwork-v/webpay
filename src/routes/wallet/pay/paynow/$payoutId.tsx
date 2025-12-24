@@ -154,22 +154,23 @@ function PayNowPaymentComponent() {
           if (record.data) {
             console.log('[PayNow] Payout data loaded:', record.data)
             setPayoutData(record.data as PayoutData)
-            // Set step based on payment status
-            if (record.data.cryptoPaymentStatus === 'pending') {
-              // Only go to preview if NOT processing a callback
-              if (!isPhantomCallback) {
-                setStep('preview')
-              } else {
-                // Ensure we stay in verifying if it's a callback
-                // But don't override if it's already 'success' or something else
-                setStep('verifying')
-              }
-            } else if (
-              (record.data.cryptoPaymentStatus === 'verified' &&
-                record.data.fiatPaymentStatus === 'processing') ||
-              record.data.fiatPaymentStatus === 'processing' ||
-              isPhantomCallback // Force entry if we are in callback mode
+            setPayoutData(record.data as PayoutData)
+
+            // Check success status first
+            if (
+              record.data.cryptoPaymentStatus === 'verified' &&
+              record.data.fiatPaymentStatus === 'success'
             ) {
+              setStep('success')
+              return
+            }
+
+            // Determine if we should be polling/verifying
+            const shouldPoll =
+              isPhantomCallback ||
+              record.data.fiatPaymentStatus === 'processing'
+
+            if (shouldPoll) {
               setStep('verifying')
               setIsPolling(true)
 
@@ -180,25 +181,17 @@ function PayNowPaymentComponent() {
                 if (pollResult === 'success') {
                   setStep('success')
                 } else if (pollResult !== 'timeout') {
-                  // Only show error if it wasn't a duplicate-skip 'timeout'
-                  // But since we return 'timeout' for duplicate, we might accidentally triggering error.
-                  // The loop above returns 'timeout' only at true timeout.
-                  // Let's rely on the ref check inside the caller mostly.
                   if (pollResult === 'failed') {
                     setError('Payment verification failed')
                     setStep('preview')
                   } else {
-                    // timeout
                     setError('Payment verification timeout')
                     setStep('preview')
                   }
                 }
               }
-            } else if (
-              record.data.cryptoPaymentStatus === 'verified' &&
-              record.data.fiatPaymentStatus === 'success'
-            ) {
-              setStep('success')
+            } else if (record.data.cryptoPaymentStatus === 'pending') {
+              setStep('preview')
             }
           }
         } catch (err) {
