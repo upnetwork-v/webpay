@@ -386,10 +386,7 @@ function PayNowPaymentComponent() {
               <div>
                 <div className="text-sm text-gray-400">Place</div>
                 <div className="text-lg font-bold text-white">
-                  {payoutData?.entityValue ||
-                    payoutData?.beneficiaryName ||
-                    payoutData?.beneficiaryId ||
-                    'Unknown'}
+                  {payoutData.beneficiaryId || 'Unknown'}
                 </div>
               </div>
             </div>
@@ -409,7 +406,7 @@ function PayNowPaymentComponent() {
                 <span className="font-bold text-white">
                   {(
                     Number(payoutData.cryptoAmount || '0') /
-                    Math.pow(10, payoutData.cryptoDecimal || 6)
+                    Math.pow(10, 6)
                   ).toFixed(6)}{' '}
                   USDC
                 </span>
@@ -488,10 +485,7 @@ function PayNowPaymentComponent() {
               Review & confirm withdrawing SGD to
               <br />
               <span className="font-bold">
-                {payoutData?.entityValue ||
-                  payoutData?.beneficiaryName ||
-                  payoutData?.beneficiaryId ||
-                  'Unknown'}
+                {payoutData.beneficiaryId || 'Unknown'}
               </span>
             </h2>
 
@@ -511,7 +505,7 @@ function PayNowPaymentComponent() {
                 <span className="font-semibold text-white">
                   {(
                     Number(payoutData.cryptoAmount || '0') /
-                    Math.pow(10, payoutData.cryptoDecimal || 6)
+                    Math.pow(10, 6)
                   ).toFixed(6)}{' '}
                   USDC
                 </span>
@@ -521,10 +515,7 @@ function PayNowPaymentComponent() {
               <div className="flex justify-between">
                 <span className="text-gray-400">PayNow ID</span>
                 <span className="font-semibold text-purple-400">
-                  {payoutData?.entityValue ||
-                    payoutData?.beneficiaryName ||
-                    payoutData?.beneficiaryId ||
-                    'Unknown'}
+                  {payoutData.beneficiaryId || 'Unknown'}
                 </span>
               </div>
 
@@ -623,10 +614,7 @@ function PayNowPaymentComponent() {
               Review & confirm withdrawing SGD to
               <br />
               <span className="font-bold">
-                {payoutData?.entityValue ||
-                  payoutData?.beneficiaryName ||
-                  payoutData?.beneficiaryId ||
-                  'Unknown'}
+                {payoutData.beneficiaryId || 'Unknown'}
               </span>
             </h2>
 
@@ -643,7 +631,7 @@ function PayNowPaymentComponent() {
                 <span className="font-semibold text-white">
                   {(
                     Number(payoutData.cryptoAmount || '0') /
-                    Math.pow(10, payoutData.cryptoDecimal || 6)
+                    Math.pow(10, 6)
                   ).toFixed(6)}{' '}
                   USDC
                 </span>
@@ -651,10 +639,7 @@ function PayNowPaymentComponent() {
               <div className="flex justify-between">
                 <span className="text-gray-400">PayNow ID</span>
                 <span className="font-semibold text-purple-400">
-                  {payoutData?.entityValue ||
-                    payoutData?.beneficiaryName ||
-                    payoutData?.beneficiaryId ||
-                    'Unknown'}
+                  {payoutData.beneficiaryId || 'Unknown'}
                 </span>
               </div>
               <div className="flex justify-between">

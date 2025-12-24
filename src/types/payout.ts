@@ -67,13 +67,6 @@ export interface PayoutData {
   qrString?: string
 
   // Fields that might differ or be optional based on endpoint
-  fiatAmount?: number
-  fiatCurrency?: string
-  cryptoDecimal?: number
-  entityType?: 'company' | 'individual'
-  entityValue?: string
-  country?: string
-  beneficiaryName?: string
   beneficiaryId?: string
 }
 

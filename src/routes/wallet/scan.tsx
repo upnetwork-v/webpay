@@ -29,9 +29,23 @@ function ScanPageComponent() {
 
   const startScanning = async () => {
     try {
+      // Ensure previous instance is cleaned up
+      if (html5QrCodeRef.current) {
+        try {
+          await html5QrCodeRef.current.stop()
+        } catch (e) {
+          // ignore
+        }
+      }
+
       const html5QrCode = new Html5Qrcode(scannerDivId)
       html5QrCodeRef.current = html5QrCode
 
+      // Reset state for new scan session
+      setHasScanned(false)
+      setError('')
+
+      console.log('[Scanner] Starting scanner...')
       await html5QrCode.start(
         { facingMode: 'environment' },
         {
@@ -48,12 +62,18 @@ function ScanPageComponent() {
   }
 
   const stopScanning = async () => {
-    if (html5QrCodeRef.current?.isScanning) {
+    // Force stop if reference exists, don't rely solely on isScanning property
+    // which might be flaky inside callbacks
+    if (html5QrCodeRef.current) {
       try {
+        console.log('[Scanner] Attempting to stop scanner...')
         await html5QrCodeRef.current.stop()
         html5QrCodeRef.current.clear()
+        console.log('[Scanner] Scanner stopped successfully')
       } catch (err) {
-        console.error('Failed to stop scanner:', err)
+        // html5-qrcode throws if you try to stop when not scanning.
+        // We can ignore that specific error, but log others.
+        console.log('[Scanner] Stop warning (likely already stopped):', err)
       }
     }
   }
@@ -76,7 +96,7 @@ function ScanPageComponent() {
     // Check if it's a PayNow QR code
     if (!isLikelyPayNowQR(decodedText)) {
       setError('暂不支持此类型二维码')
-      setHasScanned(false) // Allow rescan
+      // Don't auto-reset hasScanned to prevent loop. User must click retry.
       return
     }
 
@@ -84,7 +104,6 @@ function ScanPageComponent() {
     const payNowData = parsePayNowQR(decodedText)
     if (!payNowData) {
       setError('无法解析二维码')
-      setHasScanned(false) // Allow rescan
       return
     }
 
@@ -146,7 +165,8 @@ function ScanPageComponent() {
       } else {
         setError('创建订单失败，请重试')
       }
-      setHasScanned(false) // Allow rescan
+      // IMPORTANT: Do NOT reset hasScanned(false) here.
+      // This prevents the infinite loop. The user must click 'Retry'.
     }
   }
 
@@ -159,6 +179,11 @@ function ScanPageComponent() {
     console.log('[Scanner] Cancel clicked, stopping scanner')
     await stopScanning()
     navigate({ to: '/wallet' })
+  }
+
+  const handleRetry = () => {
+    console.log('[Scanner] Retrying...')
+    startScanning()
   }
 
   return (
@@ -215,12 +240,18 @@ function ScanPageComponent() {
         </button>
       </div>
 
-      {/* Error Message */}
+      {/* Error Message with Retry */}
       {error && (
-        <div className="absolute top-32 right-4 left-4 z-30">
-          <div className="rounded-lg bg-red-500/90 px-4 py-3 text-center text-white shadow-lg">
+        <div className="absolute top-32 right-4 left-4 z-30 flex flex-col items-center gap-4">
+          <div className="w-full rounded-lg bg-red-500/90 px-4 py-3 text-center text-white shadow-lg">
             {error}
           </div>
+          <button
+            onClick={handleRetry}
+            className="rounded-full bg-white px-6 py-2 font-semibold text-gray-900 shadow-lg transition-transform hover:scale-105 active:scale-95"
+          >
+            重试 / Retry
+          </button>
         </div>
       )}
 
