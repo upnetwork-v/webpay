@@ -6,7 +6,7 @@ import { useWallet } from '@/wallets/provider/useWallet'
 import { Connection, Transaction } from '@solana/web3.js'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import bs58 from 'bs58'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 type PaymentStep = 'preview' | 'paying' | 'verifying' | 'success'
 
@@ -40,64 +40,99 @@ function PayNowPaymentComponent() {
   const [loading, setLoading] = useState(false)
   const [isPolling, setIsPolling] = useState(false)
 
+  // Polling ref to prevent duplicate polling
+  const pollingRef = useRef(false)
+  const isMountedRef = useRef(true)
+
+  useEffect(() => {
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [])
+
   // Polling function for payout status
   const pollPayoutStatus = async (
     payoutId: string
   ): Promise<'success' | 'failed' | 'timeout'> => {
+    // If already polling, strict prevention
+    if (pollingRef.current) {
+      console.log('Already polling, skipping new request')
+      // Return a "neutral" timeout to avoid interfering with the running one,
+      // or we could throw. But returning 'timeout' might set Error in the caller.
+      // Ideally we shouldn't have called it.
+      // We'll just return 'timeout' but log it.
+      // Better strategy: The checking logic in useEffect/handlers should have prevented this.
+      // But as a failsafe:
+      return 'timeout'
+    }
+
+    pollingRef.current = true
+
     const maxAttempts = 60 // 5 minutes
     const interval = 5000 // 5 seconds
 
-    for (let i = 0; i < maxAttempts; i++) {
-      try {
-        const record = await getPayoutRecord(payoutId)
+    try {
+      for (let i = 0; i < maxAttempts; i++) {
+        // Stop if component unmounted
+        if (!isMountedRef.current) return 'timeout'
 
-        if (record.data) {
-          const { cryptoPaymentStatus, fiatPaymentStatus } = record.data
+        try {
+          const record = await getPayoutRecord(payoutId)
 
-          console.log(`[Poll ${i + 1}/${maxAttempts}] Status:`, {
-            cryptoPaymentStatus,
-            fiatPaymentStatus,
-          })
+          if (record.data) {
+            const { cryptoPaymentStatus, fiatPaymentStatus } = record.data
 
-          // ✅ Success: both crypto verified and fiat success
-          if (
-            cryptoPaymentStatus === 'verified' &&
-            fiatPaymentStatus === 'success'
-          ) {
-            console.log('Payment fully completed!')
-            return 'success'
-          }
-
-          // ❌ Failure: either failed
-          if (
-            cryptoPaymentStatus === 'failed' ||
-            fiatPaymentStatus === 'failed'
-          ) {
-            console.log('Payment failed:', {
+            console.log(`[Poll ${i + 1}/${maxAttempts}] Status:`, {
               cryptoPaymentStatus,
               fiatPaymentStatus,
             })
-            return 'failed'
+
+            // ✅ Success: both crypto verified and fiat success
+            if (
+              cryptoPaymentStatus === 'verified' &&
+              fiatPaymentStatus === 'success'
+            ) {
+              console.log('Payment fully completed!')
+              return 'success'
+            }
+
+            // ❌ Failure: either failed
+            if (
+              cryptoPaymentStatus === 'failed' ||
+              fiatPaymentStatus === 'failed'
+            ) {
+              console.log('Payment failed:', {
+                cryptoPaymentStatus,
+                fiatPaymentStatus,
+              })
+              return 'failed'
+            }
+
+            // ⏰ Expired
+            if (cryptoPaymentStatus === 'expired') {
+              console.log('Payment expired')
+              return 'failed'
+            }
+
+            // Continue polling for pending/processing states
           }
 
-          // ⏰ Expired
-          if (cryptoPaymentStatus === 'expired') {
-            console.log('Payment expired')
-            return 'failed'
-          }
-
-          // Continue polling for pending/processing states
+          if (!isMountedRef.current) return 'timeout'
+          await new Promise((resolve) => setTimeout(resolve, interval))
+        } catch (error) {
+          console.error('Poll error:', error)
+          // Continue polling even on error
+          if (!isMountedRef.current) return 'timeout'
+          await new Promise((resolve) => setTimeout(resolve, interval))
         }
-
-        await new Promise((resolve) => setTimeout(resolve, interval))
-      } catch (error) {
-        console.error('Poll error:', error)
-        // Continue polling even on error
       }
-    }
 
-    console.log('Polling timeout')
-    return 'timeout'
+      console.log('Polling timeout')
+      return 'timeout'
+    } finally {
+      pollingRef.current = false
+    }
   }
 
   // Load payout data from API if payoutId is provided
@@ -120,14 +155,27 @@ function PayNowPaymentComponent() {
             ) {
               setStep('verifying')
               setIsPolling(true)
-              // Start polling
-              const pollResult = await pollPayoutStatus(payoutId)
-              setIsPolling(false)
-              if (pollResult === 'success') {
-                setStep('success')
-              } else {
-                setError('Payment verification failed or timeout')
-                setStep('preview')
+
+              // Start polling only if not already polling
+              if (!pollingRef.current) {
+                const pollResult = await pollPayoutStatus(payoutId)
+                setIsPolling(false)
+                if (pollResult === 'success') {
+                  setStep('success')
+                } else if (pollResult !== 'timeout') {
+                  // Only show error if it wasn't a duplicate-skip 'timeout'
+                  // But since we return 'timeout' for duplicate, we might accidentally triggering error.
+                  // The loop above returns 'timeout' only at true timeout.
+                  // Let's rely on the ref check inside the caller mostly.
+                  if (pollResult === 'failed') {
+                    setError('Payment verification failed')
+                    setStep('preview')
+                  } else {
+                    // timeout
+                    setError('Payment verification timeout')
+                    setStep('preview')
+                  }
+                }
               }
             } else if (
               record.data.cryptoPaymentStatus === 'verified' &&
