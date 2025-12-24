@@ -167,7 +167,8 @@ function PayNowPaymentComponent() {
             } else if (
               (record.data.cryptoPaymentStatus === 'verified' &&
                 record.data.fiatPaymentStatus === 'processing') ||
-              record.data.fiatPaymentStatus === 'processing'
+              record.data.fiatPaymentStatus === 'processing' ||
+              isPhantomCallback // Force entry if we are in callback mode
             ) {
               setStep('verifying')
               setIsPolling(true)
