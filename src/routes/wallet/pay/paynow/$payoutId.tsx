@@ -205,7 +205,35 @@ function PayNowPaymentComponent() {
                 }
 
                 setLoading(false)
-              } catch (broadcastError) {
+                setLoading(false)
+              } catch (broadcastError: any) {
+                // Check if transaction was already processed
+                const errorMessage =
+                  broadcastError?.message || JSON.stringify(broadcastError)
+                if (errorMessage.includes('already been processed')) {
+                  console.log(
+                    'Transaction already processed, proceeding to polling...'
+                  )
+
+                  // Proceed as success
+                  setStep('verifying')
+                  setLoading(true)
+                  setIsPolling(true)
+
+                  const pollResult = await pollPayoutStatus(payoutId)
+                  setIsPolling(false)
+
+                  if (pollResult === 'success') {
+                    setStep('success')
+                  } else {
+                    // Handle other poll outcomes
+                    setStep('preview') // Or appropriate step
+                  }
+
+                  setLoading(false)
+                  return
+                }
+
                 console.error('Error broadcasting transaction:', broadcastError)
                 setError(`Failed to broadcast transaction: ${broadcastError}`)
                 setStep('preview')
@@ -368,7 +396,7 @@ function PayNowPaymentComponent() {
               <div className="mb-2 flex justify-between">
                 <span className="text-gray-400">Pay in currency</span>
                 <span className="font-bold text-white">
-                  ${(payoutData.fiatAmount / 100).toFixed(2)}
+                  ${((payoutData.fiatAmount || 0) / 100).toFixed(2)}
                 </span>
               </div>
 
@@ -377,8 +405,8 @@ function PayNowPaymentComponent() {
                 <span className="text-gray-400">In crypto</span>
                 <span className="font-bold text-white">
                   {(
-                    Number(payoutData.cryptoAmount) /
-                    Math.pow(10, payoutData.cryptoDecimal)
+                    Number(payoutData.cryptoAmount || '0') /
+                    Math.pow(10, payoutData.cryptoDecimal || 6)
                   ).toFixed(6)}{' '}
                   USDC
                 </span>
@@ -467,7 +495,7 @@ function PayNowPaymentComponent() {
               <div className="flex justify-between">
                 <span className="text-gray-400">Send SGD</span>
                 <span className="font-semibold text-purple-400">
-                  S$ {(payoutData.fiatAmount / 100).toFixed(2)}
+                  S$ {((payoutData.fiatAmount || 0) / 100).toFixed(2)}
                 </span>
               </div>
 
@@ -476,8 +504,8 @@ function PayNowPaymentComponent() {
                 <span className="text-gray-400">Token Amount</span>
                 <span className="font-semibold text-white">
                   {(
-                    Number(payoutData.cryptoAmount) /
-                    Math.pow(10, payoutData.cryptoDecimal)
+                    Number(payoutData.cryptoAmount || '0') /
+                    Math.pow(10, payoutData.cryptoDecimal || 6)
                   ).toFixed(6)}{' '}
                   USDC
                 </span>
@@ -595,15 +623,15 @@ function PayNowPaymentComponent() {
               <div className="flex justify-between">
                 <span className="text-gray-400">Send SGD</span>
                 <span className="font-semibold text-purple-400">
-                  S$ {(payoutData.fiatAmount / 100).toFixed(2)}
+                  S$ {((payoutData.fiatAmount || 0) / 100).toFixed(2)}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-400">Token Amount</span>
                 <span className="font-semibold text-white">
                   {(
-                    Number(payoutData.cryptoAmount) /
-                    Math.pow(10, payoutData.cryptoDecimal)
+                    Number(payoutData.cryptoAmount || '0') /
+                    Math.pow(10, payoutData.cryptoDecimal || 6)
                   ).toFixed(6)}{' '}
                   USDC
                 </span>
