@@ -247,30 +247,14 @@ function PayNowPaymentComponent() {
                 const txHash = await sendRawTransaction(signedTransaction)
                 console.log('Transaction broadcasted:', txHash)
 
-                // Start polling payout status
+                // Transaction broadcasted successfully.
+                // We don't need to poll here because the main loadPayoutData effect
+                // is already polling due to isPhantomCallback being true.
                 setStep('verifying')
-                setLoading(true)
                 setIsPolling(true)
+                setLoading(true)
 
-                const pollResult = await pollPayoutStatus(payoutId)
-                setIsPolling(false)
-
-                if (pollResult === 'success') {
-                  setStep('success')
-                } else if (pollResult === 'failed') {
-                  setError(
-                    'Payment verification failed. Please contact support.'
-                  )
-                  setStep('preview')
-                } else {
-                  setError(
-                    'Payment verification timeout. Please check your transaction status.'
-                  )
-                  setStep('preview')
-                }
-
-                setLoading(false)
-                setLoading(false)
+                // Just let the other poller handle the success/failure state transition
               } catch (broadcastError: any) {
                 // Check if transaction was already processed
                 const errorMessage =
@@ -280,22 +264,11 @@ function PayNowPaymentComponent() {
                     'Transaction already processed, proceeding to polling...'
                   )
 
-                  // Proceed as success
+                  // Proceed as success - let the main polling loop handle it
                   setStep('verifying')
                   setLoading(true)
                   setIsPolling(true)
 
-                  const pollResult = await pollPayoutStatus(payoutId)
-                  setIsPolling(false)
-
-                  if (pollResult === 'success') {
-                    setStep('success')
-                  } else {
-                    // Handle other poll outcomes
-                    setStep('preview') // Or appropriate step
-                  }
-
-                  setLoading(false)
                   return
                 }
 
