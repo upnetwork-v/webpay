@@ -10,9 +10,7 @@ export const Route = createFileRoute('/wallet/scan')({
 
 function ScanPageComponent() {
   const navigate = useNavigate()
-  const [isScanning, setIsScanning] = useState(false)
   const [error, setError] = useState<string>('')
-  const [torch, setTorch] = useState(false)
   const html5QrCodeRef = useRef<Html5Qrcode | null>(null)
   const scannerDivId = 'qr-reader'
 
@@ -38,8 +36,6 @@ function ScanPageComponent() {
         onScanSuccess,
         onScanFailure
       )
-
-      setIsScanning(true)
     } catch (err) {
       console.error('Failed to start scanner:', err)
       setError('无法启动摄像头，请检查权限设置')
@@ -93,12 +89,6 @@ function ScanPageComponent() {
     navigate({ to: '/wallet' })
   }
 
-  const toggleFlash = async () => {
-    // Note: html5-qrcode doesn't support torch control directly
-    // This would require using getUserMedia directly for flash support
-    setTorch(!torch)
-    console.log('Flash toggle not supported in html5-qrcode')
-  }
 
   return (
     <div className="relative flex h-screen w-screen flex-col overflow-hidden bg-black">

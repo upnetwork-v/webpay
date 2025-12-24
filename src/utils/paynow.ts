@@ -444,7 +444,6 @@ export function isPhoneNumberOrUEN(input: string): 'phone' | 'uen' | 'invalid' {
   // 4. YYYYNNNNNNNNNNNNNNNN (Year + 19 digits)
   // 5. YYYYNNNNNNNNNNNNNNNNNNNN (Year + 22 digits)
   // 6. YYYYNNNNNNNNNNNNNNNNNNNNNNNN (Year + 26 digits)
-  const uenRegex = /^(19|20)\d{2}[TNS]?\d{9,26}$|^[TNS]\d{2}\d{9,26}$/;
 
   // Debug logging
   // console.log('UEN Check:', {

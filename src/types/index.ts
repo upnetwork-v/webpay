@@ -1,3 +1,4 @@
-export * from "./payment";
-export * from "./auth";
-export * from "./kyc";
+export type { Transaction } from '@solana/web3.js'
+export * from './auth'
+export * from './kyc'
+export * from './payment'

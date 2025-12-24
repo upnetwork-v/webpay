@@ -1,17 +1,17 @@
-import { useState, useCallback, useMemo } from "react";
+import type { Order, PreferredRoute } from '@/types'
 import {
   createSolTransferTransaction,
   createSPLTransferTransaction,
-} from "@/utils";
-import type { Order, PreferredRoute } from "@/types";
-import { Connection, PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
-import { getAssociatedTokenAddress } from "@solana/spl-token";
+} from '@/utils'
+import { getAssociatedTokenAddress } from '@solana/spl-token'
+import { Connection, LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.js'
+import { useCallback, useMemo, useState } from 'react'
 
 interface UsePaymentProps {
-  order: Order | null;
-  PreferredRoute: PreferredRoute | null;
-  payTokenAmount: number;
-  phantomPublicKey: string | null;
+  order: Order | null
+  PreferredRoute: PreferredRoute | null
+  payTokenAmount: number
+  phantomPublicKey: PublicKey | null
 }
 
 export const usePayment = ({
@@ -20,162 +20,165 @@ export const usePayment = ({
   payTokenAmount,
   phantomPublicKey,
 }: UsePaymentProps) => {
-  const [error, setError] = useState<string | null>(null);
-  const [isPaying, setIsPaying] = useState(false);
+  const [error, setError] = useState<string | null>(null)
+  const [isPaying, setIsPaying] = useState(false)
 
   // Use useMemo to ensure connection is stable across renders
   const connection = useMemo(
     () => new Connection(import.meta.env.VITE_SOLANA_RPC),
     []
-  );
+  )
 
   // Proactive balance check function
   const checkBalance = useCallback(async (): Promise<{
-    sufficient: boolean;
-    details: string;
+    sufficient: boolean
+    details: string
   }> => {
     if (!phantomPublicKey || !PreferredRoute || !payTokenAmount) {
-      return { sufficient: false, details: "Missing payment parameters" };
+      return { sufficient: false, details: 'Missing payment parameters' }
     }
 
     try {
-      const publicKey = new PublicKey(phantomPublicKey);
-
       if (PreferredRoute.isNative) {
         // Check SOL balance
-        const balance = await connection.getBalance(publicKey, "confirmed");
-        const requiredAmount = BigInt(payTokenAmount);
-        const estimatedFee = BigInt(5000); // Conservative fee estimate
-        const totalRequired = requiredAmount + estimatedFee;
+        const balance = await connection.getBalance(
+          phantomPublicKey,
+          'confirmed'
+        )
+        const requiredAmount = BigInt(payTokenAmount)
+        const estimatedFee = BigInt(5000) // Conservative fee estimate
+        const totalRequired = requiredAmount + estimatedFee
 
         if (balance < totalRequired) {
           const shortfall =
-            Number(totalRequired - BigInt(balance)) / LAMPORTS_PER_SOL;
+            Number(totalRequired - BigInt(balance)) / LAMPORTS_PER_SOL
           return {
             sufficient: false,
             details: `Insufficient SOL balance. Current: ${(balance / LAMPORTS_PER_SOL).toFixed(6)} SOL, required: ${(Number(payTokenAmount) / LAMPORTS_PER_SOL).toFixed(6)} SOL + fees, shortfall: ${shortfall.toFixed(6)} SOL`,
-          };
+          }
         }
       } else {
         // Check SPL token balance
         if (!PreferredRoute.tokenAddress) {
-          return { sufficient: false, details: "Token address not provided" };
+          return { sufficient: false, details: 'Token address not provided' }
         }
 
         const tokenAccount = await getAssociatedTokenAddress(
           new PublicKey(PreferredRoute.tokenAddress),
-          publicKey
-        );
+          phantomPublicKey
+        )
 
-        const accountInfo = await connection.getAccountInfo(tokenAccount);
+        const accountInfo = await connection.getAccountInfo(tokenAccount)
         if (!accountInfo) {
           return {
             sufficient: false,
             details:
-              "Token not found in wallet. Please add the required token to your wallet first.",
-          };
+              'Token not found in wallet. Please add the required token to your wallet first.',
+          }
         }
 
         const tokenAccountParsed =
-          await connection.getParsedAccountInfo(tokenAccount);
-        let balance: number = 0;
+          await connection.getParsedAccountInfo(tokenAccount)
+        let balance: number = 0
 
         if (
           tokenAccountParsed.value &&
-          "parsed" in tokenAccountParsed.value.data &&
-          tokenAccountParsed.value.data.program === "spl-token"
+          'parsed' in tokenAccountParsed.value.data &&
+          tokenAccountParsed.value.data.program === 'spl-token'
         ) {
-          balance =
-            tokenAccountParsed.value.data.parsed.info.tokenAmount.amount;
+          balance = tokenAccountParsed.value.data.parsed.info.tokenAmount.amount
         }
 
-        const requiredAmount = BigInt(payTokenAmount);
+        const requiredAmount = BigInt(payTokenAmount)
         if (BigInt(balance) < requiredAmount) {
-          const shortfall = BigInt(payTokenAmount) - BigInt(balance);
+          const shortfall = BigInt(payTokenAmount) - BigInt(balance)
           return {
             sufficient: false,
             details: `Insufficient ${PreferredRoute.tokenSymbol} balance. Current: ${balance}, required: ${payTokenAmount}, shortfall: ${shortfall}`,
-          };
+          }
         }
 
         // Also check SOL balance for transaction fees
-        const solBalance = await connection.getBalance(publicKey, "confirmed");
-        const estimatedFee = 5000; // Conservative fee estimate
+        const solBalance = await connection.getBalance(
+          phantomPublicKey,
+          'confirmed'
+        )
+        const estimatedFee = 5000 // Conservative fee estimate
         if (solBalance < estimatedFee) {
           return {
             sufficient: false,
             details: `Insufficient SOL for transaction fees. Current: ${(solBalance / LAMPORTS_PER_SOL).toFixed(6)} SOL, required: ${(estimatedFee / LAMPORTS_PER_SOL).toFixed(6)} SOL`,
-          };
+          }
         }
       }
 
-      return { sufficient: true, details: "Sufficient balance" };
+      return { sufficient: true, details: 'Sufficient balance' }
     } catch (error) {
-      console.error("Error checking balance:", error);
-      return { sufficient: false, details: "Failed to check balance" };
+      console.error('Error checking balance:', error)
+      return { sufficient: false, details: 'Failed to check balance' }
     }
-  }, [phantomPublicKey, PreferredRoute, payTokenAmount, connection]);
+  }, [phantomPublicKey, PreferredRoute, payTokenAmount, connection])
 
   const createPaymentTransaction = useCallback(async () => {
     if (!order || !phantomPublicKey || !PreferredRoute) {
       console.warn(
-        "Missing required payment information",
+        'Missing required payment information',
         order,
         phantomPublicKey,
         PreferredRoute
-      );
-      return;
+      )
+      return
     }
 
     try {
       // Proactive balance check before creating transaction
-      const balanceCheck = await checkBalance();
+      const balanceCheck = await checkBalance()
       if (!balanceCheck.sufficient) {
-        throw new Error(balanceCheck.details);
+        throw new Error(balanceCheck.details)
       }
-      let tx;
+      let tx
 
       if (!PreferredRoute.isNative) {
         // SPL token payment
         if (!PreferredRoute.tokenAddress) {
-          throw new Error("Token address is required for SPL token payment");
+          throw new Error('Token address is required for SPL token payment')
         }
         if (!PreferredRoute.payToAddress) {
-          throw new Error("Payment address is required for SPL token payment");
+          throw new Error('Payment address is required for SPL token payment')
         }
         if (!payTokenAmount) {
-          throw new Error("Pay token amount is required for SPL token payment");
+          throw new Error('Pay token amount is required for SPL token payment')
         }
 
         tx = await createSPLTransferTransaction({
-          from: phantomPublicKey,
+          from: phantomPublicKey.toBase58(),
           to: PreferredRoute.payToAddress, //"9iusfh8hawwYU3iMW8UqNSR1wjbWTy6UkJKMZ8D65Fx3", //
           tokenAmount: payTokenAmount.toString(),
           tokenAddress: PreferredRoute.tokenAddress,
           orderId: order.id,
-        });
+        })
       } else {
         // SOL payment
         if (!PreferredRoute.payToAddress) {
-          throw new Error("Payment address is required for SOL payment");
+          throw new Error('Payment address is required for SOL payment')
         }
         if (!payTokenAmount) {
-          throw new Error("Pay token amount is required for SOL payment");
+          throw new Error('Pay token amount is required for SOL payment')
         }
         tx = await createSolTransferTransaction({
-          from: phantomPublicKey,
+          from: phantomPublicKey.toBase58(),
           to: PreferredRoute.payToAddress,
           tokenAmount: payTokenAmount.toString(),
           orderId: order.id,
-        });
+        })
       }
 
-      return tx;
+      return tx
     } catch (err) {
-      console.error("Error creating payment transaction:", err);
-      throw err;
+      console.error('Error creating payment transaction:', err)
+      throw err
     }
-  }, [order, phantomPublicKey, PreferredRoute, payTokenAmount, checkBalance]);
+  }, [order, phantomPublicKey, PreferredRoute, payTokenAmount, checkBalance])
 
   return {
     error,
@@ -184,5 +187,5 @@ export const usePayment = ({
     checkBalance,
     setError,
     setIsPaying,
-  };
-};
+  }
+}
