@@ -1,55 +1,55 @@
+import type { PublicKey } from '@solana/web3.js'
+
 export interface OrderResponse {
-  code: number;
-  data: Order;
-  msg: string;
+  code: number
+  data: Order
+  msg: string
 }
 
 export interface Order {
-  acquirerId: number;
-  acquirerOrderId: string;
-  currency: string;
-  fiatAmount: number;
-  id: string;
-  preferredRoutes?: PreferredRoute[];
-  selectionMode: "acquirer" | "user" | "either";
-  status: 1 | 2 | 4; // 1: pending, 2: completed, 4: expired
-  transactionId: string;
-  createdAt: string;
-  updatedAt: string;
-  merchantName: string;
-  tx?: TransactionResult;
-  [property: string]: unknown;
+  acquirerId: number
+  acquirerOrderId: string
+  currency: string
+  fiatAmount: number
+  id: string
+  preferredRoutes?: PreferredRoute[]
+  selectionMode: 'acquirer' | 'user' | 'either'
+  status: 1 | 2 | 4 // 1: pending, 2: completed, 4: expired
+  transactionId: string
+  createdAt: string
+  updatedAt: string
+  merchantName: string
+  tx?: TransactionResult
+  [property: string]: unknown
 }
 
 export interface PreferredRoute {
-  chainName: string;
-  payToAddress: string;
-  tokenAddress: string;
-  tokenAmount: number;
-  tokenDecimals: number;
-  tokenPrice: string;
-  tokenSymbol: string;
-  isNative?: boolean;
-  [property: string]: unknown;
+  chainName: string
+  payToAddress: string
+  tokenAddress: string
+  tokenAmount: number
+  tokenDecimals: number
+  tokenPrice: string
+  tokenSymbol: string
+  isNative?: boolean
+  [property: string]: unknown
 }
 
 export interface TransactionResult {
-  txHash: string;
-  gasFee: string;
-  fromAddress: string;
-  toAddress: string;
-  symbol: string;
-  memo: string;
-  amount: string;
-  orderId: string;
+  txHash: string
+  gasFee: string
+  fromAddress: string
+  toAddress: string
+  symbol: string
+  memo: string
+  amount: string
+  orderId: string
 }
 
 export interface TransactionParams {
-  from: string;
-  to: string;
-  tokenAmount: string | bigint;
-  tokenAddress?: string;
-  orderId: string;
+  from: PublicKey | string
+  to: PublicKey | string
+  tokenAmount: string | bigint
+  tokenAddress?: PublicKey | string
+  orderId: string
 }
-
-export type { Transaction } from "@solana/web3.js";

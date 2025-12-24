@@ -1,15 +1,27 @@
 /**
- * PayNow QR Code Data Types
+ * PayNow QR Code Data Types (matching paynow.ts export)
  */
 
 export interface PayNowQRData {
+  // Proxy info
   proxyType: 'phone' | 'nric' | 'uen' | 'unknown'
-  proxyValue: string
-  amount?: string
-  currency?: string
-  referenceId?: string
+  proxyTypeCode: string // Original code: 0, 2, 4
+  proxyValue: string // Phone number, NRIC/FIN, or UEN
+
+  // Payment info (optional)
+  amount?: string // Transaction amount
+  currency?: string // Currency code (usually SGD)
+  referenceId?: string // Reference/Order number
+  description?: string // Description
+
+  // Merchant info (optional)
   merchantName?: string
-  qrString: string
+  merchantCity?: string
+  countryCode?: string // Usually 'SG'
+
+  // Raw data
+  rawData: Record<string, string> // All parsed raw fields
+  networkSpecificData: Record<string, string> // Data inside Tag 26
 }
 
 /**
@@ -28,32 +40,58 @@ export interface CreatePayoutParams {
   qrString?: string
 }
 
+export type CryptoPaymentStatus = 'pending' | 'verified' | 'failed' | 'expired'
+export type FiatPaymentStatus = 'pending' | 'processing' | 'success' | 'failed'
+
+export interface PayoutData {
+  id: string // Payout order ID (used as orderId in Memo)
+  fiatAmount: number
+  fiatCurrency: string
+  cryptoCurrency: string
+  cryptoAmount: string // Amount to pay in smallest unit
+  cryptoDecimal: number
+  cryptoChain: string
+  paymentAddress: string // ⭐ Receiving address for blockchain transfer
+  exchangeRate: string
+  orderExpiresAt: string // ISO timestamp
+  orderExpiresAtTs: number // Unix timestamp in milliseconds
+  cryptoPaymentStatus: CryptoPaymentStatus
+  fiatPaymentStatus: FiatPaymentStatus
+  // Additional fields that may be present
+  entityType?: 'company' | 'individual'
+  entityValue?: string
+  country?: string
+  remark?: string
+}
+
 export interface CreatePayoutResponse {
   code: number
   msg: string
-  data: {
-    id: string // Payout order ID (used as orderId in Memo)
-    fiatAmount: number
-    fiatCurrency: string
-    cryptoCurrency: string
-    cryptoAmount: string // Amount to pay in smallest unit
-    cryptoDecimal: number
-    cryptoChain: string
-    paymentAddress: string // ⭐ Receiving address for blockchain transfer
-    exchangeRate: string
-    orderExpiresAt: string
-    orderExpiresAtTs: number
-    cryptoPaymentStatus: 'pending' | 'verified' | 'failed' | 'expired'
-    fiatPaymentStatus: 'pending' | 'processing' | 'success' | 'failed'
-  } | null
+  data: PayoutData | null
+}
+
+export interface PayoutRecordData {
+  id: string
+  cryptoPaymentStatus: CryptoPaymentStatus
+  fiatPaymentStatus: FiatPaymentStatus
+  // May include other fields from PayoutData
+  fiatAmount?: number
+  cryptoAmount?: string
+  paymentAddress?: string
 }
 
 export interface PayoutRecordResponse {
   code: number
   msg: string
-  data: {
-    id: string
-    cryptoPaymentStatus: 'pending' | 'verified' | 'failed' | 'expired'
-    fiatPaymentStatus: 'pending' | 'processing' | 'success' | 'failed'
-  } | null
+  data: PayoutRecordData | null
 }
+
+/**
+ * Payment status helper type
+ */
+export type PaymentStatus =
+  | 'pending'
+  | 'processing'
+  | 'success'
+  | 'failed'
+  | 'expired'
