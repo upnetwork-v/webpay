@@ -1,3 +1,4 @@
+import { createPayout, PayoutAPIError } from '@/api/payout'
 import OntaPayLogo from '@/assets/img/OntapayLogo.png'
 import { isLikelyPayNowQR, parsePayNowQR } from '@/utils/paynow'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
@@ -87,14 +88,51 @@ function ScanPageComponent() {
       return
     }
 
-    // Navigate to payment page
-    console.log('[Scanner] Navigating to payment page')
-    navigate({
-      to: '/wallet/pay/paynow',
-      state: {
-        payNowData,
-      } as any, // Type assertion needed for router state
-    })
+    try {
+      console.log('[Scanner] Creating payout order...')
+
+      // Determine entity type
+      const entityType =
+        payNowData.proxyType === 'uen' ? 'company' : 'individual'
+
+      // Use amount from QR code, or 0 if not specified
+      const amountInCents = payNowData.amount
+        ? Math.round(parseFloat(payNowData.amount) * 100).toString()
+        : '0'
+
+      // Create payout immediately
+      const payout = await createPayout({
+        entityType,
+        entityValue: payNowData.proxyValue,
+        value: amountInCents,
+        currency: 'SGD',
+        cryptoCurrency: 'USDC',
+        cryptoChain: 'SOLANA',
+        country: 'SG',
+        remark: payNowData.merchantName,
+        qrString: JSON.stringify(payNowData.rawData),
+      })
+
+      if (!payout.data) {
+        throw new Error('Failed to create payout')
+      }
+
+      console.log('[Scanner] Payout created:', payout.data.id)
+      console.log('[Scanner] Navigating to payment page')
+
+      // Navigate to payment page with payoutId
+      navigate({
+        to: `/wallet/pay/paynow/${payout.data.id}`,
+      })
+    } catch (err) {
+      console.error('[Scanner] Failed to create payout:', err)
+      if (err instanceof PayoutAPIError) {
+        setError(`创建订单失败: ${err.message}`)
+      } else {
+        setError('创建订单失败，请重试')
+      }
+      setHasScanned(false) // Allow rescan
+    }
   }
 
   const onScanFailure = () => {

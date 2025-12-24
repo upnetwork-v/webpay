@@ -1,32 +1,22 @@
-import { createPayout, getPayoutRecord, PayoutAPIError } from '@/api/payout'
+import { getPayoutRecord } from '@/api/payout'
 import { USDC_TOKEN_MINT } from '@/constants/token'
-import type { PayNowQRData, PayoutData } from '@/types/payout'
+import type { PayoutData } from '@/types/payout'
 import { createSPLTransferTransaction } from '@/utils/transaction'
 import { useWallet } from '@/wallets/provider/useWallet'
 import { Connection, Transaction } from '@solana/web3.js'
-import {
-  createFileRoute,
-  useLocation,
-  useNavigate,
-} from '@tanstack/react-router'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import bs58 from 'bs58'
 import { useEffect, useMemo, useState } from 'react'
 
-// Define the expected location state type
-interface PayNowLocationState {
-  payNowData?: PayNowQRData
-}
+type PaymentStep = 'preview' | 'paying' | 'verifying' | 'success'
 
-type PaymentStep = 'input' | 'preview' | 'paying' | 'verifying' | 'success'
-
-export const Route = createFileRoute('/wallet/pay/paynow')({
+export const Route = createFileRoute('/wallet/pay/paynow/$payoutId')({
   component: PayNowPaymentComponent,
 })
 
 function PayNowPaymentComponent() {
   const navigate = useNavigate()
-  const location = useLocation()
-  const { payoutId } = Route.useParams()
+  const { payoutId } = Route.useParams() // Required path param
   const {
     adapter,
     state,
@@ -43,12 +33,8 @@ function PayNowPaymentComponent() {
     []
   )
 
-  // Access the state with proper typing
-  const { payNowData } = (location.state as PayNowLocationState) || {}
-
   // Payment flow state
-  const [step, setStep] = useState<PaymentStep>('input')
-  const [amount, setAmount] = useState<string>(payNowData?.amount || '')
+  const [step, setStep] = useState<PaymentStep>('preview') // Start with preview
   const [payoutData, setPayoutData] = useState<PayoutData | null>(null)
   const [error, setError] = useState<string>('')
   const [loading, setLoading] = useState(false)
@@ -251,9 +237,9 @@ function PayNowPaymentComponent() {
     }
   }, [handlePaymentCallback, sendRawTransaction, payoutId])
 
-  // Only require payNowData if we don't have payoutId
-  if (!payoutId && !payNowData) {
-    console.log('[Render] No payoutId or payNowData, redirecting to /wallet')
+  // Only require payoutId (no input step needed)
+  if (!payoutId) {
+    console.log('[Render] No payoutId, redirecting to /wallet')
     navigate({ to: '/wallet' })
     return null
   }
@@ -261,82 +247,6 @@ function PayNowPaymentComponent() {
   const handleCancel = () => {
     console.log('[handleCancel] Navigating to /wallet')
     navigate({ to: '/wallet' })
-  }
-
-  const handleContinue = async () => {
-    if (!payNowData) {
-      setError('Missing payment information')
-      return
-    }
-
-    setError('')
-    setLoading(true)
-
-    try {
-      // Validate amount
-      const amountNum = parseFloat(amount)
-      if (isNaN(amountNum) || amountNum < 0.01) {
-        setError('Amount must be at least S$ 0.01')
-        setLoading(false)
-        return
-      }
-
-      // Convert SGD to cents
-      const amountInCents = Math.round(amountNum * 100).toString()
-
-      // Determine entity type based on proxy type
-      const entityType =
-        payNowData.proxyType === 'uen' ? 'company' : 'individual'
-
-      const entityValue = payNowData.proxyValue
-      if (!entityValue) {
-        throw new Error('Missing PayNow ID')
-      }
-
-      // Create payout
-      console.log('[handleContinue] Creating payout...', {
-        entityType,
-        entityValue,
-        amount: amountInCents,
-      })
-      const payout = await createPayout({
-        entityType,
-        entityValue,
-        value: amountInCents,
-        currency: 'SGD',
-        cryptoCurrency: 'USDC',
-        cryptoChain: 'SOLANA',
-        country: 'SG',
-        // optional fields
-        remark: payNowData.merchantName,
-        qrString: JSON.stringify(payNowData.rawData),
-      })
-
-      console.log('[handleContinue] Payout created:', payout.data?.id)
-
-      if (!payout.data) {
-        throw new Error('Failed to create payout')
-      }
-
-      const targetUrl = `/wallet/pay/paynow/${payout.data.id}`
-      console.log('[handleContinue] Navigating to:', targetUrl)
-
-      // Navigate to URL with payoutId
-      navigate({
-        to: targetUrl,
-      })
-
-      console.log('[handleContinue] Navigation called')
-    } catch (err) {
-      console.error('Create payout error:', err)
-      if (err instanceof PayoutAPIError) {
-        setError(`Failed to create payout: ${err.message}`)
-      } else {
-        setError('Failed to create payout')
-      }
-    } finally {
-      setLoading(false)
-    }
   }
 
   const handleConfirmPayment = async () => {
@@ -413,8 +323,6 @@ function PayNowPaymentComponent() {
     }
   }
 
-  const isAmountEditable = !payNowData?.amount
-
   // Success Page
   if (step === 'success' && payoutData) {
     return (
@@ -450,7 +358,7 @@ function PayNowPaymentComponent() {
               <div>
                 <div className="text-sm text-gray-400">Place</div>
                 <div className="text-lg font-bold text-white">
-                  {payNowData?.proxyValue}
+                  {payoutData?.entityValue || 'Unknown'}
                 </div>
               </div>
             </div>
@@ -524,7 +432,7 @@ function PayNowPaymentComponent() {
           onClick={handleCancel}
           className="text-lg text-white hover:text-gray-300"
         >
-          {step === 'input' ? '←' : 'Back'}
+          Back
         </button>
         <h1 className="text-xl font-bold">PayNow</h1>
         <div className="w-16" /> {/* Spacer for centering */}
@@ -533,78 +441,6 @@ function PayNowPaymentComponent() {
       {/* Content */}
       <div className="flex-1 px-6">
         {/* Step 1: Input Amount */}
-        {step === 'input' && (
-          <div className="space-y-6">
-            {/* Pay To Section */}
-            <div className="rounded-2xl bg-gray-800 p-6">
-              <div className="mb-2 text-sm text-gray-400">Pay To</div>
-              <div className="text-2xl font-bold text-blue-400">
-                {payNowData?.proxyValue}
-              </div>
-            </div>
-
-            {/* Amount Section */}
-            <div className="space-y-4">
-              <div className="text-sm text-gray-400">Amount</div>
-
-              {/* SGD Amount */}
-              <div className="rounded-2xl bg-gray-800 p-6">
-                <div className="flex items-center justify-between">
-                  <span className="text-xl font-bold">SGD</span>
-                  {isAmountEditable ? (
-                    <input
-                      type="number"
-                      placeholder="0.00"
-                      className="bg-transparent text-right text-4xl font-light text-white outline-none"
-                      value={amount}
-                      onChange={(e) => setAmount(e.target.value)}
-                      step="0.01"
-                      min="0.01"
-                    />
-                  ) : (
-                    <span className="text-4xl font-light">{amount}</span>
-                  )}
-                </div>
-              </div>
-
-              {/* USDC Amount */}
-              <div className="flex items-center justify-between rounded-2xl bg-gray-800 p-4">
-                <div className="flex items-center gap-2">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-500">
-                    <span className="text-sm font-bold text-white">$</span>
-                  </div>
-                  <span className="font-semibold">USDC</span>
-                </div>
-                <span className="text-2xl font-light">
-                  {amount
-                    ? (parseFloat(amount) * 0.7794).toFixed(6)
-                    : '0.000000'}
-                </span>
-              </div>
-
-              {/* Exchange Rate */}
-              <div className="text-center text-sm text-gray-400">
-                1 SGD = 0.779400 USDC
-              </div>
-            </div>
-
-            {/* Error Message */}
-            {error && (
-              <div className="rounded-lg bg-red-900/50 p-4 text-red-200">
-                {error}
-              </div>
-            )}
-
-            {/* Review Transaction Button */}
-            <button
-              onClick={handleContinue}
-              disabled={loading || !amount || parseFloat(amount) < 0.01}
-              className="w-full rounded-full bg-purple-400 px-6 py-4 text-lg font-semibold text-gray-900 transition hover:bg-purple-300 disabled:bg-gray-700 disabled:text-gray-500"
-            >
-              {loading ? 'Processing...' : 'Review Transaction'}
-            </button>
-          </div>
-        )}
 
         {/* Step 2: Preview / Review & Confirm */}
         {step === 'preview' && payoutData && (
@@ -620,7 +456,9 @@ function PayNowPaymentComponent() {
             <h2 className="text-center text-xl font-normal">
               Review & confirm withdrawing SGD to
               <br />
-              <span className="font-bold">{payNowData?.proxyValue}</span>
+              <span className="font-bold">
+                {payoutData?.entityValue || 'Unknown'}
+              </span>
             </h2>
 
             {/* Transaction Details */}
@@ -649,7 +487,7 @@ function PayNowPaymentComponent() {
               <div className="flex justify-between">
                 <span className="text-gray-400">PayNow ID</span>
                 <span className="font-semibold text-purple-400">
-                  {payNowData?.proxyValue}
+                  {payoutData?.entityValue || 'Unknown'}
                 </span>
               </div>
 
@@ -747,7 +585,9 @@ function PayNowPaymentComponent() {
             <h2 className="text-center text-xl font-normal">
               Review & confirm withdrawing SGD to
               <br />
-              <span className="font-bold">{payNowData?.proxyValue}</span>
+              <span className="font-bold">
+                {payoutData?.entityValue || 'Unknown'}
+              </span>
             </h2>
 
             {/* Transaction Details (same as preview) */}
@@ -771,7 +611,7 @@ function PayNowPaymentComponent() {
               <div className="flex justify-between">
                 <span className="text-gray-400">PayNow ID</span>
                 <span className="font-semibold text-purple-400">
-                  {payNowData?.proxyValue}
+                  {payoutData?.entityValue || 'Unknown'}
                 </span>
               </div>
               <div className="flex justify-between">

@@ -14,9 +14,8 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as WalletScanRouteImport } from './routes/wallet/scan'
-import { Route as WalletPayRouteImport } from './routes/wallet/pay'
 import { Route as WebpayOrder_idOrderIdRouteImport } from './routes/webpay/order_id/$orderId'
-import { Route as WalletPayPaynowRouteImport } from './routes/wallet/pay/paynow'
+import { Route as WalletPayPaynowPayoutIdRouteImport } from './routes/wallet/pay/paynow/$payoutId'
 
 const WalletRoute = WalletRouteImport.update({
   id: '/wallet',
@@ -43,20 +42,15 @@ const WalletScanRoute = WalletScanRouteImport.update({
   path: '/scan',
   getParentRoute: () => WalletRoute,
 } as any)
-const WalletPayRoute = WalletPayRouteImport.update({
-  id: '/pay',
-  path: '/pay',
-  getParentRoute: () => WalletRoute,
-} as any)
 const WebpayOrder_idOrderIdRoute = WebpayOrder_idOrderIdRouteImport.update({
   id: '/webpay/order_id/$orderId',
   path: '/webpay/order_id/$orderId',
   getParentRoute: () => rootRouteImport,
 } as any)
-const WalletPayPaynowRoute = WalletPayPaynowRouteImport.update({
-  id: '/paynow',
-  path: '/paynow',
-  getParentRoute: () => WalletPayRoute,
+const WalletPayPaynowPayoutIdRoute = WalletPayPaynowPayoutIdRouteImport.update({
+  id: '/pay/paynow/$payoutId',
+  path: '/pay/paynow/$payoutId',
+  getParentRoute: () => WalletRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
@@ -64,20 +58,18 @@ export interface FileRoutesByFullPath {
   '/about': typeof AboutRoute
   '/login': typeof LoginRoute
   '/wallet': typeof WalletRouteWithChildren
-  '/wallet/pay': typeof WalletPayRouteWithChildren
   '/wallet/scan': typeof WalletScanRoute
-  '/wallet/pay/paynow': typeof WalletPayPaynowRoute
   '/webpay/order_id/$orderId': typeof WebpayOrder_idOrderIdRoute
+  '/wallet/pay/paynow/$payoutId': typeof WalletPayPaynowPayoutIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/login': typeof LoginRoute
   '/wallet': typeof WalletRouteWithChildren
-  '/wallet/pay': typeof WalletPayRouteWithChildren
   '/wallet/scan': typeof WalletScanRoute
-  '/wallet/pay/paynow': typeof WalletPayPaynowRoute
   '/webpay/order_id/$orderId': typeof WebpayOrder_idOrderIdRoute
+  '/wallet/pay/paynow/$payoutId': typeof WalletPayPaynowPayoutIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -85,10 +77,9 @@ export interface FileRoutesById {
   '/about': typeof AboutRoute
   '/login': typeof LoginRoute
   '/wallet': typeof WalletRouteWithChildren
-  '/wallet/pay': typeof WalletPayRouteWithChildren
   '/wallet/scan': typeof WalletScanRoute
-  '/wallet/pay/paynow': typeof WalletPayPaynowRoute
   '/webpay/order_id/$orderId': typeof WebpayOrder_idOrderIdRoute
+  '/wallet/pay/paynow/$payoutId': typeof WalletPayPaynowPayoutIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -97,30 +88,27 @@ export interface FileRouteTypes {
     | '/about'
     | '/login'
     | '/wallet'
-    | '/wallet/pay'
     | '/wallet/scan'
-    | '/wallet/pay/paynow'
     | '/webpay/order_id/$orderId'
+    | '/wallet/pay/paynow/$payoutId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/about'
     | '/login'
     | '/wallet'
-    | '/wallet/pay'
     | '/wallet/scan'
-    | '/wallet/pay/paynow'
     | '/webpay/order_id/$orderId'
+    | '/wallet/pay/paynow/$payoutId'
   id:
     | '__root__'
     | '/'
     | '/about'
     | '/login'
     | '/wallet'
-    | '/wallet/pay'
     | '/wallet/scan'
-    | '/wallet/pay/paynow'
     | '/webpay/order_id/$orderId'
+    | '/wallet/pay/paynow/$payoutId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -168,13 +156,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WalletScanRouteImport
       parentRoute: typeof WalletRoute
     }
-    '/wallet/pay': {
-      id: '/wallet/pay'
-      path: '/pay'
-      fullPath: '/wallet/pay'
-      preLoaderRoute: typeof WalletPayRouteImport
-      parentRoute: typeof WalletRoute
-    }
     '/webpay/order_id/$orderId': {
       id: '/webpay/order_id/$orderId'
       path: '/webpay/order_id/$orderId'
@@ -182,36 +163,24 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WebpayOrder_idOrderIdRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/wallet/pay/paynow': {
-      id: '/wallet/pay/paynow'
-      path: '/paynow'
-      fullPath: '/wallet/pay/paynow'
-      preLoaderRoute: typeof WalletPayPaynowRouteImport
-      parentRoute: typeof WalletPayRoute
+    '/wallet/pay/paynow/$payoutId': {
+      id: '/wallet/pay/paynow/$payoutId'
+      path: '/pay/paynow/$payoutId'
+      fullPath: '/wallet/pay/paynow/$payoutId'
+      preLoaderRoute: typeof WalletPayPaynowPayoutIdRouteImport
+      parentRoute: typeof WalletRoute
     }
   }
 }
 
-interface WalletPayRouteChildren {
-  WalletPayPaynowRoute: typeof WalletPayPaynowRoute
-}
-
-const WalletPayRouteChildren: WalletPayRouteChildren = {
-  WalletPayPaynowRoute: WalletPayPaynowRoute,
-}
-
-const WalletPayRouteWithChildren = WalletPayRoute._addFileChildren(
-  WalletPayRouteChildren,
-)
-
 interface WalletRouteChildren {
-  WalletPayRoute: typeof WalletPayRouteWithChildren
   WalletScanRoute: typeof WalletScanRoute
+  WalletPayPaynowPayoutIdRoute: typeof WalletPayPaynowPayoutIdRoute
 }
 
 const WalletRouteChildren: WalletRouteChildren = {
-  WalletPayRoute: WalletPayRouteWithChildren,
   WalletScanRoute: WalletScanRoute,
+  WalletPayPaynowPayoutIdRoute: WalletPayPaynowPayoutIdRoute,
 }
 
 const WalletRouteWithChildren =
