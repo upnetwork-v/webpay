@@ -46,6 +46,7 @@ function PayMongoPaymentComponent() {
   const [error, setError] = useState<string>('')
   const [loading, setLoading] = useState(false)
   const [isPolling, setIsPolling] = useState(false)
+  const [isFailed, setIsFailed] = useState(false)
 
   // Polling ref to prevent duplicate polling
   const pollingRef = useRef(false)
@@ -148,6 +149,22 @@ function PayMongoPaymentComponent() {
               record.data.fiatPaymentStatus === 'success'
             ) {
               setStep('success')
+              return
+            }
+
+            // Check failed status
+            if (
+              record.data.cryptoPaymentStatus === 'failed' ||
+              record.data.fiatPaymentStatus === 'failed' ||
+              record.data.cryptoPaymentStatus === 'expired'
+            ) {
+              setIsFailed(true)
+              setError(
+                record.data.cryptoPaymentStatus === 'expired'
+                  ? 'Payment has expired. Please create a new payment.'
+                  : 'Payment failed. Please try again or contact support.'
+              )
+              setStep('preview')
               return
             }
 
@@ -561,38 +578,50 @@ function PayMongoPaymentComponent() {
               </div>
             )}
 
-            {/* Confirm Transfer Button */}
-            <button
-              onClick={handleConfirmPayment}
-              disabled={loading}
-              className="w-full rounded-full bg-purple-400 px-6 py-4 text-lg font-semibold text-gray-900 transition hover:bg-purple-300 disabled:bg-gray-700 disabled:text-gray-500"
-            >
-              {loading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24">
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                      fill="none"
-                    />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    />
-                  </svg>
-                  Processing...
-                </span>
-              ) : (
-                <span className="flex items-center justify-center gap-2">
-                  <span>💳</span> Confirm transfer
-                </span>
-              )}
-            </button>
+            {/* Confirm Transfer Button - hidden when payment failed */}
+            {!isFailed && (
+              <button
+                onClick={handleConfirmPayment}
+                disabled={loading}
+                className="w-full rounded-full bg-purple-400 px-6 py-4 text-lg font-semibold text-gray-900 transition hover:bg-purple-300 disabled:bg-gray-700 disabled:text-gray-500"
+              >
+                {loading ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24">
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                        fill="none"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      />
+                    </svg>
+                    Processing...
+                  </span>
+                ) : (
+                  <span className="flex items-center justify-center gap-2">
+                    <span>💳</span> Confirm transfer
+                  </span>
+                )}
+              </button>
+            )}
+
+            {/* Back to Wallet Button - shown when payment failed */}
+            {isFailed && (
+              <button
+                onClick={handleCancel}
+                className="w-full rounded-full bg-gray-700 px-6 py-4 text-lg font-semibold text-white transition hover:bg-gray-600"
+              >
+                Back to Wallet
+              </button>
+            )}
           </div>
         )}
 
