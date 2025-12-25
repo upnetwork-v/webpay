@@ -36,7 +36,7 @@ function PayMongoInputPage() {
   const [error, setError] = useState('')
 
   const handleContinue = async () => {
-    // Minimum amount check (assuming 1 PHP based on requirements)
+    // Minimum amount check (1 PHP based on requirements)
     if (!amount || parseFloat(amount) < 1) {
       setError('Amount must be at least ₱ 1.00')
       return
@@ -86,12 +86,16 @@ function PayMongoInputPage() {
     }
   }
 
+  const handleBack = () => {
+    navigate({ to: '/wallet/scan' })
+  }
+
   return (
     <div className="flex min-h-screen flex-col bg-[#0B0E17] text-white">
       {/* Header */}
       <div className="flex items-center p-4">
         <button
-          onClick={() => navigate({ to: '/wallet/scan' })}
+          onClick={handleBack}
           className="text-lg text-white hover:text-gray-300"
         >
           Back
@@ -105,36 +109,42 @@ function PayMongoInputPage() {
       <div className="flex-1 px-6 pt-6">
         {/* Pay To Info */}
         <div className="mb-8 rounded-2xl bg-gray-800 p-6">
-          <div className="mb-2 text-sm text-gray-400">Pay To</div>
+          <div className="mb-1 flex items-center gap-2">
+            <span className="text-2xl">🇵🇭</span>
+            <span className="text-sm text-gray-400">Pay To (Philippines)</span>
+          </div>
           <div className="text-xl font-bold break-all text-blue-400">
             {search.merchantName || search.entityValue}
           </div>
           {search.merchantName &&
             search.merchantName !== search.entityValue && (
               <div className="mt-2 text-sm text-gray-400">
-                {search.entityValue}
+                Account: {search.entityValue}
               </div>
             )}
         </div>
 
         {/* Amount Input */}
         <div className="space-y-4">
-          <div className="text-sm text-gray-400">Amount (PHP)</div>
+          <div className="text-sm text-gray-400">Amount (Philippine Peso)</div>
           <div className="rounded-2xl bg-gray-800 p-6">
             <div className="flex items-center justify-between">
-              <span className="text-xl font-bold">PHP</span>
+              <span className="text-3xl font-bold text-purple-400">₱</span>
               <input
                 type="number"
                 placeholder="0.00"
-                className="w-full bg-transparent text-right text-4xl font-light text-white outline-none"
+                className="w-full bg-transparent text-right text-4xl font-light text-white outline-none placeholder:text-gray-600"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 step="0.01"
-                min="0.01"
+                min="1"
                 autoFocus
               />
             </div>
           </div>
+          <p className="text-center text-sm text-gray-500">
+            USDC amount will be calculated after order creation
+          </p>
         </div>
 
         {error && (
@@ -148,7 +158,29 @@ function PayMongoInputPage() {
           disabled={loading || !amount || parseFloat(amount) < 1}
           className="mt-8 w-full rounded-full bg-purple-500 py-4 text-lg font-bold text-white transition hover:bg-purple-600 disabled:bg-gray-700 disabled:text-gray-500"
         >
-          {loading ? 'Creating Order...' : 'Next'}
+          {loading ? (
+            <span className="flex items-center justify-center gap-2">
+              <svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24">
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                  fill="none"
+                />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                />
+              </svg>
+              Creating Order...
+            </span>
+          ) : (
+            'Continue'
+          )}
         </button>
       </div>
     </div>

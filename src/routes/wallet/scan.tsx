@@ -243,8 +243,7 @@ function ScanPageComponent() {
         cryptoChain: 'SOLANA',
         country: 'PH',
         remark: payMongoData.remark || 'PayMongo Scan',
-        qrString: decodedText, // Or JSON.stringify(rawData)? UpNetwork uses formatted string or parsed? Usually raw string is safer for reference.
-        // Wait, PayNow uses JSON.stringify(payNowData.rawData). PayMongo can use raw string.
+        qrString: decodedText,
         purpose: payMongoData.purpose,
         accountType: payMongoData.accountType,
       })
