@@ -27,23 +27,6 @@ export function isLikelyPayMongo(qrData: string): boolean {
   const currency = emvData['53']
   const isPHP = currency === 'PHP'
 
-  // Check for PayMongo network identifier in merchant account information
-  // PayMongo may have specific network identifiers in tags 26-51
-  let hasPayMongoNetwork = false
-  for (let tag = 26; tag <= 51; tag++) {
-    const tagStr = tag.toString().padStart(2, '0')
-    const value = emvData[tagStr]
-    if (
-      value &&
-      (value.includes('PAYMONGO') ||
-        value.includes('PH') ||
-        value.includes('PayMongo'))
-    ) {
-      hasPayMongoNetwork = true
-      break
-    }
-  }
-
   // PayMongo typically has Philippines country code and PHP currency
   return (isPhilippines || isPHP) && hasTLVStructure(qrData)
 }
