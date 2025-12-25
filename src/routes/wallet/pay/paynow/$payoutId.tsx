@@ -265,10 +265,12 @@ function PayNowPaymentComponent() {
                 setLoading(true)
 
                 // Just let the other poller handle the success/failure state transition
-              } catch (broadcastError: any) {
+              } catch (broadcastError: unknown) {
                 // Check if transaction was already processed
                 const errorMessage =
-                  broadcastError?.message || JSON.stringify(broadcastError)
+                  broadcastError instanceof Error
+                    ? broadcastError.message
+                    : JSON.stringify(broadcastError)
                 if (errorMessage.includes('already been processed')) {
                   console.log(
                     'Transaction already processed, proceeding to polling...'
