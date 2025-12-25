@@ -133,15 +133,8 @@ export async function createSPLTransferTransaction({
       BigInt(tokenAmount)
     )
 
-    // Memo instruction
-    const memoIx = createMemoInstruction(
-      JSON.stringify({
-        webpay: {
-          orderId,
-        },
-      }),
-      fromPubkey
-    )
+    // Memo instruction: orderId + comma format (e.g., "1453442627554263040,")
+    const memoIx = createMemoInstruction(`${orderId},`, fromPubkey)
 
     const tx = new Transaction().add(transferIx, memoIx)
     tx.feePayer = fromPubkey
@@ -223,15 +216,8 @@ export async function createSolTransferTransaction({
     // Add the transfer instruction
     tx.add(transferIx)
 
-    // Add memo instruction with orderId
-    const memoIx = createMemoInstruction(
-      JSON.stringify({
-        webpay: {
-          orderId,
-        },
-      }),
-      fromPubkey
-    )
+    // Add memo instruction with orderId: orderId + comma format (e.g., "1453442627554263040,")
+    const memoIx = createMemoInstruction(`${orderId},`, fromPubkey)
     tx.add(memoIx)
 
     // Set fee payer
