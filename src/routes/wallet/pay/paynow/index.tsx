@@ -41,7 +41,7 @@ function PayNowInputPage() {
 
     try {
       const amountInCents = Math.round(parseFloat(amount) * 100).toString()
-      const entityType = search.proxyType === 'uen' ? 'company' : 'individual'
+      const entityType = 'company' // Fixed to 'company' to match upnetwork-v2
 
       console.log('[PayNowInput] Creating payout...', {
         amount: amountInCents,

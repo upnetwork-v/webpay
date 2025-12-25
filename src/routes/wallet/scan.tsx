@@ -156,9 +156,8 @@ function ScanPageComponent() {
 
       console.log('[Scanner] PayNow: Amount found, creating payout order...')
 
-      // Determine entity type
-      const entityType =
-        payNowData.proxyType === 'uen' ? 'company' : 'individual'
+      // Fixed to 'company' to match upnetwork-v2
+      const entityType = 'company'
 
       // Use amount from QR code, or 0 if not specified
       const amountInCents = payNowData.amount
