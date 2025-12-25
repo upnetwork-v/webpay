@@ -1,17 +1,17 @@
-import type { User } from "@/types/auth";
-import { useKYCStore } from "@/stores";
+import { useKYCStore } from '@/stores'
+import type { User } from '@/types/auth'
 
 export default function KYCStatus({
   user,
   upToLimit,
 }: {
-  user: User | null;
-  upToLimit: boolean;
+  user: User | null
+  upToLimit: boolean
 }) {
-  const { launchKYC, isKYCLoading, kycError } = useKYCStore();
+  const { launchKYC, isKYCLoading, kycError } = useKYCStore()
 
   if (!user) {
-    return null;
+    return null
   }
 
   if (upToLimit) {
@@ -23,21 +23,21 @@ export default function KYCStatus({
           onClick={() => launchKYC()}
           disabled={isKYCLoading}
         >
-          {isKYCLoading ? "Loading..." : "Retry KYC"}
+          {isKYCLoading ? 'Loading...' : 'Retry KYC'}
         </button>
       </div>
     ) : (
       <div className="p-2">
         <button
-          className="btn btn-primary btn-block rounded-full btn-lg"
+          className="btn btn-primary btn-block btn-lg rounded-full"
           onClick={() => launchKYC()}
           disabled={isKYCLoading}
         >
-          {isKYCLoading ? "Loading..." : "Complete KYC to pay"}
+          {isKYCLoading ? 'Loading...' : 'Complete KYC to pay'}
         </button>
-        {kycError && <div className="text-error text-xs mt-2">{kycError}</div>}
+        {kycError && <div className="text-error mt-2 text-xs">{kycError}</div>}
       </div>
-    );
+    )
   }
 
   return (
@@ -53,8 +53,8 @@ export default function KYCStatus({
               onClick={() => launchKYC()}
               disabled={isKYCLoading}
             >
-              {isKYCLoading ? "Loading..." : "Complete KYC"}
-            </button>{" "}
+              {isKYCLoading ? 'Loading...' : 'Complete KYC'}
+            </button>{' '}
             to get unlimited transaction limit
           </div>
         </>
@@ -62,7 +62,7 @@ export default function KYCStatus({
       {/* kyc 正在审核中 */}
       {user?.verified === 1 && <div> KYC is being reviewed</div>}
 
-      {kycError && <div className="text-error text-xs mt-2">{kycError}</div>}
+      {kycError && <div className="text-error mt-2 text-xs">{kycError}</div>}
     </div>
-  );
+  )
 }

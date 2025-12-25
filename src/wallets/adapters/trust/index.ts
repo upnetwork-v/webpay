@@ -1,1 +1,1 @@
-export { TrustWalletAdapter } from "./TrustWalletAdapter";
+export { TrustWalletAdapter } from './TrustWalletAdapter'

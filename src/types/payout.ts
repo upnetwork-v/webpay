@@ -30,14 +30,17 @@ export interface PayNowQRData {
 
 export interface CreatePayoutParams {
   entityType: 'company' | 'individual'
-  entityValue: string // PayNow ID (phone/UEN)
-  value: string // Amount in cents (e.g., "1000" = 10.00 SGD)
-  currency: 'SGD'
+  entityValue: string // PayNow ID (phone/UEN) or PayMongo Account
+  value: string // Amount in cents (e.g., "1000" = 10.00 SGD/PHP)
+  currency: 'SGD' | 'PHP'
   cryptoCurrency: 'USDC'
   cryptoChain: 'SOLANA'
-  country: 'SG'
+  country: 'SG' | 'PH'
   remark?: string
   qrString?: string
+  // PayMongo specific fields
+  accountType?: string
+  purpose?: string
 }
 
 export type CryptoPaymentStatus = 'pending' | 'verified' | 'failed' | 'expired'

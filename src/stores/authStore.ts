@@ -1,9 +1,9 @@
-import { create } from "zustand";
-import { persist } from "zustand/middleware";
-import type { AuthStore } from "@/types/auth";
-import { getUserInfo } from "@/api/auth";
+import { getUserInfo } from '@/api/auth'
+import type { AuthStore } from '@/types/auth'
+import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
 
-const AUTH_STORAGE_KEY = "ontapay_auth";
+const AUTH_STORAGE_KEY = 'ontapay_auth'
 
 export const useAuthStore = create<AuthStore>()(
   persist(
@@ -22,10 +22,10 @@ export const useAuthStore = create<AuthStore>()(
           authToken: token,
           isLoading: false,
           error: null,
-        });
+        })
 
-        const user = await getUserInfo();
-        set({ user: user });
+        const user = await getUserInfo()
+        set({ user: user })
       },
 
       logout: () => {
@@ -35,48 +35,48 @@ export const useAuthStore = create<AuthStore>()(
           user: null,
           isLoading: false,
           error: null,
-        });
+        })
       },
 
       setLoading: (loading: boolean) => {
-        set({ isLoading: loading });
+        set({ isLoading: loading })
       },
 
       setError: (error: string | null) => {
-        set({ error, isLoading: false });
+        set({ error, isLoading: false })
       },
 
       checkAuth: () => {
-        const { authToken, user } = get();
-        const isAuthenticated = !!(authToken && user);
+        const { authToken, user } = get()
+        const isAuthenticated = !!(authToken && user)
 
         if (isAuthenticated !== get().isAuthenticated) {
-          set({ isAuthenticated });
+          set({ isAuthenticated })
         }
 
-        return isAuthenticated;
+        return isAuthenticated
       },
 
       clearError: () => {
-        set({ error: null });
+        set({ error: null })
       },
 
       // 初始化方法：在 store 创建时自动调用
       initialize: async () => {
-        const { authToken } = get();
+        const { authToken } = get()
 
         // 如果有 token 尝试获取用户信息
         if (authToken) {
-          set({ isLoading: true });
+          set({ isLoading: true })
           try {
-            const user = await getUserInfo();
+            const user = await getUserInfo()
             if (user) {
               set({
                 user,
                 isAuthenticated: true,
                 isLoading: false,
                 error: null,
-              });
+              })
             } else {
               // 如果获取用户信息失败，清除认证状态
               set({
@@ -84,18 +84,18 @@ export const useAuthStore = create<AuthStore>()(
                 authToken: null,
                 user: null,
                 isLoading: false,
-                error: "Failed to get user info",
-              });
+                error: 'Failed to get user info',
+              })
             }
           } catch (error) {
-            console.error("Failed to initialize auth:", error);
+            console.error('Failed to initialize auth:', error)
             set({
               isAuthenticated: false,
               authToken: null,
               user: null,
               isLoading: false,
-              error: "Failed to initialize auth",
-            });
+              error: 'Failed to initialize auth',
+            })
           }
         }
       },
@@ -109,14 +109,14 @@ export const useAuthStore = create<AuthStore>()(
       }),
     }
   )
-);
+)
 
 // Helper function to get auth token for API calls
 export const getAuthToken = (): string | null => {
-  return useAuthStore.getState().authToken;
-};
+  return useAuthStore.getState().authToken
+}
 
 // Helper function to check if user is authenticated
 export const isAuthenticated = (): boolean => {
-  return useAuthStore.getState().checkAuth();
-};
+  return useAuthStore.getState().checkAuth()
+}

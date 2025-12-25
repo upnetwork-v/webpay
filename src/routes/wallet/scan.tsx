@@ -1,5 +1,6 @@
 import { createPayout, PayoutAPIError } from '@/api/payout'
 import OntaPayLogo from '@/assets/img/OntapayLogo.png'
+import { isLikelyPayMongo, parsePayMongo } from '@/utils/paymongo'
 import { isLikelyPayNowQR, parsePayNowQR } from '@/utils/paynow'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Html5Qrcode } from 'html5-qrcode'
@@ -112,12 +113,22 @@ function ScanPageComponent() {
     console.log('[Scanner] Scanner stopped')
 
     // Check if it's a PayNow QR code
-    if (!isLikelyPayNowQR(decodedText)) {
-      setError('暂不支持此类型二维码')
-      // Don't auto-reset hasScanned to prevent loop. User must click retry.
+    if (isLikelyPayNowQR(decodedText)) {
+      await handlePayNowQR(decodedText)
       return
     }
 
+    // Check if it's a PayMongo QR code
+    if (isLikelyPayMongo(decodedText)) {
+      await handlePayMongoQR(decodedText)
+      return
+    }
+
+    setError('暂不支持此类型二维码')
+    // Don't auto-reset hasScanned to prevent loop. User must click retry.
+  }
+
+  const handlePayNowQR = async (decodedText: string) => {
     // Parse PayNow QR
     const payNowData = parsePayNowQR(decodedText)
     if (!payNowData) {
@@ -128,7 +139,9 @@ function ScanPageComponent() {
     try {
       // Check if amount exists in QR code
       if (!payNowData.amount || parseFloat(payNowData.amount) <= 0) {
-        console.log('[Scanner] No amount in QR, navigating to input page')
+        console.log(
+          '[Scanner] PayNow: No amount in QR, navigating to input page'
+        )
         navigate({
           to: '/wallet/pay/paynow',
           search: {
@@ -141,7 +154,7 @@ function ScanPageComponent() {
         return
       }
 
-      console.log('[Scanner] Amount found, creating payout order...')
+      console.log('[Scanner] PayNow: Amount found, creating payout order...')
 
       // Determine entity type
       const entityType =
@@ -170,21 +183,87 @@ function ScanPageComponent() {
       }
 
       console.log('[Scanner] Payout created:', payout.data.id)
-      console.log('[Scanner] Navigating to payment page')
-
-      // Navigate to payment page with payoutId
       navigate({
         to: `/wallet/pay/paynow/${payout.data.id}`,
       })
     } catch (err) {
-      console.error('[Scanner] Failed to create payout:', err)
+      console.error('[Scanner] Failed to create PayNow payout:', err)
       if (err instanceof PayoutAPIError) {
         setError(`创建订单失败: ${err.message}`)
       } else {
         setError('创建订单失败，请重试')
       }
-      // IMPORTANT: Do NOT reset hasScanned(false) here.
-      // This prevents the infinite loop. The user must click 'Retry'.
+    }
+  }
+
+  const handlePayMongoQR = async (decodedText: string) => {
+    // Parse PayMongo QR
+    const payMongoData = parsePayMongo(decodedText)
+    if (!payMongoData) {
+      setError('无法解析 PayMongo 二维码')
+      return
+    }
+
+    try {
+      // Check if amount exists in QR code (payMongoData.value is number)
+      // Map entityType 'corporate' -> 'company' for API compatibility
+      const entityType =
+        payMongoData.entityType === 'corporate' ? 'company' : 'individual'
+
+      if (!payMongoData.value || payMongoData.value <= 0) {
+        console.log(
+          '[Scanner] PayMongo: No amount in QR, navigating to input page'
+        )
+        navigate({
+          to: '/wallet/pay/paymongo',
+          search: {
+            entityValue: payMongoData.entityValue,
+            entityType: entityType,
+            merchantName: payMongoData.remark, // Use remark as merchant name if available
+            qrString: decodedText,
+            purpose: payMongoData.purpose,
+            accountType: payMongoData.accountType,
+          },
+        })
+        return
+      }
+
+      console.log('[Scanner] PayMongo: Amount found, creating payout order...')
+
+      // value is already number, but createPayout expects string (cents)
+      // If payMongoData.value comes from '100.50', it is 100.5. Multiplied by 100 -> 10050.
+      const amountInCents = Math.round(payMongoData.value * 100).toString()
+
+      const payout = await createPayout({
+        entityType: entityType,
+        entityValue: payMongoData.entityValue,
+        value: amountInCents,
+        currency: 'PHP',
+        cryptoCurrency: 'USDC',
+        cryptoChain: 'SOLANA',
+        country: 'PH',
+        remark: payMongoData.remark || 'PayMongo Scan',
+        qrString: decodedText, // Or JSON.stringify(rawData)? UpNetwork uses formatted string or parsed? Usually raw string is safer for reference.
+        // Wait, PayNow uses JSON.stringify(payNowData.rawData). PayMongo can use raw string.
+        purpose: payMongoData.purpose,
+        accountType: payMongoData.accountType,
+      })
+
+      if (!payout.data) {
+        throw new Error('Failed to create payout')
+      }
+
+      console.log('[Scanner] Payout created:', payout.data.id)
+      navigate({
+        to: `/wallet/pay/paymongo/${payout.data.id}`,
+      })
+    } catch (err) {
+      console.error('[Scanner] Failed to create PayMongo payout:', err)
+      if (err instanceof PayoutAPIError) {
+        setError(`创建订单失败: ${err.message}`)
+      } else {
+        setError('创建订单失败，请重试')
+      }
     }
   }
 

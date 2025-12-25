@@ -1,5 +1,5 @@
-import { useEffect } from "react";
-import { useAuthStore } from "@/stores/authStore";
+import { useAuthStore } from '@/stores/authStore'
+import { useEffect } from 'react'
 
 /**
  * Hook to initialize auth store on app startup
@@ -7,12 +7,12 @@ import { useAuthStore } from "@/stores/authStore";
  * auth state is properly initialized when the app loads
  */
 export const useAuthInitialization = () => {
-  const initialize = useAuthStore((state) => state.initialize);
+  const initialize = useAuthStore((state) => state.initialize)
 
   useEffect(() => {
     // Initialize auth store when component mounts
     initialize().catch((error) => {
-      console.error("Failed to initialize auth store:", error);
-    });
-  }, [initialize]);
-};
+      console.error('Failed to initialize auth store:', error)
+    })
+  }, [initialize])
+}

@@ -1,5 +1,5 @@
-import type { Order, OrderResponse } from "@/types/payment";
-import { fetchInstance } from "./index";
+import type { Order, OrderResponse } from '@/types/payment'
+import { fetchInstance } from './index'
 
 export async function getPreOrder(
   receivePaymentOrderId: string
@@ -11,12 +11,12 @@ export async function getPreOrder(
         receivePaymentOrderId,
       },
     }
-  );
+  )
 
   if (response.code === 200 && response.data) {
-    return response.data;
+    return response.data
   } else {
-    throw new Error(response.msg || "Failed to get order");
+    throw new Error(response.msg || 'Failed to get order')
   }
 }
 
@@ -28,12 +28,12 @@ export async function createOrder(
     {
       receivePaymentOrderId,
     }
-  );
+  )
 
   if (response.code === 200 && response.data) {
-    return response.data;
+    return response.data
   } else {
-    throw new Error(response.msg || "Failed to get order");
+    throw new Error(response.msg || 'Failed to get order')
   }
 }
 
@@ -45,11 +45,11 @@ export async function getOrderById(paymentOrderId: string): Promise<Order> {
         paymentOrderId,
       },
     }
-  );
+  )
 
   if (response.code === 200 && response.data) {
-    return response.data;
+    return response.data
   } else {
-    throw new Error(response.msg || "Failed to get order");
+    throw new Error(response.msg || 'Failed to get order')
   }
 }

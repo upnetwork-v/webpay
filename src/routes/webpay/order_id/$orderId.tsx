@@ -560,7 +560,7 @@ export default function PaymentPage() {
     <div className="bg-base-200 relative h-full overflow-auto">
       {shouldShowError ? (
         // Error state UI
-        (<div className="m-auto w-xs py-10">
+        <div className="m-auto w-xs py-10">
           <h1 className="text-5xl font-bold">
             {isBalanceError
               ? 'Insufficient Balance'
@@ -677,10 +677,10 @@ export default function PaymentPage() {
               Back to Payment
             </button>
           </div>
-        </div>)
+        </div>
       ) : (
         // Normal payment UI
-        (<div className="bg-base-300 flex h-full w-full items-center justify-center px-8 py-4 pb-8">
+        <div className="bg-base-300 flex h-full w-full items-center justify-center px-8 py-4 pb-8">
           <div className="min-w-xs">
             {orderConfirmed && <div className="paid-bg-gradient"></div>}
             <div className="my-10 flex flex-col gap-y-4 text-center">
@@ -786,7 +786,7 @@ export default function PaymentPage() {
               <GoogleLoginButton />
             )}
           </div>
-        </div>)
+        </div>
       )}
     </div>
   )

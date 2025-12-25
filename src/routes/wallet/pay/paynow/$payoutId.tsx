@@ -228,7 +228,7 @@ function PayNowPaymentComponent() {
               result.data !== null &&
               'transaction' in result.data &&
               typeof (result.data as { transaction?: unknown }).transaction ===
-              'string'
+                'string'
             ) {
               // Signature successful, broadcast transaction
               try {
@@ -375,7 +375,7 @@ function PayNowPaymentComponent() {
       // Real errors
       setError(
         'Payment failed: ' +
-        (err instanceof Error ? err.message : 'Unknown error')
+          (err instanceof Error ? err.message : 'Unknown error')
       )
       setStep('preview')
       setLoading(false)
@@ -436,8 +436,7 @@ function PayNowPaymentComponent() {
                 <span className="text-gray-400">In crypto</span>
                 <span className="font-bold text-white">
                   {(
-                    Number(payoutData.cryptoAmount || '0') /
-                    Math.pow(10, 6)
+                    Number(payoutData.cryptoAmount || '0') / Math.pow(10, 6)
                   ).toFixed(6)}{' '}
                   USDC
                 </span>
@@ -535,8 +534,7 @@ function PayNowPaymentComponent() {
                 <span className="text-gray-400">Token Amount</span>
                 <span className="font-semibold text-white">
                   {(
-                    Number(payoutData.cryptoAmount || '0') /
-                    Math.pow(10, 6)
+                    Number(payoutData.cryptoAmount || '0') / Math.pow(10, 6)
                   ).toFixed(6)}{' '}
                   USDC
                 </span>
@@ -661,8 +659,7 @@ function PayNowPaymentComponent() {
                 <span className="text-gray-400">Token Amount</span>
                 <span className="font-semibold text-white">
                   {(
-                    Number(payoutData.cryptoAmount || '0') /
-                    Math.pow(10, 6)
+                    Number(payoutData.cryptoAmount || '0') / Math.pow(10, 6)
                   ).toFixed(6)}{' '}
                   USDC
                 </span>
