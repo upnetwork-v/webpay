@@ -1,6 +1,6 @@
 import { createPayout, PayoutAPIError } from '@/api/payout'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 interface PayMongoInputSearchParams {
   entityValue: string
@@ -27,6 +27,10 @@ export const Route = createFileRoute('/wallet/pay/paymongo/')({
   },
 })
 
+// USDC/PHP exchange rate (approximately 0.017 USDC per 1 PHP)
+// In production, this should be fetched from a price oracle API
+const DEFAULT_USDC_PHP_RATE = 0.017
+
 function PayMongoInputPage() {
   const navigate = useNavigate()
   const search = Route.useSearch()
@@ -34,6 +38,48 @@ function PayMongoInputPage() {
   const [amount, setAmount] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [exchangeRate, setExchangeRate] = useState<number>(
+    DEFAULT_USDC_PHP_RATE
+  )
+  const [rateLoading, setRateLoading] = useState(true)
+
+  // Fetch exchange rate on mount (simulated - in production use real API)
+  useEffect(() => {
+    const fetchExchangeRate = async () => {
+      try {
+        setRateLoading(true)
+        // In a real implementation, this would call a price oracle API
+        // For now, we use a reasonable default rate
+        // const response = await fetch('...')
+        // const data = await response.json()
+        // setExchangeRate(data.rate)
+        setExchangeRate(DEFAULT_USDC_PHP_RATE)
+      } catch (err) {
+        console.warn('[PayMongoInput] Failed to fetch exchange rate:', err)
+        // Keep using default rate on error
+      } finally {
+        setRateLoading(false)
+      }
+    }
+    fetchExchangeRate()
+
+    // Refresh rate periodically (every 30 seconds)
+    const interval = setInterval(fetchExchangeRate, 30000)
+    return () => clearInterval(interval)
+  }, [])
+
+  // Calculate estimated USDC amount based on PHP input
+  const estimatedUSDC = useMemo(() => {
+    if (!amount || isNaN(parseFloat(amount))) return '0.000000'
+    const phpAmount = parseFloat(amount)
+    const usdcAmount = phpAmount * exchangeRate
+    return usdcAmount.toFixed(6)
+  }, [amount, exchangeRate])
+
+  // Format exchange rate display
+  const formatExchangeRate = useCallback(() => {
+    return exchangeRate.toFixed(6)
+  }, [exchangeRate])
 
   const handleContinue = async () => {
     // Minimum amount check (1 PHP based on requirements)
@@ -142,8 +188,29 @@ function PayMongoInputPage() {
               />
             </div>
           </div>
+
+          {/* USDC Estimate Display - like upnetwork-v2 */}
+          <div className="rounded-2xl bg-gray-800/50 p-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-500">
+                  <span className="text-xs font-bold text-white">$</span>
+                </div>
+                <span className="text-gray-300">USDC</span>
+              </div>
+              <span className="text-2xl font-light text-white">
+                {rateLoading ? (
+                  <span className="text-gray-500">Loading...</span>
+                ) : (
+                  estimatedUSDC
+                )}
+              </span>
+            </div>
+          </div>
+
+          {/* Exchange Rate Info */}
           <p className="text-center text-sm text-gray-500">
-            USDC amount will be calculated after order creation
+            1 PHP ≈ {formatExchangeRate()} USDC
           </p>
         </div>
 

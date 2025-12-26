@@ -308,6 +308,34 @@ function PayMongoPaymentComponent() {
       return
     }
 
+    // Check if order has expired before attempting payment (like upnetwork-v2)
+    const expiresAtTs = payoutData.orderExpiresAtTs
+      ? Number(payoutData.orderExpiresAtTs)
+      : payoutData.orderExpiresAt
+        ? Date.parse(payoutData.orderExpiresAt)
+        : undefined
+
+    if (expiresAtTs && Number.isFinite(expiresAtTs)) {
+      const nowTs = Date.now()
+      const timeRemaining = expiresAtTs - nowTs
+
+      // If already expired or about to expire within 30 seconds
+      if (timeRemaining <= 30000) {
+        setError(
+          'Payment order has expired. Please go back and create a new payment.'
+        )
+        setIsFailed(true)
+        return
+      }
+
+      // Warn if less than 5 minutes remaining
+      if (timeRemaining < 5 * 60 * 1000) {
+        console.warn(
+          `[PayMongo] Order expires in ${Math.round(timeRemaining / 1000)} seconds`
+        )
+      }
+    }
+
     setError('')
     setLoading(true)
     setStep('paying')
@@ -373,6 +401,12 @@ function PayMongoPaymentComponent() {
   // Format USDC amount (cryptoAmount is in smallest unit, 6 decimals)
   const formatUSDC = (amount: string) => {
     return `${(Number(amount) / Math.pow(10, 6)).toFixed(6)} USDC`
+  }
+
+  // Format chain name for display (e.g., 'SOLANA' -> 'Solana')
+  const formatChainName = (chain: string | undefined) => {
+    if (!chain) return 'Unknown'
+    return chain.charAt(0).toUpperCase() + chain.slice(1).toLowerCase()
   }
 
   // Success Page
@@ -545,7 +579,9 @@ function PayMongoPaymentComponent() {
               {/* Chain */}
               <div className="flex justify-between">
                 <span className="text-gray-400">Chain</span>
-                <span className="font-semibold text-white">Solana</span>
+                <span className="font-semibold text-white">
+                  {formatChainName(payoutData.cryptoChain)}
+                </span>
               </div>
 
               {/* Gas Fee */}
@@ -673,7 +709,9 @@ function PayMongoPaymentComponent() {
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-400">Chain</span>
-                <span className="font-semibold text-white">Solana</span>
+                <span className="font-semibold text-white">
+                  {formatChainName(payoutData.cryptoChain)}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-400">Gas Fee</span>
