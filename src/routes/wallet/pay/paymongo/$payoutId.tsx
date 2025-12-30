@@ -202,7 +202,7 @@ function PayMongoPaymentComponent() {
       }
       loadPayoutData()
     }
-  }, [payoutId, payoutData, navigate, isPhantomCallback])
+  }, [payoutId, navigate, isPhantomCallback])
 
   // Handle Phantom payment callback
   useEffect(() => {
