@@ -1,5 +1,5 @@
 import Logo from '@/assets/img/logo.svg'
-import GoogleLoginButton from '@/components/GoogleLoginButton'
+import PasskeyLoginButton from '@/components/PasskeyLoginButton'
 import { useAuthStore } from '@/stores'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useEffect } from 'react'
@@ -39,8 +39,8 @@ function Login() {
         <div className="max-w-md">
           <img src={Logo} alt="OntaPay" className="mx-auto mb-4 h-8" />
           <h1 className="mb-4 text-3xl font-bold">Welcome to OntaPay</h1>
-          <p className="mb-4 py-4">Please login to continue</p>
-          <GoogleLoginButton />
+          <p className="mb-4 py-4">Please login with Passkey to continue</p>
+          <PasskeyLoginButton />
         </div>
       </div>
     </div>

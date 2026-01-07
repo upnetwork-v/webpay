@@ -1,3 +1,4 @@
+import { AuthProvider } from '@/hooks/useAuthProvider'
 import { WalletProvider } from '@/wallets/provider/WalletProvider'
 import { RouterProvider, createRouter } from '@tanstack/react-router'
 import { StrictMode } from 'react'
@@ -20,9 +21,11 @@ if (!rootElement.innerHTML) {
   const root = ReactDOM.createRoot(rootElement)
   root.render(
     <StrictMode>
-      <WalletProvider>
-        <RouterProvider router={router} />
-      </WalletProvider>
+      <AuthProvider>
+        <WalletProvider>
+          <RouterProvider router={router} />
+        </WalletProvider>
+      </AuthProvider>
     </StrictMode>
   )
 }

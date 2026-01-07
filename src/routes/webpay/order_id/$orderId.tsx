@@ -1,9 +1,9 @@
 import { createOrder, getOrderById, getPreOrder } from '@/api/order'
 import CheckIcon from '@/assets/img/check.png'
 import Logo from '@/assets/img/logo.svg'
-import GoogleLoginButton from '@/components/GoogleLoginButton'
 import KYCStatus from '@/components/KYCStatus'
 import OrderDetailCard from '@/components/orderDetailCard'
+import PasskeyLoginButton from '@/components/PasskeyLoginButton'
 import { usePayment } from '@/hooks'
 import { useAuthStore } from '@/stores'
 import type { Order } from '@/types'
@@ -783,7 +783,7 @@ export default function PaymentPage() {
                 </div>
               ) : null
             ) : (
-              <GoogleLoginButton />
+              <PasskeyLoginButton />
             )}
           </div>
         </div>

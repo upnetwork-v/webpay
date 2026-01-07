@@ -351,6 +351,36 @@
     "@babel/helper-string-parser" "^7.27.1"
     "@babel/helper-validator-identifier" "^7.27.1"
 
+"@dfinity/agent@^3.4.3":
+  version "3.4.3"
+  resolved "https://registry.yarnpkg.com/@dfinity/agent/-/agent-3.4.3.tgz#c49ef43a59a753647daea5f7a55a168447369604"
+  integrity sha512-qOJqvZdMzncbbYX3eUjlAqvP66DQuOQgBFQE06yzI3m/lVXnefxvY7wE9Y1Sb2wjVIQs6W2rfjixnn4EEjHAZg==
+  dependencies:
+    "@dfinity/cbor" "^0.2.2"
+    "@noble/curves" "^1.9.2"
+
+"@dfinity/candid@^3.4.3":
+  version "3.4.3"
+  resolved "https://registry.yarnpkg.com/@dfinity/candid/-/candid-3.4.3.tgz#d383f6252de9a762ba115e741e5c8ed2e6433691"
+  integrity sha512-M2MuNariyCZHvxT0IXvMWmg8jvG19EORDveoFm7PCIVXLgYfWSy0P59t6tQ24D72yRGu40CRLm85aqpt3cRvxw==
+
+"@dfinity/cbor@^0.2.2":
+  version "0.2.2"
+  resolved "https://registry.yarnpkg.com/@dfinity/cbor/-/cbor-0.2.2.tgz#4f31f4f0c1aeb0c8179edd99625180a76a5b43e0"
+  integrity sha512-GPJpH73kDEKbUBdUjY80lz7cq9l0vm1h/7ppejPV6O0ZTqCLrYspssYvqjRmK4aNnJ/SKXsP0rg9LYX7zpegaA==
+
+"@dfinity/identity@^3.4.3":
+  version "3.4.3"
+  resolved "https://registry.yarnpkg.com/@dfinity/identity/-/identity-3.4.3.tgz#e910c16e44a18cc610d1dae201c0177ba2bbbdf6"
+  integrity sha512-mAsdmlaZPe7UkPL8AKNq7801pYve3LWnXQLOq39Nu+pzAUWRnZcKO3Ao+xouym5VnQnBwO68BnSSvQ044bEyTA==
+
+"@dfinity/principal@^3.4.3":
+  version "3.4.3"
+  resolved "https://registry.yarnpkg.com/@dfinity/principal/-/principal-3.4.3.tgz#19d40407098dad8521a11e7d50206a93f8702927"
+  integrity sha512-KTWIRqj/0clwsxcXnjgMVpnvxis6ji8vddRbBnYLsPjRFaVXHeBwVN1rziA1w3u7AtlP3kuovB4czd2F5ORxDw==
+  dependencies:
+    "@noble/hashes" "^1.8.0"
+
 "@emnapi/core@^1.4.3":
   version "1.4.3"
   resolved "https://registry.yarnpkg.com/@emnapi/core/-/core-1.4.3.tgz#9ac52d2d5aea958f67e52c40a065f51de59b77d6"
@@ -695,6 +725,13 @@
   version "1.9.1"
   resolved "https://registry.yarnpkg.com/@noble/curves/-/curves-1.9.1.tgz#9654a0bc6c13420ae252ddcf975eaf0f58f0a35c"
   integrity sha512-k11yZxZg+t+gWvBbIswW0yoJlu8cHOC7dhunwOzoWH/mXGBiYyR4YY6hAEK/3EUs4UpB8la1RfdRpeGsFHkWsA==
+  dependencies:
+    "@noble/hashes" "1.8.0"
+
+"@noble/curves@^1.9.2":
+  version "1.9.7"
+  resolved "https://registry.yarnpkg.com/@noble/curves/-/curves-1.9.7.tgz#79d04b4758a43e4bca2cbdc62e7771352fa6b951"
+  integrity sha512-gbKGcRUYIjA3/zCCNaWDciTMFI0dCkvou3TL8Zmy5Nc7sJ47a0jtOeZoTaMxkuqRo9cRhjOdZJXegxYE5FN/xw==
   dependencies:
     "@noble/hashes" "1.8.0"
 

@@ -1,43 +1,109 @@
-import { getUserInfo } from '@/api/auth'
-import type { AuthStore } from '@/types/auth'
+/**
+ * Authentication Store - Refactored for Passkey/ICP Identity
+ *
+ * This store integrates ICP identity management with authentication state.
+ * Replaces Google OAuth with Passkey-based authentication.
+ */
+
+import type { _SERVICE } from '@/libs/icp/service'
+import type { ActorSubclass } from '@dfinity/agent'
+import type { DelegationChain, DelegationIdentity } from '@dfinity/identity'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
 const AUTH_STORAGE_KEY = 'ontapay_auth'
 
+// User type (minimal version for now, will be populated from backend)
+export interface User {
+  badge: number
+  createdAt: string
+  id: string
+  inviteCode: string
+  principal_id: string
+  privilege: boolean
+  transaction_limit: string
+  transaction_total: string
+  updatedAt: string
+  username: string
+  verified: 0 | 1 | 2 | 3 // KYC status
+}
+
+// Auth state interface
+export interface AuthState {
+  // Existing fields
+  isAuthenticated: boolean
+  user: User | null
+  isLoading: boolean
+  error: string | null
+
+  // ICP Identity fields
+  identity: DelegationIdentity | null
+  identityId: string | null // username
+  delegationChain: DelegationChain | null
+  principalId: string | null
+  identityActor: ActorSubclass<_SERVICE> | null
+  anonymousActor: ActorSubclass<_SERVICE> | null
+
+  // Auth Token fields
+  authToken: string | null
+  authTokenExpiry: number | null
+}
+
+// Auth actions interface
+export interface AuthActions {
+  // State management
+  setLoading: (loading: boolean) => void
+  setError: (error: string | null) => void
+  clearError: () => void
+
+  // Identity management (to be called by login components)
+  setIdentity: (
+    identity: DelegationIdentity,
+    identityId: string,
+    delegationChain: DelegationChain,
+    identityActor: ActorSubclass<_SERVICE>
+  ) => void
+  setAnonymousActor: (actor: ActorSubclass<_SERVICE>) => void
+
+  // Auth token management
+  setAuthToken: (token: string, expiry: number) => void
+  clearAuthToken: () => void
+
+  // User management
+  setUser: (user: User) => void
+
+  // Logout
+  logout: () => void
+
+  // Check auth (utility)
+  checkAuth: () => boolean
+
+  // Initialize (restore from storage)
+  initialize: () => Promise<void>
+}
+
+export type AuthStore = AuthState & AuthActions
+
 export const useAuthStore = create<AuthStore>()(
   persist(
     (set, get) => ({
-      // State
+      // Initial State
       isAuthenticated: false,
-      authToken: null,
       user: null,
       isLoading: false,
       error: null,
 
+      identity: null,
+      identityId: null,
+      delegationChain: null,
+      principalId: null,
+      identityActor: null,
+      anonymousActor: null,
+
+      authToken: null,
+      authTokenExpiry: null,
+
       // Actions
-      login: async (token: string) => {
-        set({
-          isAuthenticated: true,
-          authToken: token,
-          isLoading: false,
-          error: null,
-        })
-
-        const user = await getUserInfo()
-        set({ user: user })
-      },
-
-      logout: () => {
-        set({
-          isAuthenticated: false,
-          authToken: null,
-          user: null,
-          isLoading: false,
-          error: null,
-        })
-      },
-
       setLoading: (loading: boolean) => {
         set({ isLoading: loading })
       },
@@ -46,65 +112,103 @@ export const useAuthStore = create<AuthStore>()(
         set({ error, isLoading: false })
       },
 
-      checkAuth: () => {
-        const { authToken, user } = get()
-        const isAuthenticated = !!(authToken && user)
-
-        if (isAuthenticated !== get().isAuthenticated) {
-          set({ isAuthenticated })
-        }
-
-        return isAuthenticated
-      },
-
       clearError: () => {
         set({ error: null })
       },
 
-      // 初始化方法：在 store 创建时自动调用
-      initialize: async () => {
-        const { authToken } = get()
+      setIdentity: (
+        identity: DelegationIdentity,
+        identityId: string,
+        delegationChain: DelegationChain,
+        identityActor: ActorSubclass<_SERVICE>
+      ) => {
+        const principalId = identity.getPrincipal().toString()
 
-        // 如果有 token 尝试获取用户信息
-        if (authToken) {
-          set({ isLoading: true })
-          try {
-            const user = await getUserInfo()
-            if (user) {
-              set({
-                user,
-                isAuthenticated: true,
-                isLoading: false,
-                error: null,
-              })
-            } else {
-              // 如果获取用户信息失败，清除认证状态
-              set({
-                isAuthenticated: false,
-                authToken: null,
-                user: null,
-                isLoading: false,
-                error: 'Failed to get user info',
-              })
-            }
-          } catch (error) {
-            console.error('Failed to initialize auth:', error)
-            set({
-              isAuthenticated: false,
-              authToken: null,
-              user: null,
-              isLoading: false,
-              error: 'Failed to initialize auth',
-            })
-          }
+        set({
+          identity,
+          identityId,
+          delegationChain,
+          principalId,
+          identityActor,
+          isAuthenticated: true,
+          error: null,
+        })
+      },
+
+      setAnonymousActor: (actor: ActorSubclass<_SERVICE>) => {
+        set({ anonymousActor: actor })
+      },
+
+      setAuthToken: (token: string, expiry: number) => {
+        set({
+          authToken: token,
+          authTokenExpiry: expiry,
+        })
+      },
+
+      clearAuthToken: () => {
+        set({
+          authToken: null,
+          authTokenExpiry: null,
+        })
+      },
+
+      setUser: (user: User) => {
+        set({ user })
+      },
+
+      logout: () => {
+        // Clear all auth state
+        set({
+          isAuthenticated: false,
+          identity: null,
+          identityId: null,
+          delegationChain: null,
+          principalId: null,
+          identityActor: null,
+          authToken: null,
+          authTokenExpiry: null,
+          user: null,
+          isLoading: false,
+          error: null,
+        })
+
+        // Clear localStorage
+        localStorage.removeItem('siwp_identity')
+        localStorage.removeItem('auth_token')
+        localStorage.removeItem('auth_token_expiry')
+      },
+
+      checkAuth: () => {
+        const { identityId, identityActor, authToken } = get()
+        const isAuth = !!(identityId && identityActor && authToken)
+
+        const currentIsAuth = get().isAuthenticated
+        if (isAuth !== currentIsAuth) {
+          set({ isAuthenticated: isAuth })
+        }
+
+        return isAuth
+      },
+
+      initialize: async () => {
+        // This is called on app startup
+        // The actual identity loading is done by useSIWPIdentity hook
+        // This just checks the state
+        const { identityId, identityActor } = get()
+        if (identityId && identityActor) {
+          set({ isAuthenticated: true })
         }
       },
     }),
     {
       name: AUTH_STORAGE_KEY,
       partialize: (state) => ({
+        // Only persist minimal state
+        // Identity and tokens are managed by their respective hooks
         isAuthenticated: state.isAuthenticated,
-        authToken: state.authToken,
+        identityId: state.identityId,
+        principalId: state.principalId,
         user: state.user,
       }),
     }

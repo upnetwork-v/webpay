@@ -8,8 +8,6 @@ export interface User {
    */
   badge: number
   createdAt: string
-  google_email: string
-  google_id: string
   id: string
   inviteCode: string
   principal_id: string
